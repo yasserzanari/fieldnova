@@ -80,7 +80,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 ### C. Sol et santé des sols — 21 à 30
 
 21. **[P0] Profil de sol avec inconnues explicites** : texture, profondeur utile, drainage, matière organique et pH ne sont jamais remplis par défaut.
-22. **[P0] Import d’une analyse de sol** : saisir ou joindre une analyse de laboratoire avec date, profondeur, unité et laboratoire.
+22. **[Livrée — CSV] Import d’une analyse de sol** : lire localement un CSV UTF-8 avec intervalles en centimètres, aperçu révocable, validation des plages et métadonnées de laboratoire/date conservées au niveau des horizons. L’origine des caractéristiques générales déjà saisies n’est pas remplacée. Le profil n’est modifié qu’après application de l’aperçu et enregistrement explicite. Les PDF et images ne sont pas encore analysés.
 23. **[P0] Étiquette de fiabilité par champ** : « mesuré », « déclaré », « produit satellite/modèle », « estimé » ou « inconnu ».
 24. **[Livrée] Vue des horizons du sol** : saisir jusqu’à cinq couches de 0 à 400 cm, leurs textures/pH/matière organique connus, et distinguer les intervalles manquants ainsi que la profondeur sous la dernière couche comme non documentés. Provenance déclarée partagée avec le profil local.
 25. **[P1] Indicateurs de santé du sol définis** : expliquer chaque indicateur, sa méthode et les données requises avant de le calculer.

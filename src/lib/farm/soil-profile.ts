@@ -9,6 +9,9 @@ export type SoilHorizon = {
   texture?: SoilTexture
   ph?: number
   organicMatterPercent?: number
+  sourceType?: SoilSourceType
+  sourceName?: string
+  sampleDate?: string
 }
 export const soilSourceLabels: Record<SoilSourceType, string> = {
   'farmer-reported': 'déclaration de l’exploitation',
@@ -93,6 +96,9 @@ export function validateSoilHorizons(horizons: SoilHorizon[]) {
     if (horizon.texture !== undefined && !isOneOf(horizon.texture, ['sandy', 'loamy', 'clayey', 'unknown'])) return `Horizon ${index + 1} : texture invalide.`
     if (horizon.ph !== undefined && !isInRange(horizon.ph, 0, 14)) return `Horizon ${index + 1} : pH hors plage (0 à 14).`
     if (horizon.organicMatterPercent !== undefined && !isInRange(horizon.organicMatterPercent, 0, 100)) return `Horizon ${index + 1} : matière organique hors plage (0 à 100 %).`
+    if (horizon.sourceType !== undefined && !isOneOf(horizon.sourceType, ['farmer-reported', 'lab-analysis', 'other-source'])) return `Horizon ${index + 1} : origine invalide.`
+    if (horizon.sourceName !== undefined && (typeof horizon.sourceName !== 'string' || horizon.sourceName.length > 120)) return `Horizon ${index + 1} : la référence de source ne peut pas dépasser 120 caractères.`
+    if (horizon.sampleDate !== undefined && !isIsoDate(horizon.sampleDate)) return `Horizon ${index + 1} : date d’échantillon invalide.`
   }
   return ''
 }
@@ -123,6 +129,9 @@ function readHorizons(value: unknown): SoilHorizon[] | undefined {
       texture: isOneOf(source.texture, ['sandy', 'loamy', 'clayey', 'unknown']) ? source.texture : undefined,
       ph: isInRange(source.ph, 0, 14) ? source.ph : undefined,
       organicMatterPercent: isInRange(source.organicMatterPercent, 0, 100) ? source.organicMatterPercent : undefined,
+      sourceType: isOneOf(source.sourceType, ['farmer-reported', 'lab-analysis', 'other-source']) ? source.sourceType : undefined,
+      sourceName: typeof source.sourceName === 'string' ? source.sourceName.slice(0, 120) : undefined,
+      sampleDate: isIsoDate(source.sampleDate) ? source.sampleDate : undefined,
     }]
   })
   return horizons.length && !validateSoilHorizons(horizons) ? horizons : undefined

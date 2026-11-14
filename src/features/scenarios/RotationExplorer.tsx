@@ -34,6 +34,10 @@ function soilSummary(profile: FarmSoilProfile) {
   return labels
 }
 
+function hasGeneralSoilValues(profile: FarmSoilProfile) {
+  return profile.texture !== undefined || profile.ph !== undefined || profile.organicMatterPercent !== undefined || profile.effectiveDepthCm !== undefined || profile.drainage !== undefined
+}
+
 function sameMonthReference(records: PowerMonthlyRecord[], current: PowerMonthlyRecord | undefined, field: 'precipitationMmPerDay' | 'temperatureC' | 'rootZoneWetness', unit: string) {
   if (!current) return 'Repère indisponible'
   const month = current.date.slice(-2)
@@ -103,6 +107,7 @@ export function RotationExplorer() {
   const leaders = topRotations(currentWorkspace.plans, currentWorkspace.priority)
   const soil = soilState.pointKey === pointKey ? soilState.value : readSoilProfile(location)
   const soilValues = soilSummary(soil)
+  const soilHasGeneralValues = hasGeneralSoilValues(soil)
   const changeWorkspace = (update: (value: RotationWorkspace) => RotationWorkspace) => {
     setWorkspace(current => ({ pointKey, value: { ...update(current.pointKey === pointKey ? current.value : readRotationWorkspace(location)), isExample: false } }))
   }
@@ -165,13 +170,16 @@ export function RotationExplorer() {
       `- Matière organique déclarée : ${soil.organicMatterPercent === undefined ? 'inconnue' : `${soil.organicMatterPercent.toLocaleString('fr-FR')} %`}.`,
       `- Profondeur utile déclarée : ${soil.effectiveDepthCm === undefined ? 'inconnue' : `${soil.effectiveDepthCm} cm`}.`,
       `- Drainage déclaré : ${soil.drainage && soil.drainage !== 'unknown' ? ({ poor: 'lent', moderate: 'modéré', good: 'rapide' } as const)[soil.drainage] : 'inconnu'}.`,
-      `- Origine déclarée : ${soilValues.length ? `${soilSourceLabels[soil.sourceType ?? 'farmer-reported']} (non vérifiée)` : 'aucune donnée de sol renseignée; origine inconnue'}.`,
-      `- Référence déclarée : ${soilValues.length ? soil.sourceName || 'non précisée' : 'non applicable'}.`,
-      `- Date d’échantillon ou d’observation : ${soilValues.length ? soil.sampleDate || 'non précisée' : 'non applicable'}.`,
+      `- Origine déclarée des caractéristiques générales : ${soilHasGeneralValues ? `${soilSourceLabels[soil.sourceType ?? 'farmer-reported']} (non vérifiée)` : 'aucune caractéristique générale renseignée'}.`,
+      `- Référence des caractéristiques générales : ${soilHasGeneralValues ? soil.sourceName || 'non précisée' : 'non applicable'}.`,
+      `- Date des caractéristiques générales : ${soilHasGeneralValues ? soil.sampleDate || 'non précisée' : 'non applicable'}.`,
       `- Enregistré localement le : ${soil.updatedAt ? new Date(soil.updatedAt).toLocaleDateString('fr-FR') : 'aucune date enregistrée'}.`,
       ...(soil.horizons?.length ? soil.horizons.map((horizon, index) => {
         const texture = horizon.texture && horizon.texture !== 'unknown' ? ({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[horizon.texture] : 'inconnue'
-        return `- Horizon ${index + 1} · ${horizon.topCm}–${horizon.bottomCm} cm : texture ${texture}; pH ${horizon.ph === undefined ? 'inconnu' : horizon.ph.toLocaleString('fr-FR')}; matière organique ${horizon.organicMatterPercent === undefined ? 'inconnue' : `${horizon.organicMatterPercent.toLocaleString('fr-FR')} %`}.`
+        const sourceType = horizon.sourceType ?? soil.sourceType ?? 'farmer-reported'
+        const sourceName = horizon.sourceName ?? soil.sourceName
+        const sampleDate = horizon.sampleDate ?? soil.sampleDate
+        return `- Horizon ${index + 1} · ${horizon.topCm}–${horizon.bottomCm} cm : texture ${texture}; pH ${horizon.ph === undefined ? 'inconnu' : horizon.ph.toLocaleString('fr-FR')}; matière organique ${horizon.organicMatterPercent === undefined ? 'inconnue' : `${horizon.organicMatterPercent.toLocaleString('fr-FR')} %`}; origine déclarée ${soilSourceLabels[sourceType]}${sourceName ? ` · ${sourceName}` : ''}; date ${sampleDate || 'non précisée'} (non vérifiée).`
       }) : ['- Aucun horizon local détaillé n’est renseigné.']),
       '- Les profondeurs non couvertes par les horizons déclarés restent inconnues.',
     ]
@@ -237,7 +245,7 @@ export function RotationExplorer() {
       <span className="rotation-map-hint">Cliquez pour déplacer le point suivi · les profils et séries suivent la position sélectionnée</span>
 
       <aside className="rotation-context-panel rotation-context-left" aria-label="Contexte du sol local et du climat NASA">
-        <header className="rotation-panel-heading"><span className="rotation-panel-icon soil"><Sprout size={15} /></span><span><strong>Sol local</strong><small>{soilValues.length ? `Origine déclarée : ${soilSourceLabels[soil.sourceType ?? 'farmer-reported']}` : 'Aucune donnée renseignée'}</small></span></header>
+        <header className="rotation-panel-heading"><span className="rotation-panel-icon soil"><Sprout size={15} /></span><span><strong>Sol local</strong><small>{soilHasGeneralValues ? `Origine déclarée : ${soilSourceLabels[soil.sourceType ?? 'farmer-reported']}` : soil.horizons?.length ? 'Origine propre à chaque horizon' : 'Aucune donnée renseignée'}</small></span></header>
         {soilValues.length ? <ul className="rotation-soil-list">{soilValues.map(value => <li key={value}>{value}</li>)}</ul> : <p className="rotation-context-empty">Aucune caractéristique de sol n’est renseignée pour ce point.</p>}
         <Link to="/app/terrain" className="rotation-context-link">Renseigner le profil du sol <ArrowUpRight size={12} /></Link>
         <div className="rotation-parcel-card">
