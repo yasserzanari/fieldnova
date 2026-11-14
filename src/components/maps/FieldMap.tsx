@@ -36,6 +36,16 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
   const parcelLabel = parcel ? ` Limite affichée : ${parcel.feature.properties?.name ?? 'parcelle importée'}, environ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} hectares.` : ''
   const gridCellLabel = powerGridCell ? ` Maille météo NASA POWER indiquée par un contour vert discontinu, environ ${Math.round(powerGridCell.properties.widthKm)} par ${Math.round(powerGridCell.properties.heightKm)} km.` : ''
   const mapLabel = `${ariaLabel}.${parcelLabel}${gridCellLabel}`
+  const legendItems = [
+    ...(baseLayer === 'nasa' ? [{ id: 'truecolor', label: `MODIS Terra · composition couleur · ${imageryDate}`, detail: 'Image composite; pas une mesure unique.' }] : []),
+    ...(showNdvi ? [{ id: 'ndvi', label: `NDVI MODIS Terra · composite 8 jours · ${imageryDate}`, detail: 'Indice sans unité · palette et gamme NASA GIBS.', legendUrl: 'https://gibs.earthdata.nasa.gov/legends/MODIS_NDVI_H.svg' }] : []),
+    ...(showSurfaceSoil ? [{ id: 'surface', label: 'SMAP L4 · humidité de surface · ~9 km', detail: 'Humidité volumétrique · date du produit non récupérée.', legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
+    ...(showRootSoil ? [{ id: 'root', label: 'SMAP L4 · humidité zone racinaire · ~9 km', detail: 'Humidité volumétrique · date du produit non récupérée.', legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
+    ...(powerGridCell ? [{ id: 'power', label: 'Maille NASA POWER', detail: `≈ ${Math.round(powerGridCell.properties.widthKm)} × ${Math.round(powerGridCell.properties.heightKm)} km · contour vert discontinu; pas une parcelle.` }] : []),
+    ...(parcel ? [{ id: 'parcel', label: parcel.feature.properties?.name ?? 'Parcelle importée', detail: `Contour saisi/importé · ≈ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} ha.` }] : []),
+    ...(baseLayer === 'streets' && !showNdvi && !showSurfaceSoil && !showRootSoil ? [{ id: 'osm', label: 'Fond de rues · OpenStreetMap', detail: '© OpenStreetMap contributors.' }] : []),
+  ]
+  const hasNasaLayers = legendItems.some(item => item.id === 'truecolor' || item.id === 'ndvi' || item.id === 'surface' || item.id === 'root')
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const onSelectRef = useRef(onPointSelect)
@@ -214,9 +224,13 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
 
   return <div className={`field-map-shell ${className}`}>
     <div ref={containerRef} className="field-map" role="application" aria-label={mapLabel} />
-    {powerGridCell && <div className="field-map-power-legend" aria-label={`Maille météorologique NASA POWER, environ ${Math.round(powerGridCell.properties.widthKm)} par ${Math.round(powerGridCell.properties.heightKm)} kilomètres`}>
-      <span className="field-map-power-swatch" aria-hidden="true" />
-      <span><strong>Maille météo · NASA POWER</strong><small>≈ {Math.round(powerGridCell.properties.widthKm)} × {Math.round(powerGridCell.properties.heightKm)} km · point séparé</small></span>
-    </div>}
+    <aside className="field-map-layer-legend" aria-label="Légende des couches visibles">
+      <strong className="field-map-layer-legend-title">Couches visibles</strong>
+      {legendItems.map(item => <div className={`field-map-legend-item legend-${item.id}`} key={item.id}>
+        <span className="field-map-legend-swatch" aria-hidden="true" />
+        <span className="field-map-legend-copy"><strong>{item.label}</strong><small>{item.detail}</small>{'legendUrl' in item && <img src={item.legendUrl} alt={`Échelle de couleurs NASA GIBS · ${item.label}`} loading="lazy" />}</span>
+      </div>)}
+      <small className="field-map-legend-attribution">{hasNasaLayers ? 'NASA EOSDIS GIBS · couches régionales, pas des mesures de parcelle.' : 'Fond OpenStreetMap · attribution affichée sur la carte.'}</small>
+    </aside>
   </div>
 }

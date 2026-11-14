@@ -70,8 +70,8 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 11. **[P0] Limite de parcelle dessinable ou importable** : GeoJSON en priorité, avec validation de géométrie et superficie calculée.
 12. **[P0 · LIVRÉ] Empreinte de la maille météo NASA sur la carte** : afficher le centre, les limites MERRA-2 (0,5° × 0,625°) et la taille approximative, séparément du point cliqué, des couches GIBS/SMAP et du polygone agricole. Le centre est dérivé de la grille native, car la géométrie de réponse POWER reprend la coordonnée demandée.
-13. **[P0] Fiche de provenance au clic** : mission ou produit, variable, période, résolution, date de récupération et lien de source.
-14. **[P0] Légende permanente des couches** : expliquer unités, gamme de couleurs et limites de lecture de chaque couche active.
+13. **[LIVRÉ · PARTIEL] Fiche de provenance au clic** : l’onglet Données & confiance expose la source POWER renvoyée, la date de récupération, la grille, les produits GIBS sélectionnés et leurs liens de citation. Les tuiles GIBS SMAP ne fournissent pas encore leur date de produit à l’interface.
+14. **[LIVRÉ · PARTIEL] Légende persistante des couches** : la carte partagée présente les couches visibles, les unités ou échelles publiées par GIBS, les dates connues et les limites de grille/parcelle. Les détails spécifiques de chaque couche continuent d’être améliorés.
 15. **[P1] Chronologie des observations** : faire défiler la série historique sans confondre date d’observation et date de téléchargement.
 16. **[P1] Historique NDVI par point** : afficher un signal de végétation avec la date et la cadence réelle du produit GIBS sélectionné.
 17. **[P1] Humidité de surface et racinaire SMAP** : distinguer clairement le produit cartographique SMAP des variables NASA POWER.
@@ -146,7 +146,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 ### H. Validité, confiance et qualité des données — 71 à 80
 
-71. **[P0] Registre des sources utilisé dans le calcul** : nom exact du jeu, produit, variable, période, résolution et URL.
+71. **[LIVRÉ · PARTIEL] Registre des sources et méthode** : registre suivi avec produits, paramètres, périodes, résolutions, liens et limites pour les sources actuelles; chaque vue ne référence pas encore tous les détails propres à chaque requête.
 72. **[P0] Fiche de méthode du classement** : formule ou règles visibles, unités et exemples reproductibles.
 73. **[P0] Séparation entre observation, modèle et saisie utilisateur** : aucune mesure satellite ne se fait passer pour une analyse de sol.
 74. **[P0] Dates et valeurs manquantes auditables** : l’application précise les mois complets et les périodes exclues.
