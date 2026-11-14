@@ -1,0 +1,15 @@
+# Private working documentation stays local and is never pushed.
+/docs/
+
+# Dependencies and local build output
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+
+# Editor and operating system files
+.DS_Store
+.vscode/
+.idea/
