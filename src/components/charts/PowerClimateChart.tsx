@@ -21,9 +21,10 @@ function finite(values: Array<number | undefined>) {
 export function PowerClimateChart({ records, source, mode = 'climate', title, months = 12 }: Props) {
   const visible = records.slice(-months).map(record => ({ ...record, month: formatPowerMonth(record.date) }))
   const isSoil = mode === 'soil'
-  const allValues = finite(visible.map(row => isSoil ? (row.rootZoneWetness ?? row.surfaceSoilWetness) : row.precipitationMmPerDay))
+  const allValues = finite(visible.map(row => isSoil ? row.rootZoneWetness : row.precipitationMmPerDay))
+  const surfaceValues = finite(visible.map(row => row.surfaceSoilWetness))
   const tempValues = finite(visible.map(row => row.temperatureC))
-  const hasData = allValues.length > 0 || (!isSoil && tempValues.length > 0)
+  const hasData = isSoil ? allValues.length > 0 || surfaceValues.length > 0 : allValues.length > 0 || tempValues.length > 0
   const latest = [...visible].reverse().find(row => isSoil ? row.rootZoneWetness !== undefined || row.surfaceSoilWetness !== undefined : row.precipitationMmPerDay !== undefined || row.temperatureC !== undefined)
   const valueMax = isSoil ? 100 : Math.max(1, Math.ceil((Math.max(...allValues, 0) * 1.15) * 2) / 2)
   const tempMin = tempValues.length ? Math.floor(Math.min(...tempValues) / 5) * 5 : 0
@@ -55,8 +56,8 @@ export function PowerClimateChart({ records, source, mode = 'climate', title, mo
         return <g key={fraction}><line x1={LEFT} x2={RIGHT} y1={y} y2={y} className="power-chart-gridline" /><text x={LEFT - 7} y={y + 3} className="power-chart-tick" textAnchor="end">{isSoil ? `${Math.round(value)}%` : Number(value.toFixed(1))}</text>{!isSoil && <text x={RIGHT + 7} y={y + 3} className="power-chart-tick" textAnchor="start">{(tempMin + fraction * (tempMax - tempMin)).toFixed(0)}°</text>}{index === 0 && <title>NASA POWER</title>}</g>
       })}
       {isSoil ? <>
-        <path d={`${linePath(valuePoints)} L ${valuePoints[valuePoints.length - 1]?.x ?? RIGHT} ${BOTTOM} L ${valuePoints[0]?.x ?? LEFT} ${BOTTOM} Z`} className="power-chart-soil-area" />
-        <path d={linePath(valuePoints)} className="power-chart-soil-line" />
+        {valuePoints.length > 0 && <path d={`${linePath(valuePoints)} L ${valuePoints[valuePoints.length - 1].x} ${BOTTOM} L ${valuePoints[0].x} ${BOTTOM} Z`} className="power-chart-soil-area" />}
+        {valuePoints.length > 1 && <path d={linePath(valuePoints)} className="power-chart-soil-line" />}
         {valuePoints.map(point => <circle key={point.date} cx={point.x} cy={point.y} r="2.5" className="power-chart-soil-dot"><title>{point.month} · GWETROOT {point.value.toFixed(1)} % (modélisé)</title></circle>)}
         {surfacePoints.length > 1 && <path d={linePath(surfacePoints)} className="power-chart-surface-line" />}
         {surfacePoints.map(point => <circle key={point.date} cx={point.x} cy={point.y} r="2.4" className="power-chart-surface-dot"><title>{point.month} · GWETTOP {(point.value * 100).toFixed(1)} % (modélisé)</title></circle>)}
