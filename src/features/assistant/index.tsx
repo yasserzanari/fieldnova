@@ -324,6 +324,15 @@ export function AssistantPage() {
   const soilValue = latest?.rootZoneWetness
   const imageryDate = recentImageryDate()
   const imageDateLabel = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${imageryDate}T12:00:00Z`))
+  const suggestedQuestions = [
+    ...(latest?.precipitationMmPerDay !== undefined ? [{ label: 'Pluie du mois', question: 'Quelle est la pluie mensuelle NASA POWER ?' }] : []),
+    ...(latest?.temperatureC !== undefined ? [{ label: 'Température', question: 'Que montrent les températures mensuelles NASA POWER ?' }] : []),
+    ...(latest?.rootZoneWetness !== undefined || latest?.surfaceSoilWetness !== undefined ? [{ label: 'Humidité modélisée', question: 'Explique l’humidité du sol observée pour ce point.' }] : []),
+    [{ label: layer === 'ndvi' ? 'Limites du NDVI' : 'Voir le NDVI', question: layer === 'ndvi' ? 'Explique les limites du NDVI affiché.' : 'Affiche le NDVI et explique ses limites.' }],
+    { label: 'Profil de sol', question: 'Lis mon profil de sol pour ce point.' },
+    { label: 'Profil de ferme', question: 'Résume mon profil de ferme et mes contraintes d’eau.' },
+    { label: 'Mes rotations', question: 'Compare mes rotations pour ce point.' },
+  ].flat()
 
   return (
     <section className="assistant-workspace" aria-label="Assistant agricole et carte NASA interactive">
@@ -349,14 +358,9 @@ export function AssistantPage() {
             </div>
           </article>)}
         </div>
-        <div className="assistant-suggestions" aria-label="Questions suggérées">
+        <div className="assistant-suggestions" aria-label="Questions suggérées selon les données disponibles">
           <span>Essayer</span>
-          <button type="button" onClick={() => handleSend('Quelle est la pluie mensuelle NASA POWER ?', [])}>Pluie du mois <ChevronDown size={12} /></button>
-          <button type="button" onClick={() => handleSend('Que montre l’humidité racinaire ?', [])}>Humidité du sol <ChevronDown size={12} /></button>
-          <button type="button" onClick={() => handleSend('Affiche le NDVI et explique ses limites.', [])}>Voir le NDVI <ChevronDown size={12} /></button>
-          <button type="button" onClick={() => handleSend('Lis mon profil de sol pour ce point.', [])}>Mon profil de sol <ChevronDown size={12} /></button>
-          <button type="button" onClick={() => handleSend('Résume mon profil de ferme et mes contraintes d’eau.', [])}>Profil de ferme <ChevronDown size={12} /></button>
-          <button type="button" onClick={() => handleSend('Compare mes rotations pour ce point.', [])}>Mes rotations <ChevronDown size={12} /></button>
+          {suggestedQuestions.map(item => <button type="button" key={item.label} onClick={() => handleSend(item.question, [])}>{item.label} <ChevronDown size={12} /></button>)}
         </div>
         <div className="assistant-composer-wrap">
           <LiquidMultimodalInput className="assistant-composer" defaultModel="fast" placeholder="Demandez à propos des données NASA…" maxHeight={110} onSubmit={handleSend} />
