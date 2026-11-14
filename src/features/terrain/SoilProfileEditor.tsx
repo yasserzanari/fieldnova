@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Layers3, Pencil, Save, Trash2, X } from 'lucide-react'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { Download, FileSpreadsheet, Layers3, Pencil, Save, Trash2, Upload, X } from 'lucide-react'
 import type { GeoPoint } from '../../lib/geo/location'
 import { clearSoilProfile, readSoilProfile, soilSourceLabels, validateSoilHorizons, type FarmSoilProfile, type SoilHorizon, writeSoilProfile } from '../../lib/farm/soil-profile'
+import { parseSoilAnalysisCsv, soilAnalysisCsvTemplate, type SoilAnalysisCsvImport } from '../../lib/farm/soil-analysis-csv'
 
 const textureLabels = { sandy: 'Sableux', loamy: 'Limoneux', clayey: 'Argileux', unknown: 'Inconnu' } as const
 const drainageLabels = { poor: 'Lent', moderate: 'Modéré', good: 'Rapide', unknown: 'Inconnu' } as const
+type SoilCsvPreview = SoilAnalysisCsvImport & { fileName: string }
 
 function decimal(value: number) {
   return value.toLocaleString('fr-FR', { maximumFractionDigits: 1 })
@@ -15,7 +17,11 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
   const [draft, setDraft] = useState<FarmSoilProfile>({})
   const [open, setOpen] = useState(false)
   const [error, setError] = useState('')
+  const [csvError, setCsvError] = useState('')
+  const [csvPreview, setCsvPreview] = useState<SoilCsvPreview>()
+  const [appliedImportFile, setAppliedImportFile] = useState('')
   const dialogRef = useRef<HTMLDialogElement>(null)
+  const csvInputRef = useRef<HTMLInputElement>(null)
   const locationKey = `${point.latitude.toFixed(4)},${point.longitude.toFixed(4)}`
 
   useEffect(() => {
@@ -33,6 +39,9 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
   const edit = () => {
     setDraft({ ...profile, horizons: profile.horizons?.map(horizon => ({ ...horizon })) ?? [] })
     setError('')
+    setCsvError('')
+    setCsvPreview(undefined)
+    setAppliedImportFile('')
     setOpen(true)
   }
 
@@ -68,8 +77,8 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
     }
   }
 
-  const hasProfile = profile.texture !== undefined || profile.ph !== undefined || profile.organicMatterPercent !== undefined || profile.effectiveDepthCm !== undefined || profile.drainage !== undefined
-    || Boolean(profile.horizons?.length)
+  const hasGeneralProfile = profile.texture !== undefined || profile.ph !== undefined || profile.organicMatterPercent !== undefined || profile.effectiveDepthCm !== undefined || profile.drainage !== undefined
+  const hasProfile = hasGeneralProfile || Boolean(profile.horizons?.length)
   const hasDraftValue = draft.texture !== undefined || draft.ph !== undefined || draft.organicMatterPercent !== undefined || draft.effectiveDepthCm !== undefined || draft.drainage !== undefined
     || Boolean(draft.horizons?.length)
   const soilSummary = [
@@ -98,16 +107,54 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
 
   const removeHorizon = (index: number) => setDraft(value => ({ ...value, horizons: (value.horizons ?? []).filter((_, horizonIndex) => horizonIndex !== index) }))
 
+  const readCsvFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    setCsvPreview(undefined)
+    setAppliedImportFile('')
+    if (!file.name.toLocaleLowerCase('fr').endsWith('.csv')) return setCsvError('Sélectionnez un fichier .csv. Les PDF et photos ne sont pas analysés.')
+    if (!file.size || file.size > 1_000_000) return setCsvError('Le fichier doit contenir des données et ne pas dépasser 1 Mo.')
+    try {
+      const parsed = parseSoilAnalysisCsv(await file.text())
+      if (!parsed.valid) return setCsvError(parsed.error)
+      setCsvError('')
+      setCsvPreview({ ...parsed.value, fileName: file.name })
+    } catch {
+      setCsvError('Lecture du fichier impossible. Vérifiez qu’il s’agit bien d’un CSV en texte brut.')
+    }
+  }
+
+  const applyCsvPreview = () => {
+    if (!csvPreview) return
+    setDraft(value => ({
+      ...value,
+      horizons: csvPreview.horizons.map(horizon => ({ ...horizon })),
+    }))
+    setAppliedImportFile(csvPreview.fileName)
+    setCsvPreview(undefined)
+    setCsvError('')
+  }
+
+  const downloadCsvTemplate = () => {
+    const url = URL.createObjectURL(new Blob([soilAnalysisCsvTemplate()], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'modele-analyse-de-sol.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return <>
     <div className={`terrain-profile-missing ${hasProfile ? 'has-user-profile' : ''}`}>
       <span className="terrain-profile-icon"><Layers3 size={16} /></span>
       <span className="terrain-profile-copy">
-        <strong>{hasProfile ? profile.sourceType === 'lab-analysis' ? 'Analyse de laboratoire déclarée' : 'Profil de sol déclaré par vous' : 'Texture, pH et matière organique'}</strong>
+        <strong>{hasProfile ? !hasGeneralProfile && profile.horizons?.length ? 'Profil de sol par horizons' : profile.sourceType === 'lab-analysis' ? 'Analyse de laboratoire déclarée' : 'Profil de sol déclaré par vous' : 'Texture, pH et matière organique'}</strong>
         <small>{hasProfile ? [soilSummary.join(' · '), profile.sourceName, profile.sampleDate ? `Échantillon du ${new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${profile.sampleDate}T12:00:00Z`))}` : undefined].filter(Boolean).join(' · ') || 'Profil enregistré, champs encore inconnus.' : 'Aucune analyse ou mesure locale enregistrée pour ce point.'}</small>
       </span>
       <button className="terrain-profile-edit" type="button" onClick={edit} aria-label={hasProfile ? 'Modifier le profil de sol local' : 'Renseigner le profil de sol local'}><Pencil size={13} /><span>{hasProfile ? 'Modifier' : 'Renseigner'}</span></button>
     </div>
-    {profile.horizons?.length ? <SoilHorizonVisual horizons={profile.horizons} /> : null}
+    {profile.horizons?.length ? <SoilHorizonVisual horizons={profile.horizons} defaultSourceType={profile.sourceType} defaultSourceName={profile.sourceName} defaultSampleDate={profile.sampleDate} /> : null}
     {profile.updatedAt && <p className="terrain-profile-date">Enregistré localement · {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(profile.updatedAt))} · Origine déclarée : {soilSourceLabels[profile.sourceType ?? 'farmer-reported']} (non vérifiée)</p>}
 
     <dialog ref={dialogRef} className="terrain-soil-dialog" aria-labelledby="soil-profile-title" onClose={() => setOpen(false)} onClick={event => { if (event.target === dialogRef.current) setOpen(false) }}>
@@ -121,7 +168,22 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
           <label>Profondeur utile (cm)<input type="number" min="0" max="400" step="1" inputMode="numeric" placeholder="Ex. 90" value={draft.effectiveDepthCm ?? ''} onChange={event => setDraft(value => ({ ...value, effectiveDepthCm: event.target.value === '' ? undefined : Number(event.target.value) }))} /></label>
           <label className="terrain-soil-field-wide">Drainage<select value={draft.drainage ?? ''} onChange={event => setDraft(value => ({ ...value, drainage: (event.target.value || undefined) as FarmSoilProfile['drainage'] }))}><option value="">Non renseigné</option><option value="poor">Lent</option><option value="moderate">Modéré</option><option value="good">Rapide</option><option value="unknown">Inconnu</option></select></label>
           <section className="terrain-horizon-editor terrain-soil-field-wide" aria-label="Horizons de sol déclarés">
-            <header><span><strong>Composition par profondeur</strong><small>Ajoutez uniquement les couches décrites par votre relevé ou analyse.</small></span><button type="button" onClick={addHorizon} disabled={(draft.horizons?.length ?? 0) >= 5}>Ajouter un horizon</button></header>
+            <header><span><strong>Composition par profondeur</strong><small>Ajoutez uniquement les couches décrites par votre relevé ou analyse.</small></span></header>
+            <div className="terrain-horizon-import-actions">
+              <button type="button" onClick={() => csvInputRef.current?.click()}><Upload size={12} />Importer CSV</button>
+              <button type="button" onClick={downloadCsvTemplate}><Download size={12} />Modèle CSV</button>
+              <button type="button" onClick={addHorizon} disabled={(draft.horizons?.length ?? 0) >= 5}>Ajouter un horizon</button>
+            </div>
+            <input ref={csvInputRef} className="terrain-csv-file-input" type="file" accept=".csv,text/csv" onChange={readCsvFile} aria-label="Importer une analyse de sol au format CSV" />
+            {csvError && <p className="terrain-horizon-csv-error" role="alert">{csvError}</p>}
+            {csvPreview && <div className="terrain-horizon-csv-preview" aria-label="Aperçu des mesures importées">
+              <div className="terrain-horizon-csv-preview-heading"><FileSpreadsheet size={15} /><span><strong>{csvPreview.fileName}</strong><small>{csvPreview.rowCount} intervalle{csvPreview.rowCount > 1 ? 's' : ''} détecté{csvPreview.rowCount > 1 ? 's' : ''} · rien n’est encore enregistré</small></span></div>
+              <ul>{csvPreview.horizons.map((horizon, index) => <li key={`${horizon.topCm}-${horizon.bottomCm}-${index}`}><strong>{horizon.topCm}–{horizon.bottomCm} cm</strong><span>{horizon.texture ? textureLabels[horizon.texture].toLocaleLowerCase('fr') : 'texture non renseignée'} · pH {horizon.ph?.toLocaleString('fr-FR') ?? 'inconnu'} · MO {horizon.organicMatterPercent === undefined ? 'inconnue' : `${horizon.organicMatterPercent.toLocaleString('fr-FR')} %`}</span></li>)}</ul>
+              <small>Origine déclarée : analyse de laboratoire · {csvPreview.laboratory || 'laboratoire non précisé'} · {csvPreview.sampleDate || 'date non précisée'} (non vérifiée).</small>
+              <small>L’application remplacera la liste d’horizons du brouillon. Les autres champs et leur origine resteront inchangés.</small>
+              <div className="terrain-horizon-csv-preview-actions"><button type="button" onClick={() => setCsvPreview(undefined)}>Annuler</button><button type="button" onClick={applyCsvPreview}>Utiliser ces valeurs</button></div>
+            </div>}
+            {appliedImportFile && <p className="terrain-horizon-csv-applied">Valeurs prêtes à enregistrer depuis {appliedImportFile}. Vérifiez-les puis enregistrez le profil.</p>}
             {(draft.horizons ?? []).map((horizon, index) => <fieldset className="terrain-horizon-fields" key={index}>
               <legend>Horizon {index + 1}</legend>
               <button className="terrain-horizon-remove" type="button" aria-label={`Supprimer l’horizon ${index + 1}`} onClick={() => removeHorizon(index)}><Trash2 size={12} /></button>
@@ -146,20 +208,30 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
   </>
 }
 
-function SoilHorizonVisual({ horizons }: { horizons: SoilHorizon[] }) {
+function SoilHorizonVisual({ horizons, defaultSourceType, defaultSourceName, defaultSampleDate }: { horizons: SoilHorizon[]; defaultSourceType?: FarmSoilProfile['sourceType']; defaultSourceName?: string; defaultSampleDate?: string }) {
   const layers: Array<SoilHorizon & { gap: boolean }> = horizons.flatMap((horizon, index) => {
     const previousBottom = horizons[index - 1]?.bottomCm ?? 0
     const gap = horizon.topCm > previousBottom ? [{ topCm: previousBottom, bottomCm: horizon.topCm, texture: 'unknown' as const, gap: true }] : []
     return [...gap, { ...horizon, gap: false }]
   })
   const depth = horizons[horizons.length - 1]?.bottomCm ?? 0
+  const sources = [...new Set(horizons.map(horizon => horizonSourceSummary(horizon, defaultSourceType, defaultSourceName, defaultSampleDate)))]
   return <div className="terrain-horizon-visual" aria-label={`Profil de sol déclaré de 0 à ${depth} centimètres`}>
-    <div><strong>Horizons saisis</strong><small>Profondeurs déclarées · intervalles manquants inconnus</small></div>
+    <div><strong>Horizons saisis</strong><small>Profondeurs déclarées · intervalles manquants inconnus</small><small className="terrain-horizon-source">Origine déclarée (non vérifiée) : {sources.join(' · ')}</small></div>
     <div className="terrain-horizon-stack" role="list">{layers.map((layer, index) => {
       const texture = layer.texture && layer.texture !== 'unknown' ? textureLabels[layer.texture].toLocaleLowerCase('fr') : 'texture inconnue'
       const values = [layer.ph !== undefined ? `pH ${decimal(layer.ph)}` : '', layer.organicMatterPercent !== undefined ? `${decimal(layer.organicMatterPercent)} % MO` : ''].filter(Boolean).join(' · ')
-      return <div key={`${layer.topCm}-${layer.bottomCm}-${index}`} className={`terrain-horizon-layer ${layer.gap ? 'is-gap' : `texture-${layer.texture ?? 'unknown'}`}`} role="listitem" title={`${layer.topCm}–${layer.bottomCm} cm · ${texture}${values ? ` · ${values}` : ''}`}><span>{layer.topCm}–{layer.bottomCm} cm</span><strong>{layer.gap ? 'Non décrit' : texture}</strong>{values && <small>{values}</small>}</div>
+      const source = layer.gap ? '' : horizonSourceSummary(layer, defaultSourceType, defaultSourceName, defaultSampleDate)
+      return <div key={`${layer.topCm}-${layer.bottomCm}-${index}`} className={`terrain-horizon-layer ${layer.gap ? 'is-gap' : `texture-${layer.texture ?? 'unknown'}`}`} role="listitem" title={`${layer.topCm}–${layer.bottomCm} cm · ${texture}${values ? ` · ${values}` : ''}${source ? ` · ${source}` : ''}`}><span>{layer.topCm}–{layer.bottomCm} cm</span><strong>{layer.gap ? 'Non décrit' : texture}</strong>{values && <small>{values}</small>}</div>
     })}</div>
     <small className="terrain-horizon-beyond">Au-delà de {depth} cm : non documenté.</small>
   </div>
+}
+
+function horizonSourceSummary(horizon: SoilHorizon, defaultSourceType?: FarmSoilProfile['sourceType'], defaultSourceName?: string, defaultSampleDate?: string) {
+  const sourceType = horizon.sourceType ?? defaultSourceType ?? 'farmer-reported'
+  const sourceName = horizon.sourceName ?? defaultSourceName
+  const sampleDate = horizon.sampleDate ?? defaultSampleDate
+  const date = sampleDate ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${sampleDate}T12:00:00Z`)) : undefined
+  return [soilSourceLabels[sourceType], sourceName, date].filter(Boolean).join(' · ')
 }
