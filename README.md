@@ -30,6 +30,6 @@ Le serveur Vite écoute sur `http://localhost:5173` et recharge l’application 
 
 ## État
 
-Le socle React, le shell partagé, la landing page et la connexion de démonstration sont installés. Les modules authentifiés sont réalisés un par un ; tant qu’un onglet n’est pas livré, il affiche son concept visuel de référence.
+Le socle React, le shell partagé, la landing page, la connexion de démonstration, la vue d’ensemble, l’Atlas et Mon terrain sont installés. Les autres modules authentifiés sont réalisés un par un ; tant qu’un onglet n’est pas livré, il affiche son concept visuel de référence.
 
 Les nombres visibles dans les visuels de présentation sont illustratifs. Ils ne proviennent pas encore de données de parcelle en direct.
