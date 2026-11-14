@@ -1,10 +1,7 @@
 # Atlas
 
 - **Route :** `/app/atlas`
-- **Entrée :** `index.tsx`
-- **Objectif :** explorer le fond de carte, les parcelles, les couches thématiques et les dates d’acquisition dans un seul espace.
-- **Interactions :** recherche de parcelle, sélection par carte/panneau, déplacement et zoom, fond satellite/relief, activation des couches, légende, navigation temporelle et période d’historique.
-- **Données :** parcelles, frontières, NDVI, valeurs de couche et dates sont des exemples locaux. L’interface dit explicitement que les produits NASA ne sont pas raccordés ; elle ne revendique aucune mesure, couverture ni fraîcheur satellitaire réelle.
-- **Graphique :** `AtlasChart.tsx` reprend la composition du graphique Recharts archivée dans FrontUI et réutilise les primitives de `src/components/charts/chart.tsx`.
-- **Carte :** le fond image est décoratif et n’est pas géoréférencé. Les commandes de déplacement/zoom servent à la démo visuelle ; elles ne calculent pas de coordonnées.
-- **À raccorder :** catalogue de tuiles et acquisitions NASA, reprojection, date/qualité de scène, limites cadastrales et légendes physiques validées.
+- **Carte :** carte MapLibre partagée avec la vue d’ensemble : fond OpenStreetMap, True Color MODIS/Terra et NDVI MODIS/Terra via NASA GIBS. Les contrôles de fond, de couche et de date changent les tuiles réellement affichées.
+- **Point suivi :** clic sur la carte, coordonnées saisies (latitude puis longitude) ou géolocalisation du navigateur. Le point est persisté et partagé avec les autres cartes de l’application.
+- **Graphique :** série mensuelle NASA POWER (`PRECTOTCORR`, `T2M`) pour la cellule de grille correspondante. Le sélecteur limite le graphique aux 3, 6 ou 12 derniers mois disponibles.
+- **Limites :** aucune parcelle n’est inventée. NASA POWER fournit ici une estimation climatique à la grille, et le NDVI GIBS est un produit satellitaire reprojeté ; ni l’un ni l’autre ne donne une mesure à la parcelle.

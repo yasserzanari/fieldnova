@@ -1,175 +1,140 @@
-import { useMemo, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent } from 'react'
-import { ArrowLeft, ArrowRight, CalendarDays, Check, ChevronDown, ChevronRight, CloudRain, Droplets, Layers2, LocateFixed, Minus, Plus, Search, Sprout, ThermometerSun } from 'lucide-react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Activity, CloudRain, Droplets, Layers2, LocateFixed, MapPinned, Minus, Plus, Search, ShieldCheck, Satellite, ThermometerSun } from 'lucide-react'
+import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
-import { AtlasChart } from './AtlasChart'
+import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
+import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
+import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
+import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import './atlas.css'
 
-type Layer = { id: string; label: string; group: string; icon: typeof Sprout; color: string }
-type Acquisition = { id: string; date: string; short: string; value: number; valid: boolean }
-type Parcel = { id: string; name: string; crop: string; area: string }
-
-const layers: Layer[] = [
-  { id: 'rain', label: 'Pluie cumulée · 7 j', group: 'Climat', icon: CloudRain, color: '#4083bb' },
-  { id: 'temperature', label: 'Température de surface', group: 'Climat', icon: ThermometerSun, color: '#dd8151' },
-  { id: 'moisture', label: 'Humidité du sol', group: 'Eau', icon: Droplets, color: '#3d9b9c' },
-  { id: 'stress', label: 'Stress hydrique', group: 'Eau', icon: Droplets, color: '#dd8950' },
-  { id: 'ndvi', label: 'Vigueur de la végétation · NDVI', group: 'Végétation', icon: Sprout, color: '#4c9b50' },
-  { id: 'evi', label: 'Indice EVI', group: 'Végétation', icon: Sprout, color: '#84ab48' },
-  { id: 'soil', label: 'Texture du sol', group: 'Sol', icon: Layers2, color: '#a7835d' },
-]
-
-const acquisitions: Acquisition[] = [
-  { id: 'dec20', date: '20 déc. 2024', short: '20 déc.', value: 0.49, valid: true },
-  { id: 'jan05', date: '05 janv. 2025', short: '05 janv.', value: 0.53, valid: true },
-  { id: 'jan20', date: '20 janv. 2025', short: '20 janv.', value: 0.57, valid: true },
-  { id: 'jan30', date: '30 janv. 2025', short: '30 janv.', value: 0.58, valid: false },
-  { id: 'feb05', date: '05 févr. 2025', short: '05 févr.', value: 0.59, valid: true },
-  { id: 'feb10', date: '10 févr. 2025', short: '10 févr.', value: 0.58, valid: false },
-  { id: 'feb20', date: '20 févr. 2025', short: '20 févr.', value: 0.60, valid: true },
-  { id: 'mar01', date: '01 mars 2025', short: '01 mars', value: 0.61, valid: true },
-  { id: 'mar10', date: '10 mars 2025', short: '10 mars', value: 0.61, valid: true },
-  { id: 'mar20', date: '20 mars 2025', short: '20 mars', value: 0.62, valid: true },
-  { id: 'mar25', date: '25 mars 2025', short: '25 mars', value: 0.63, valid: true },
-  { id: 'apr05', date: '05 avr. 2025', short: '05 avr.', value: 0.64, valid: true },
-]
-
-const parcels: Parcel[] = [
-  { id: 'P-03', name: 'La Grande Pièce', crop: 'Maïs', area: '7,4 ha' },
-  { id: 'P-04', name: 'Les Chênes', crop: 'Blé tendre', area: '5,8 ha' },
-  { id: 'P-07', name: 'Le Haut Champ', crop: 'Couvert', area: '4,2 ha' },
-]
-
-const parcelPolygons: Record<string, string> = {
-  'P-03': '345,245 507,185 618,226 610,370 465,422 352,373',
-  'P-04': '608,144 771,171 815,298 619,363 616,225',
-  'P-07': '202,383 351,374 464,425 420,564 236,531 170,454',
+function daysAgo(days: number) {
+  const date = new Date()
+  date.setUTCDate(date.getUTCDate() - days)
+  return date.toISOString().slice(0, 10)
 }
 
-const rangeCount: Record<string, number> = { '3 mois': 6, '6 mois': 9, '1 an': 12 }
+function formatCoord(value: number, positive: string, negative: string) {
+  return `${Math.abs(value).toFixed(3).replace('.', ',')}° ${value < 0 ? negative : positive}`
+}
 
 export function AtlasPage() {
-  const [selectedParcelId, setSelectedParcelId] = useState('P-03')
-  const [activeLayers, setActiveLayers] = useState<string[]>(['ndvi'])
-  const [expandedGroups, setExpandedGroups] = useState(['Végétation'])
-  const [layerTab, setLayerTab] = useState<'layers' | 'legend'>('layers')
-  const [mapBase, setMapBase] = useState<'satellite' | 'relief'>('satellite')
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [dragging, setDragging] = useState(false)
-  const [selectedDateId, setSelectedDateId] = useState('mar20')
-  const [range, setRange] = useState('3 mois')
-  const [query, setQuery] = useState('')
-  const [searchMessage, setSearchMessage] = useState('')
-  const mapStageRef = useRef<HTMLDivElement>(null)
-  const selectedParcel = parcels.find(parcel => parcel.id === selectedParcelId) ?? parcels[0]
-  const selectedDate = acquisitions.find(date => date.id === selectedDateId) ?? acquisitions[9]
-  const visibleDates = useMemo(() => acquisitions.slice(-rangeCount[range]), [range])
-  const groups = ['Climat', 'Eau', 'Végétation', 'Sol']
-  const parcelNdviOffset = selectedParcelId === 'P-04' ? .06 : selectedParcelId === 'P-07' ? -.04 : 0
-  const selectedValue = Math.max(.1, Math.min(.9, selectedDate.value + parcelNdviOffset))
-  const dragStart = useRef({ pointerX: 0, pointerY: 0, panX: 0, panY: 0 })
-  const activeLayer = activeLayers.length ? layers.find(layer => layer.id === activeLayers[activeLayers.length - 1]) : undefined
+  const { location, selectLocation } = useSelectedLocation()
+  const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
+  const [showNdvi, setShowNdvi] = useState(true)
+  const [imageryDate, setImageryDate] = useState(daysAgo(11))
+  const [map, setMap] = useState<MapLibreMap | null>(null)
+  const [coordinateInput, setCoordinateInput] = useState(`${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`)
+  const [coordinateError, setCoordinateError] = useState('')
+  const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [range, setRange] = useState(12)
+  const [locating, setLocating] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
 
-  const beginPan = (event: PointerEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest('button, input, a, svg, .atlas-float-panel, .atlas-map-controls, .atlas-map-toolbar')) return
-    event.currentTarget.setPointerCapture(event.pointerId)
-    dragStart.current = { pointerX: event.clientX, pointerY: event.clientY, panX: pan.x, panY: pan.y }
-    setDragging(true)
-  }
-  const movePan = (event: PointerEvent<HTMLDivElement>) => {
-    if (!dragging) return
-    const bounds = mapStageRef.current?.getBoundingClientRect()
-    if (!bounds) return
-    const maxX = Math.max(0, (bounds.width * 1.06 * zoom - bounds.width) / 2)
-    const maxY = Math.max(0, (bounds.height * 1.06 * zoom - bounds.height) / 2)
-    setPan({
-      x: Math.max(-maxX, Math.min(maxX, dragStart.current.panX + event.clientX - dragStart.current.pointerX)),
-      y: Math.max(-maxY, Math.min(maxY, dragStart.current.panY + event.clientY - dragStart.current.pointerY)),
+  useEffect(() => {
+    setCoordinateInput(`${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`)
+    setCoordinateError('')
+  }, [location.latitude, location.longitude])
+
+  useEffect(() => {
+    let current = true
+    setLoading(true)
+    setError('')
+    fetchPowerMonthly(location, 5).then(result => {
+      if (current) setSeries(result)
+    }).catch(reason => {
+      if (current) setError(reason instanceof Error ? reason.message : 'Impossible de charger NASA POWER.')
+    }).finally(() => {
+      if (current) setLoading(false)
     })
-  }
-  const selectParcel = (id: string) => { setSelectedParcelId(id); setQuery(id); setSearchMessage('') }
+    return () => { current = false }
+  }, [location.latitude, location.longitude, refreshKey])
 
-  const toggleLayer = (id: string) => setActiveLayers(current => current.includes(id) ? current.filter(layer => layer !== id) : [...current, id])
-  const toggleGroup = (group: string) => setExpandedGroups(current => current.includes(group) ? current.filter(value => value !== group) : [...current, group])
-  const moveDate = (direction: -1 | 1) => {
-    const dates = visibleDates
-    const index = dates.findIndex(date => date.id === selectedDateId)
-    const next = Math.min(dates.length - 1, Math.max(0, index + direction))
-    setSelectedDateId(dates[next].id)
+  const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
+  const latestDate = latest ? formatPowerMonth(latest.date) : 'aucune période valide'
+  const gridPoint = series?.gridPoint
+
+  const moveToPoint = (point: GeoPoint) => {
+    selectLocation(point)
+    map?.flyTo({ center: [point.longitude, point.latitude], zoom: Math.max(7, map.getZoom()), duration: 850 })
+    setCoordinateError('')
   }
-  const submitSearch = (event: FormEvent<HTMLFormElement>) => {
+
+  const submitCoordinates = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    const normalized = query.trim().toLocaleLowerCase('fr')
-    if (!normalized) { setSearchMessage('Saisissez un identifiant ou un nom de parcelle.'); return }
-    const parcel = parcels.find(item => item.id.toLocaleLowerCase('fr') === normalized || item.name.toLocaleLowerCase('fr').includes(normalized))
-    if (parcel) {
-      selectParcel(parcel.id)
-    } else {
-      setSearchMessage('Aucune parcelle de démonstration ne correspond à cette recherche.')
+    const values = coordinateInput.trim().split(/[;,\s]+/).filter(Boolean).map(value => Number(value.replace(',', '.')))
+    if (values.length !== 2 || !Number.isFinite(values[0]) || !Number.isFinite(values[1]) || Math.abs(values[0]) > 90 || Math.abs(values[1]) > 180) {
+      setCoordinateError('Entrez latitude puis longitude (−90 à 90, −180 à 180).')
+      return
     }
+    moveToPoint({ latitude: values[0], longitude: values[1] })
   }
 
-  return (
-    <section className="atlas-page" aria-label="Atlas des parcelles">
-      <header className="atlas-heading">
-        <div className="atlas-title"><h1>Atlas</h1><span className="atlas-title-divider" /><p>Cartographie, imagerie et indicateurs de vos parcelles</p></div>
-        <form className="atlas-search" onSubmit={submitSearch} role="search">
-          <Search size={17} aria-hidden="true" /><input aria-label="Rechercher une parcelle" value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher une parcelle" />
-          {query && <button type="button" aria-label="Effacer la recherche" onClick={() => { setQuery(''); setSearchMessage('') }}>×</button>}
-        </form>
-      </header>
+  const locateMe = () => {
+    if (!navigator.geolocation) { setCoordinateError('La géolocalisation n’est pas disponible sur cet appareil.'); return }
+    setLocating(true)
+    setCoordinateError('')
+    navigator.geolocation.getCurrentPosition(position => {
+      moveToPoint({ latitude: Number(position.coords.latitude.toFixed(5)), longitude: Number(position.coords.longitude.toFixed(5)) })
+      setLocating(false)
+    }, reason => {
+      setCoordinateError(reason.code === reason.PERMISSION_DENIED ? 'Autorisez la position ou choisissez un point sur la carte.' : 'Position indisponible. Choisissez un point sur la carte.')
+      setLocating(false)
+    }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 })
+  }
 
-      <div ref={mapStageRef} className={`atlas-map-stage ${mapBase === 'relief' ? 'atlas-relief' : ''} ${dragging ? 'is-dragging' : ''}`} onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={() => setDragging(false)} onPointerCancel={() => setDragging(false)}>
-        <div className="atlas-map-world" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
-          <img src="/images/landing-fields.png" alt="Image satellite de démonstration pour le fond de carte" draggable={false} />
-          {activeLayers.map(layerId => <div key={layerId} className={`atlas-layer-overlay overlay-${layerId}`} aria-hidden="true" />)}
-          <svg className="atlas-parcel-shapes" viewBox="0 0 1000 700" role="group" aria-label="Parcelles de démonstration">
-            {parcels.map(parcel => <g key={parcel.id} onClick={() => selectParcel(parcel.id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectParcel(parcel.id) } }} tabIndex={0} role="button" aria-label={`Sélectionner la parcelle ${parcel.id}, ${parcel.area}`} className={`atlas-parcel-shape ${parcel.id === selectedParcelId ? 'is-selected' : ''}`}><polygon points={parcelPolygons[parcel.id]} /><text x={parcel.id === 'P-03' ? 485 : parcel.id === 'P-04' ? 700 : 286} y={parcel.id === 'P-03' ? 327 : parcel.id === 'P-04' ? 250 : 479}>{parcel.id}<tspan x={parcel.id === 'P-03' ? 485 : parcel.id === 'P-04' ? 700 : 286} dy="16">{parcel.area}</tspan></text></g>)}
-          </svg>
-        </div>
+  const selectPoint = (point: GeoPoint) => {
+    selectLocation(point)
+    setCoordinateError('')
+  }
 
-        <div className="atlas-map-toolbar">
-          <div className="atlas-base-switch" role="group" aria-label="Fond de carte">
-            <button type="button" className={mapBase === 'satellite' ? 'is-active' : ''} onClick={() => setMapBase('satellite')}>Satellite</button>
-            <button type="button" className={mapBase === 'relief' ? 'is-active' : ''} onClick={() => setMapBase('relief')}>Relief</button>
-          </div>
-          <span className="atlas-global-label"><LocateFixed size={15} /> Vue locale</span>
-        </div>
-        <div className="atlas-map-controls"><button type="button" aria-label="Agrandir la carte" onClick={() => setZoom(value => Math.min(1.7, +(value + .15).toFixed(2)))}><Plus size={16} /></button><button type="button" aria-label="Réduire la carte" onClick={() => setZoom(value => Math.max(.95, +(value - .15).toFixed(2)))}><Minus size={16} /></button><button type="button" aria-label="Recentrer la carte" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}><LocateFixed size={15} /></button></div>
-        <div className="atlas-map-scale"><span />500 m</div>
-        <div className="atlas-map-footnote">Fond visuel non géoréférencé · couches illustratives</div>
+  return <section className="atlas-page" aria-label="Atlas interactif des couches NASA">
+    <header className="atlas-heading">
+      <div className="atlas-title"><h1>Atlas</h1><span className="atlas-title-divider" /><p>Explorez l’imagerie NASA et les séries climatiques au point choisi</p></div>
+      <form className="atlas-search" onSubmit={submitCoordinates} role="search"><Search size={16} aria-hidden="true" /><input aria-label="Coordonnées, latitude puis longitude" value={coordinateInput} onChange={event => setCoordinateInput(event.target.value)} placeholder="Latitude, longitude" /><button type="submit" aria-label="Aller aux coordonnées"><MapPinned size={15} /></button></form>
+    </header>
 
-        <aside className="atlas-float-panel atlas-layers-panel" aria-label="Couches de l’Atlas">
-          <header className="atlas-panel-header"><div><Layers2 size={19} /><div><h2>Couches</h2><p>Choisissez ce que vous souhaitez explorer</p></div></div><span className="atlas-layer-count">{activeLayers.length}</span></header>
-          <div className="atlas-panel-tabs" role="tablist" aria-label="Vue des couches"><button type="button" role="tab" aria-selected={layerTab === 'layers'} className={layerTab === 'layers' ? 'is-active' : ''} onClick={() => setLayerTab('layers')}>Couches</button><button type="button" role="tab" aria-selected={layerTab === 'legend'} className={layerTab === 'legend' ? 'is-active' : ''} onClick={() => setLayerTab('legend')}>Légende</button></div>
-          {layerTab === 'layers' ? <div className="atlas-layer-groups">{groups.map(group => {
-            const groupLayers = layers.filter(layer => layer.group === group)
-            const GroupIcon = groupLayers[0].icon
-            const expanded = expandedGroups.includes(group)
-            return <section className="atlas-layer-group" key={group}><button type="button" className="atlas-group-toggle" aria-expanded={expanded} onClick={() => toggleGroup(group)}><GroupIcon size={16} /><strong>{group}</strong><ChevronDown size={14} className={expanded ? '' : 'is-collapsed'} /></button>{expanded && <div className="atlas-layer-options">{groupLayers.map(layer => <label key={layer.id} className={`atlas-layer-option ${activeLayers.includes(layer.id) ? 'is-active' : ''}`}><input type="checkbox" checked={activeLayers.includes(layer.id)} onChange={() => toggleLayer(layer.id)} /><span className="atlas-layer-swatch" style={{ '--layer-color': layer.color } as CSSProperties} /><span>{layer.label}</span></label>)}</div>}</section>
-          })}</div> : <div className="atlas-legend-view"><strong>{activeLayers.length ? layers.filter(layer => activeLayers.includes(layer.id)).map(layer => layer.label).join(' · ') : 'Aucune couche active'}</strong><span>Intensité faible</span><div className={`atlas-legend-ramp ${activeLayers.length ? `legend-${activeLayers[activeLayers.length - 1]}` : ''}`} /><div className="atlas-legend-values"><span>Bas</span><span>Modéré</span><span>Élevé</span></div><p>Échelle indicative des valeurs de démonstration.</p></div>}
-          <div className="atlas-panel-source"><span className="source-mini-mark">FN</span><span><strong>Jeu de données exemple</strong><small>Aucune source satellite connectée</small></span></div>
-        </aside>
-
-        <aside className="atlas-float-panel atlas-selection-panel" aria-label="Informations de la parcelle sélectionnée">
-          <header className="atlas-selection-heading"><div><span className="atlas-polygon-icon" /><div><h2>Parcelle sélectionnée</h2><p>{selectedParcel.id} · {selectedParcel.area} · {selectedParcel.crop}</p></div></div><button type="button" aria-label="Parcelle précédente" onClick={() => selectParcel(parcels[(parcels.findIndex(parcel => parcel.id === selectedParcelId) + parcels.length - 1) % parcels.length].id)}><ArrowLeft size={15} /></button><button type="button" aria-label="Parcelle suivante" onClick={() => selectParcel(parcels[(parcels.findIndex(parcel => parcel.id === selectedParcelId) + 1) % parcels.length].id)}><ArrowRight size={15} /></button></header>
-          <div className="atlas-acquisition-row"><span className="atlas-small-icon"><CalendarDays size={16} /></span><span><small>Date de l’image</small><strong>{selectedDate.date}</strong></span><div className="atlas-date-arrows"><button type="button" aria-label="Acquisition précédente" onClick={() => moveDate(-1)}><ArrowLeft size={14} /></button><button type="button" aria-label="Acquisition suivante" onClick={() => moveDate(1)}><ArrowRight size={14} /></button></div></div>
-          {searchMessage && <p className="atlas-search-message" role="status">{searchMessage}</p>}
-          <div className="atlas-source-row"><span className="atlas-source-logo"><Layers2 size={17} /></span><span><small>Provenance de cette vue</small><strong>Données de démonstration locales</strong><small>Les produits NASA ne sont pas raccordés.</small></span></div>
-          <div className="atlas-stats-row"><div><small>NDVI illustratif</small><strong>{selectedDate.value.toFixed(2).replace('.', ',')}</strong></div><span className="atlas-ndvi-state"><Check size={12} /> Couche active</span></div>
-          <div className="atlas-chart-heading"><strong>Évolution du NDVI</strong><span>3 derniers mois · exemple</span></div>
-          <AtlasChart selectedDate={selectedDate.date} selectedValue={selectedValue} parcelId={selectedParcelId} />
-          <Link to="/app/data-trust" className="atlas-provenance-link">Comprendre la provenance <ChevronRight size={14} /></Link>
-        </aside>
-
-        <div className="atlas-map-selected-label"><span><LocateFixed size={15} /></span><strong>{selectedParcel.id}</strong><small>{selectedParcel.area}</small></div>
-        {activeLayer && <div className={`atlas-map-legend-mini legend-${activeLayer.id}`}><strong>{activeLayer.label}</strong><span>Bas</span><i /><span>Élevé</span></div>}
+    <div className="atlas-map-stage">
+      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive OpenStreetMap et couches satellite NASA GIBS" />
+      <div className="atlas-map-toolbar">
+        <div className="atlas-base-switch" role="group" aria-label="Fond de carte"><button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Image NASA</button></div>
+        <label className="atlas-ndvi-toggle"><input type="checkbox" checked={showNdvi} onChange={event => setShowNdvi(event.target.checked)} /><Activity size={14} /> NDVI</label>
+        <label className="atlas-image-date">Date affichée <input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label>
       </div>
+      <div className="atlas-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 250 })}><Plus size={16} /></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 250 })}><Minus size={16} /></button><button type="button" aria-label="Utiliser ma position" title="Utiliser ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></div>
+      <span className="atlas-map-click-hint">Cliquez sur la carte pour choisir un point et charger NASA POWER</span>
+      {coordinateError && <p className="atlas-coordinate-error" role="alert">{coordinateError}</p>}
 
-      <section className="atlas-timeline" aria-label="Chronologie des acquisitions">
-        <div className="atlas-timeline-heading"><div><span className="timeline-icon"><CalendarDays size={17} /></span><span><strong>Chronologie des acquisitions</strong><small>Images de démonstration · parcelle {selectedParcel.id}</small></span></div><div className="timeline-ranges" role="group" aria-label="Période à afficher">{Object.keys(rangeCount).map(option => <button key={option} type="button" className={range === option ? 'is-active' : ''} onClick={() => { setRange(option); if (!acquisitions.slice(-rangeCount[option]).some(date => date.id === selectedDateId)) setSelectedDateId(acquisitions.slice(-rangeCount[option])[rangeCount[option] - 1].id) }}>{option}</button>)}</div><div className="timeline-legend"><span><i className="timeline-valid" /> Image exemple</span><span><i className="timeline-missing" /> Date sans image</span></div></div>
-        <div className="timeline-scroll"><div className="timeline-track">{visibleDates.map((date, index) => <button type="button" key={date.id} className={`timeline-date ${date.id === selectedDateId ? 'is-selected' : ''} ${date.valid ? 'is-valid' : 'is-missing'}`} onClick={() => setSelectedDateId(date.id)} aria-current={date.id === selectedDateId ? 'date' : undefined}><span className="timeline-dot" /><span className="timeline-date-label">{date.short}</span><span className="timeline-date-value">NDVI {Math.max(.1, Math.min(.9, date.value + parcelNdviOffset)).toFixed(2).replace('.', ',')}</span>{index < visibleDates.length - 1 && <i className={`timeline-connector ${!date.valid ? 'has-gap' : ''}`} />}</button>)}</div></div>
-      </section>
+      <aside className="atlas-float-panel atlas-layers-panel" aria-label="Couches de l’Atlas">
+        <header className="atlas-panel-header"><div><Layers2 size={18} /><div><h2>Imagerie NASA</h2><p>Produits satellite disponibles</p></div></div><span className="atlas-layer-count">{showNdvi ? '2' : '1'}</span></header>
+        <div className="atlas-source-option"><span className="atlas-source-swatch nasa-satellite" /><span><strong>MODIS Terra · True Color</strong><small>Réflectance corrigée · GIBS</small></span><span className="atlas-source-tag">NASA</span></div>
+        <label className="atlas-source-option atlas-checkbox-option"><input type="checkbox" checked={showNdvi} onChange={event => setShowNdvi(event.target.checked)} /><span className="atlas-source-swatch nasa-ndvi" /><span><strong>MODIS Terra · NDVI 8 jours</strong><small>Indice satellitaire de végétation</small></span></label>
+        <label className="atlas-panel-date"><span>Date de la couche</span><input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label>
+        <div className="atlas-panel-source"><Satellite size={16} /><span><strong>NASA EOSDIS GIBS</strong><small>Tuile cartographique en imagerie reprojetée</small></span></div>
+        <div className="atlas-panel-note"><ShieldCheck size={13} /><span>Le NDVI est un produit satellitaire régional. Il ne constitue pas une mesure de parcelle.</span></div>
+      </aside>
+
+      <aside className="atlas-float-panel atlas-selection-panel" aria-label="Séries climatiques du point sélectionné">
+        <header className="atlas-selection-heading"><div><span className="atlas-polygon-icon" /><div><h2>Point suivi</h2><p>{formatCoord(location.latitude, 'N', 'S')} · {formatCoord(location.longitude, 'E', 'O')}</p></div></div><button type="button" aria-label="Centrer sur ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></header>
+        <p className="atlas-grid-point">{gridPoint ? `Cellule NASA POWER · ${gridPoint.latitude.toFixed(3)}, ${gridPoint.longitude.toFixed(3)}` : 'Cellule de grille NASA en attente'}</p>
+        {loading ? <div className="atlas-data-state" role="status">Chargement de NASA POWER…</div> : error ? <div className="atlas-data-error" role="alert"><span>{error}</span><button type="button" onClick={() => setRefreshKey(value => value + 1)}>Réessayer</button></div> : <>
+          <div className="atlas-live-metrics"><AtlasMetric icon={<CloudRain size={15} />} label="Pluie moyenne" value={latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(2).replace('.', ',')} mm/j`} source="PRECTOTCORR" /><AtlasMetric icon={<ThermometerSun size={15} />} label="Température moyenne" value={latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`} source="T2M" /><AtlasMetric icon={<Droplets size={15} />} label="Humidité racinaire modélisée" value={latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`} source="GWETROOT" /></div>
+          <p className="atlas-live-source">Dernière période exploitable · {latestDate} · NASA POWER · {series?.source.join(' + ')}</p>
+        </>}
+        <div className="atlas-panel-note"><ShieldCheck size={13} /><span>Valeurs mensuelles sur cellule de grille, pas des observations de la ferme.</span></div>
+        <Link to="/app/data-trust" className="atlas-provenance-link">Sources et limites des données <span>›</span></Link>
+      </aside>
+    </div>
+
+    <section className="atlas-data-timeline" aria-label="Graphiques climatiques NASA POWER">
+      <div className="atlas-timeline-controls"><div><span className="timeline-icon"><Activity size={16} /></span><span><strong>Série climatique NASA POWER</strong><small>{range} derniers mois · point suivi</small></span></div><div className="timeline-ranges" role="group" aria-label="Période du graphique">{[[3, '3 mois'], [6, '6 mois'], [12, '1 an']].map(([months, label]) => <button key={months} type="button" className={range === months ? 'is-active' : ''} onClick={() => setRange(Number(months))}>{label}</button>)}</div></div>
+      <PowerClimateChart records={series?.records ?? []} source={series?.source.join(' + ') ?? 'en attente'} months={range} title="Précipitations et température · données mensuelles NASA" />
     </section>
-  )
+  </section>
+}
+
+function AtlasMetric({ icon, label, value, source }: { icon: React.ReactNode; label: string; value: string; source: string }) {
+  return <div className="atlas-live-metric"><span>{icon}</span><div><small>{label}</small><strong>{value}</strong><em>NASA POWER · {source}</em></div></div>
 }
