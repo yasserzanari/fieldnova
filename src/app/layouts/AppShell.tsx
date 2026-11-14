@@ -1,10 +1,35 @@
-import { Bell, ChevronDown, CircleHelp, Leaf, Menu, UserRound } from 'lucide-react'
+import { Bell, ChevronDown, CircleHelp, CloudRain, Leaf, MapPin, Menu, ThermometerSun, UserRound } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { featureRoutes } from '../navigation'
+import { useSelectedLocation } from '../../lib/geo/location'
+import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord } from '../../lib/nasa/power'
+
+function coordinate(value: number, positive: string, negative: string) {
+  return `${Math.abs(value).toFixed(2).replace('.', ',')}° ${value < 0 ? negative : positive}`
+}
 
 export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const { location } = useSelectedLocation()
+  const [latest, setLatest] = useState<PowerMonthlyRecord | undefined>()
+  const [loading, setLoading] = useState(true)
+  const [unavailable, setUnavailable] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    setUnavailable(false)
+    fetchPowerMonthly(location, 5).then(series => {
+      if (active) setLatest(latestCompleteRecord(series.records))
+    }).catch(() => {
+      if (active) {
+        setLatest(undefined)
+        setUnavailable(true)
+      }
+    }).finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [location])
 
   return (
     <div className="app-frame">
@@ -27,8 +52,8 @@ export function AppShell() {
           ))}
         </nav>
         <div className="sidebar-bottom">
-          <span className="workspace-avatar">FC</span>
-          <span className="sidebar-farm"><strong>Ferme des Chênes</strong><small>Exploitation active</small></span>
+          <span className="workspace-avatar"><MapPin size={15} /></span>
+          <span className="sidebar-farm"><strong>Point suivi</strong><small>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</small></span>
           <ChevronDown size={16} aria-hidden="true" />
         </div>
       </aside>
@@ -39,9 +64,13 @@ export function AppShell() {
             <Menu size={19} />
           </button>
           <div className="topbar-context">
-            <span className="context-control"><Leaf size={18} /> Maïs · Saison 2025 <ChevronDown size={15} /></span>
-            <span className="context-weather">☀️ <strong>18 °C</strong><span>Précipitations 7 j : 12 mm</span></span>
-            <span className="context-demo">Données de démonstration</span>
+            <span className="context-control"><MapPin size={17} /> Point suivi · {coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</span>
+            <span className="context-weather" aria-live="polite">
+              <ThermometerSun size={16} />
+              {loading ? <strong>NASA POWER…</strong> : unavailable ? <strong>Données indisponibles</strong> : latest?.temperatureC !== undefined ? <strong>{latest.temperatureC.toFixed(1).replace('.', ',')} °C · {formatPowerMonth(latest.date)}</strong> : <strong>Température non disponible</strong>}
+              <span><CloudRain size={14} />{latest?.precipitationMmPerDay !== undefined ? `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j · moyenne mensuelle` : 'Précipitations non disponibles'}</span>
+            </span>
+            <span className="context-source">NASA POWER · mensuel</span>
           </div>
           <div className="topbar-actions">
             <button className="icon-button" aria-label="Notifications"><Bell size={18} /></button>
