@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Droplets, Layers3, LocateFixed, MapPinned, Minus, Plus, Satellite, ShieldCheck, Sprout } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
-import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
+import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { SoilProfileEditor } from './SoilProfileEditor'
 import './terrain.css'
 
@@ -28,25 +29,8 @@ export function TerrainPage() {
   const imageryDate = daysAgo(11)
   const imageDateLabel = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${imageryDate}T12:00:00Z`))
   const [map, setMap] = useState<MapLibreMap | null>(null)
-  const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [locating, setLocating] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
-
-  useEffect(() => {
-    let current = true
-    setLoading(true)
-    setError('')
-    fetchPowerMonthly(location, 5).then(result => {
-      if (current) setSeries(result)
-    }).catch(reason => {
-      if (current) setError(reason instanceof Error ? reason.message : 'Impossible de charger NASA POWER.')
-    }).finally(() => {
-      if (current) setLoading(false)
-    })
-    return () => { current = false }
-  }, [location.latitude, location.longitude, refreshKey])
+  const { series, loading, error, retry } = usePowerMonthly(location)
 
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
   const gridPoint = series?.gridPoint
@@ -92,8 +76,8 @@ export function TerrainPage() {
       </aside>
 
       <aside className="terrain-panel terrain-soil-panel" aria-label="Mesures climatiques NASA POWER et état des données de sol">
-        <header className="terrain-soil-heading"><div><span className="terrain-heading-icon soil"><Droplets size={17} /></span><span><h2>Sol & eau · NASA POWER</h2><small>{loading ? 'Chargement de la série mensuelle…' : `Dernière période disponible · ${latestDate}`}</small></span></div><button type="button" className="terrain-refresh" aria-label="Actualiser les données NASA" onClick={() => setRefreshKey(value => value + 1)}><span>↻</span></button></header>
-        {loading ? <div className="terrain-data-state" role="status">Récupération des données NASA…</div> : error ? <div className="terrain-data-error" role="alert">{error}<button type="button" onClick={() => setRefreshKey(value => value + 1)}>Réessayer</button></div> : <>
+        <header className="terrain-soil-heading"><div><span className="terrain-heading-icon soil"><Droplets size={17} /></span><span><h2>Sol & eau · NASA POWER</h2><small>{loading ? 'Chargement de la série mensuelle…' : `Dernière période disponible · ${latestDate}`}</small></span></div><button type="button" className="terrain-refresh" aria-label="Actualiser les données NASA" onClick={retry}><span>↻</span></button></header>
+        {loading ? <div className="terrain-data-state" role="status">Récupération des données NASA…</div> : error ? <div className="terrain-data-error" role="alert">{error}<button type="button" onClick={retry}>Réessayer</button></div> : <>
           <p className="terrain-grid-location">Centre maille NASA POWER · {gridPoint?.latitude.toFixed(3)}, {gridPoint?.longitude.toFixed(3)} · 0,5° × 0,625°</p>
           <SoilMetric label="Humidité de surface modélisée" parameter="GWETTOP" value={latest?.surfaceSoilWetness} color="surface" />
           <SoilMetric label="Humidité racinaire modélisée" parameter="GWETROOT" value={latest?.rootZoneWetness} color="root" />

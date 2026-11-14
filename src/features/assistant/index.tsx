@@ -7,6 +7,7 @@ import { MessageActions } from '../../components/ai-chat/message-actions'
 import { LiquidMultimodalInput } from '../../components/ai-chat/liquid-multimodal-input'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { readSoilProfile, soilSourceLabels } from '../../lib/farm/soil-profile'
 import { readRotationConstraints } from '../scenarios/rotation-constraints'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
@@ -149,9 +150,7 @@ function traceNode(id: string, toolName: string, label: string, primary: string,
 export function AssistantPage() {
   const { location, selectLocation } = useSelectedLocation()
   const [layer, setLayer] = useState<LayerId>('truecolor')
-  const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
-  const [loadingData, setLoadingData] = useState(true)
-  const [dataError, setDataError] = useState('')
+  const { series, loading: loadingData, error: dataError } = usePowerMonthly(location)
   const [codexStatus, setCodexStatus] = useState<CodexStatus>('checking')
   const [messages, setMessages] = useState<Message[]>([
     { id: 1, role: 'assistant', text: 'Bonjour. Je peux consulter les données climatiques mensuelles NASA POWER et afficher les couches MODIS ou SMAP sur la carte. Cliquez sur la carte pour changer le point suivi, puis demandez-moi la pluie, la température, le NDVI ou l’humidité du sol.' },
@@ -161,21 +160,6 @@ export function AssistantPage() {
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const threadRef = useRef<HTMLDivElement>(null)
   const lastId = useRef(1)
-
-  useEffect(() => {
-    let active = true
-    setLoadingData(true)
-    setDataError('')
-    fetchPowerMonthly(location, 5).then(result => {
-      if (active) setSeries(result)
-    }).catch(error => {
-      if (active) {
-        setSeries(null)
-        setDataError(error instanceof Error ? error.message : 'NASA POWER est indisponible.')
-      }
-    }).finally(() => { if (active) setLoadingData(false) })
-    return () => { active = false }
-  }, [location])
 
   useEffect(() => {
     let active = true
@@ -232,7 +216,6 @@ export function AssistantPage() {
       try {
         if (!seriesAlreadyLoaded) {
           currentSeries = await fetchPowerMonthly(location, 5)
-          setSeries(currentSeries)
         }
       } catch {
         failed = true

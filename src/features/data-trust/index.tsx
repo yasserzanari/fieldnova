@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowUpRight, Check, ChevronRight, CloudSun, Database, Droplets, ExternalLink, FileInput, Filter, Globe2, Layers3, MapPin, Search, ShieldAlert, ShieldCheck, Sprout, Waves, X } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
-import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
+import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { useSelectedLocation } from '../../lib/geo/location'
 import './data-trust.css'
 
@@ -41,28 +42,11 @@ export function DataTrustPage() {
   const [layer, setLayer] = useState<'truecolor' | 'ndvi' | 'surface' | 'root'>('truecolor')
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
   const [map, setMap] = useState<MapLibreMap | null>(null)
-  const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const { series, loading, error } = usePowerMonthly(location)
   const selected = sources.find(source => source.id === selectedId) ?? sources[0]
   const SourceIcon = selected.icon
   const latest = series ? latestCompleteRecord(series.records) : undefined
   const filteredSources = useMemo(() => sources.filter(source => (theme === 'Toutes' || source.kind === theme) && (statusFilter === 'Tous les statuts' || source.status === statusFilter) && `${source.name} ${source.provider} ${source.description}`.toLocaleLowerCase('fr').includes(query.toLocaleLowerCase('fr'))), [query, statusFilter, theme])
-
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    setError('')
-    fetchPowerMonthly(location, 5).then(result => {
-      if (active) setSeries(result)
-    }).catch(reason => {
-      if (active) {
-        setSeries(null)
-        setError(reason instanceof Error ? reason.message : 'NASA POWER indisponible.')
-      }
-    }).finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [location])
 
   const imageryDate = (() => {
     const date = new Date()

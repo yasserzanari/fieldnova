@@ -5,7 +5,8 @@ import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
-import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
+import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import './atlas.css'
 
 function daysAgo(days: number) {
@@ -26,31 +27,14 @@ export function AtlasPage() {
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [coordinateInput, setCoordinateInput] = useState(`${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`)
   const [coordinateError, setCoordinateError] = useState('')
-  const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
   const [range, setRange] = useState(12)
   const [locating, setLocating] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const { series, loading, error, retry } = usePowerMonthly(location)
 
   useEffect(() => {
     setCoordinateInput(`${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`)
     setCoordinateError('')
   }, [location.latitude, location.longitude])
-
-  useEffect(() => {
-    let current = true
-    setLoading(true)
-    setError('')
-    fetchPowerMonthly(location, 5).then(result => {
-      if (current) setSeries(result)
-    }).catch(reason => {
-      if (current) setError(reason instanceof Error ? reason.message : 'Impossible de charger NASA POWER.')
-    }).finally(() => {
-      if (current) setLoading(false)
-    })
-    return () => { current = false }
-  }, [location.latitude, location.longitude, refreshKey])
 
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
   const latestDate = latest ? formatPowerMonth(latest.date) : 'aucune période valide'
@@ -119,7 +103,7 @@ export function AtlasPage() {
       <aside className="atlas-float-panel atlas-selection-panel" aria-label="Séries climatiques du point sélectionné">
         <header className="atlas-selection-heading"><div><span className="atlas-polygon-icon" /><div><h2>Point suivi</h2><p>{formatCoord(location.latitude, 'N', 'S')} · {formatCoord(location.longitude, 'E', 'O')}</p></div></div><button type="button" aria-label="Centrer sur ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></header>
         <p className="atlas-grid-point">{gridPoint ? `Centre maille NASA POWER · ${gridPoint.latitude.toFixed(3)}, ${gridPoint.longitude.toFixed(3)} · 0,5° × 0,625°` : 'Cellule de grille NASA en attente'}</p>
-        {loading ? <div className="atlas-data-state" role="status">Chargement de NASA POWER…</div> : error ? <div className="atlas-data-error" role="alert"><span>{error}</span><button type="button" onClick={() => setRefreshKey(value => value + 1)}>Réessayer</button></div> : <>
+        {loading ? <div className="atlas-data-state" role="status">Chargement de NASA POWER…</div> : error ? <div className="atlas-data-error" role="alert"><span>{error}</span><button type="button" onClick={retry}>Réessayer</button></div> : <>
           <div className="atlas-live-metrics">
             <AtlasMetric icon={<CloudRain size={14} />} label="Pluie moyenne" value={latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(2).replace('.', ',')} mm/j`} source="PRECTOTCORR" />
             <AtlasMetric icon={<ThermometerSun size={14} />} label="Température moyenne" value={latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`} source="T2M" />
