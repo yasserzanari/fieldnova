@@ -30,7 +30,7 @@ L’agriculteur choisit les scénarios et sa priorité à gauche. La comparaison
 
 ## 5. Assistant — chat à gauche, carte à droite
 
-Le chat LLM est le panneau principal à gauche, avec les questions suggérées, le champ de saisie et une trace des outils agricoles consultés (météo, satellite, sol, historique cultural). La carte interactive occupe la droite et montre la parcelle, le stress hydrique et les couches disponibles.
+Le chat de l’assistant est le panneau principal à gauche, avec les questions suggérées, le champ de saisie et une trace des outils agricoles consultés (climat, carte, sol, rotations). La carte interactive occupe la droite. Ce concept visuel ne signifie pas qu’un modèle LLM est branché : le prototype actuel utilise un routeur local.
 
 ![Assistant FieldNova — chat et carte](05-assistant-chat-map.png)
 
@@ -43,3 +43,7 @@ Le catalogue et ses filtres sont à gauche ; la couverture géographique est vis
 ## À confirmer
 
 Merci de confirmer les écrans que tu souhaites garder, et d’indiquer les ajustements éventuels. Le dashboard du globe est une proposition spécifique pour l’écran d’accueil ; les cinq autres visuels couvrent les onglets de la navigation.
+
+## Démonstration
+
+Le [script de démo de 90 secondes](demo-script-90s-fieldnova.md) suit les fonctions actuellement présentes et rappelle les limites à ne pas masquer pendant la vidéo.
