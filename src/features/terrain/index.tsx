@@ -10,6 +10,12 @@ import './terrain.css'
 
 type SoilLayer = 'surface' | 'root'
 
+function daysAgo(days: number) {
+  const date = new Date()
+  date.setUTCDate(date.getUTCDate() - days)
+  return date.toISOString().slice(0, 10)
+}
+
 function coordinate(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(3).replace('.', ',')}° ${value < 0 ? negative : positive}`
 }
@@ -18,7 +24,8 @@ export function TerrainPage() {
   const { location, selectLocation } = useSelectedLocation()
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
   const [soilLayer, setSoilLayer] = useState<SoilLayer>('root')
-  const imageryDate = 'default'
+  const imageryDate = daysAgo(11)
+  const imageDateLabel = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${imageryDate}T12:00:00Z`))
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
   const [loading, setLoading] = useState(true)
@@ -65,7 +72,7 @@ export function TerrainPage() {
         <div className="terrain-map-location"><MapPinned size={15} /><span>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</span><small>Point suivi</small></div>
         <div className="terrain-map-options">
           <div className="terrain-base-switch" role="group" aria-label="Fond de carte"><button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Satellite</button></div>
-          <span className="terrain-latest-chip">Dernières tuiles disponibles</span>
+          <span className="terrain-latest-chip">MODIS · {imageDateLabel} · SMAP récent</span>
         </div>
       </div>
       <div className="terrain-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 250 })}><Plus size={16} /></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 250 })}><Minus size={16} /></button><button type="button" aria-label="Utiliser ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></div>
