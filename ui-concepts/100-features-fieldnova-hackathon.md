@@ -120,7 +120,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 ### F. Assistant agricole explicable — 51 à 60
 
-51. **[P0] Réponse liée au scénario et à la parcelle sélectionnés** : le chat ne perd pas son contexte lorsque la carte change.
+51. **[P0 · LIVRÉ] Réponse liée au point sélectionné** : chaque réponse conserve et affiche la coordonnée utilisée, même lorsque l’utilisateur déplace ensuite le point suivi sur la carte; les sources indiquent séparément la maille ou résolution de leur produit.
 52. **[P0 · LIVRÉ] Réponse avec sources consultables** : chaque réponse fondée sur un outil affiche les sources associées à ses données — NASA POWER/GIBS, profil local FieldNova ou références agronomiques — avec distinction explicite entre déclaration locale et source externe.
 53. **[P0] Trace d’outils réelle** : montrer les requêtes exécutées et leur statut, et non une animation prétendant avoir interrogé un outil.
 54. **[P0 · LIVRÉ] Questions de suivi suggérées** : proposer pluie, température et humidité seulement lorsque la variable correspondante existe dans la dernière période NASA exploitable; adapter aussi la question NDVI à la couche affichée et conserver les actions vers les profils locaux et rotations.

@@ -2,6 +2,8 @@
 
 The Assistant route pairs a French chat with the shared interactive map. Clicking the map updates the selected coordinate across the application. The map can switch between OpenStreetMap, NASA MODIS true color and NDVI, and NASA SMAP surface and root-zone soil moisture.
 
+Each user request and its reply retain the selected coordinate used for that tool call. Later map changes update the active context for new questions without relabeling earlier answers.
+
 ## Live data and limits
 
 - Climate questions read the selected point's NASA POWER monthly temperature, corrected precipitation, and modeled soil-wetness series. The displayed month and grid coordinate travel with the response.
