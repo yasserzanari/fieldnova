@@ -21,7 +21,7 @@ export function PublicLanding() {
           badgeText=""
           title="Le climat change."
           titleLine2="Décider avec le terrain."
-          description="FieldNova rassemble observations, parcelles et rotations pour vous aider à comprendre les risques et choisir la suite avec méthode."
+          description="FieldNova relie les séries mensuelles NASA POWER, les couches MODIS/SMAP et les informations locales du sol aux rotations de cinq ans. Comparez des critères descriptifs sans confondre contexte régional et recommandation de parcelle."
           primaryButtonText="Essayer la démo fictive"
           primaryButtonHref="/demo"
           secondaryButtonText="Se connecter"

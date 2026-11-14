@@ -174,9 +174,9 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 91. **[P0] Démo chronométrée de 90 secondes** : un problème, un clic de carte, trois rotations, une décision éclairée.
 92. **[LIVRÉ] Scénario de démonstration reproductible** : route `/demo`, profil et rotations marqués fictifs, point connu, observations NASA POWER rechargées, état antérieur sauvegardé puis restaurable.
-93. **[P0] Écran d’accueil expliquant le problème** : qui est l’utilisateur, ce qu’il décide et comment FieldNova l’aide.
+93. **[P0 · LIVRÉ] Écran d’accueil expliquant le problème** : l’accueil décrit le lien entre séries NASA, contexte local et rotations; les vues expliquent les critères réellement comparés et leurs limites.
 94. **[P0] Vidéo avec données lisibles** : montrer sources et limites à l’écran, pas seulement des animations de carte.
-95. **[P0] Phrase de distinction** : expliquer en une phrase ce que la plateforme relie et ce que l’agriculteur peut comparer.
+95. **[P0 · LIVRÉ] Phrase de distinction** : FieldNova relie séries NASA mensuelles, contexte local et rotations de cinq ans pour comparer des critères descriptifs, sans prétendre prévoir un rendement ou diagnostiquer une parcelle.
 96. **[P1] Page technique publique** : architecture, données, licences, calculs, limites et instructions de lancement.
 97. **[P1] État de service visible** : distinguer données en direct, en cache, d’exemple ou indisponibles.
 98. **[P1] Mode de secours hors réseau** : fournir une démo locale balisée si une API NASA est momentanément inaccessible.
