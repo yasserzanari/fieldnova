@@ -5,7 +5,8 @@ import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
-import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord } from '../../lib/nasa/power'
+import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { readSoilProfile, soilSourceLabels, type FarmSoilProfile } from '../../lib/farm/soil-profile'
 import { cropCatalog, evaluateRotation, exampleRotationWorkspace, generateRotationOptions, priorityLabels, readRotationWorkspace, rotationSources, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
 import { emptyRotationConstraints, readRotationConstraints, writeRotationConstraints } from './rotation-constraints'
@@ -68,10 +69,7 @@ export function RotationExplorer() {
   const [generationMessage, setGenerationMessage] = useState('')
   const [detailPlanId, setDetailPlanId] = useState<RotationId | null>(null)
   const detailsDialogRef = useRef<HTMLDialogElement>(null)
-  const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
-  const [climateLoading, setClimateLoading] = useState(true)
-  const [climateError, setClimateError] = useState('')
-  const [refreshKey, setRefreshKey] = useState(0)
+  const { series: currentSeries, loading: climateLoading, error: climateError, retry: retryClimate } = usePowerMonthly(location)
   const [locating, setLocating] = useState(false)
 
   useEffect(() => {
@@ -108,21 +106,8 @@ export function RotationExplorer() {
     if (detailPlanId && dialog && !dialog.open) dialog.showModal()
   }, [detailPlanId])
 
-  useEffect(() => {
-    let current = true
-    setClimateLoading(true)
-    setClimateError('')
-    fetchPowerMonthly(location, 5).then(result => {
-      if (current) setSeries(result)
-    }).catch(reason => {
-      if (current) setClimateError(reason instanceof Error ? reason.message : 'NASA POWER est indisponible.')
-    }).finally(() => { if (current) setClimateLoading(false) })
-    return () => { current = false }
-  }, [location.latitude, location.longitude, refreshKey])
-
   const currentWorkspace = workspace.pointKey === pointKey ? workspace.value : readRotationWorkspace(location)
   const constraints = constraintState.pointKey === pointKey ? constraintState.value : emptyRotationConstraints()
-  const currentSeries = series && series.point.latitude === location.latitude && series.point.longitude === location.longitude ? series : null
   const latest = useMemo(() => currentSeries ? latestCompleteRecord(currentSeries.records) : undefined, [currentSeries])
   const climateReferences = {
     precipitation: sameMonthReference(currentSeries?.records ?? [], latest, 'precipitationMmPerDay', 'mm/j'),
@@ -313,7 +298,7 @@ export function RotationExplorer() {
         {parcel && <small className="rotation-parcel-note">Contour importé localement · surface géodésique approximative. Aucune statistique NASA zonale calculée.</small>}
         <div className="rotation-context-divider" />
         <header className="rotation-panel-heading"><span className="rotation-panel-icon climate"><Activity size={15} /></span><span><strong>Contexte NASA POWER</strong><small>{climateLoading ? 'Chargement des données…' : latest ? `${formatPowerMonth(latest.date)} · valeur mensuelle` : 'Données non disponibles'}</small></span></header>
-        {climateLoading ? <div className="rotation-context-empty" role="status">Récupération de la série climatique…</div> : climateError ? <div className="rotation-context-error" role="alert">{climateError}<button type="button" onClick={() => setRefreshKey(value => value + 1)}>Réessayer</button></div> : <><div className="rotation-climate-metrics"><span><CloudRain size={13} /><div><small>Pluie moyenne</small><small className="rotation-climate-reference">{climateReferences.precipitation}</small></div><strong>{latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j`}</strong></span><span><ThermometerSun size={13} /><div><small>Température</small><small className="rotation-climate-reference">{climateReferences.temperature}</small></div><strong>{latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`}</strong></span><span><Droplets size={13} /><div><small>Humidité racinaire</small><small className="rotation-climate-reference">{climateReferences.roots}</small></div><strong>{latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`}</strong></span></div><small className="rotation-climate-footnote">Repère historique du même mois · pas une prévision</small></>}
+        {climateLoading ? <div className="rotation-context-empty" role="status">Récupération de la série climatique…</div> : climateError ? <div className="rotation-context-error" role="alert">{climateError}<button type="button" onClick={retryClimate}>Réessayer</button></div> : <><div className="rotation-climate-metrics"><span><CloudRain size={13} /><div><small>Pluie moyenne</small><small className="rotation-climate-reference">{climateReferences.precipitation}</small></div><strong>{latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j`}</strong></span><span><ThermometerSun size={13} /><div><small>Température</small><small className="rotation-climate-reference">{climateReferences.temperature}</small></div><strong>{latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`}</strong></span><span><Droplets size={13} /><div><small>Humidité racinaire</small><small className="rotation-climate-reference">{climateReferences.roots}</small></div><strong>{latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0).replace('.', ',')} %`}</strong></span></div><small className="rotation-climate-footnote">Repère historique du même mois · pas une prévision</small></>}
         <p className="rotation-context-source">Centre de maille MERRA-2 {currentSeries?.gridPoint.latitude.toFixed(3)}, {currentSeries?.gridPoint.longitude.toFixed(3)} · 0,5° × 0,625° · {currentSeries?.source.join(' + ') ?? 'source en attente'}</p>
       </aside>
 

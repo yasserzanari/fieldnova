@@ -4,7 +4,8 @@ import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
-import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
+import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import './overview.css'
 
@@ -24,27 +25,11 @@ export function OverviewPage() {
   const [showNdvi, setShowNdvi] = useState(false)
   const [imageryDate, setImageryDate] = useState(daysAgo(2))
   const [map, setMap] = useState<MapLibreMap | null>(null)
-  const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const { series, loading, error, retry } = usePowerMonthly(location)
   const [latitude, setLatitude] = useState(String(location.latitude))
   const [longitude, setLongitude] = useState(String(location.longitude))
   const [coordError, setCoordError] = useState('')
   const [locating, setLocating] = useState(false)
-
-  useEffect(() => {
-    let current = true
-    setLoading(true)
-    setError('')
-    fetchPowerMonthly(location, 5).then(result => {
-      if (current) setSeries(result)
-    }).catch(reason => {
-      if (current) setError(reason instanceof Error ? reason.message : 'Impossible de charger les données NASA POWER.')
-    }).finally(() => {
-      if (current) setLoading(false)
-    })
-    return () => { current = false }
-  }, [location.latitude, location.longitude])
 
   useEffect(() => {
     setLatitude(String(location.latitude))
@@ -130,7 +115,7 @@ export function OverviewPage() {
 
         <aside className="overview-panel overview-climate-panel" aria-label="Dernière période climatique NASA POWER">
           <header className="overview-panel-heading"><div><h2>Climat & eau · NASA POWER</h2><p>{loading ? 'Chargement de la série mensuelle…' : `Dernière période disponible · ${latestDate}`}</p></div><span className="panel-icon climate-icon"><CloudRain size={18} /></span></header>
-          {loading ? <div className="overview-loading"><span className="overview-spinner" />Récupération de données NASA…</div> : error ? <div className="overview-api-error" role="alert"><span>{error}</span><button type="button" onClick={() => { setSeries(null); setLoading(true); setError(''); fetchPowerMonthly(location, 5).then(setSeries).catch(reason => setError(reason instanceof Error ? reason.message : 'Erreur NASA POWER.')).finally(() => setLoading(false)) }}><RefreshCw size={13} />Réessayer</button></div> : <>
+          {loading ? <div className="overview-loading"><span className="overview-spinner" />Récupération de données NASA…</div> : error ? <div className="overview-api-error" role="alert"><span>{error}</span><button type="button" onClick={retry}><RefreshCw size={13} />Réessayer</button></div> : <>
             <div className="climate-indicators">
               <Metric icon={<CloudRain size={17} />} tone="rain" label="Pluie moyenne mensuelle" value={latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(2).replace('.', ',')} mm/j`} detail="NASA POWER · PRECTOTCORR" />
               <Metric icon={<ThermometerSun size={17} />} tone="temp" label="Température moyenne" value={latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`} detail="NASA POWER · T2M" />

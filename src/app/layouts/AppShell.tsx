@@ -1,9 +1,10 @@
 import { Bell, ChevronDown, ChevronLeft, CircleHelp, CloudRain, Leaf, MapPin, Menu, ThermometerSun, UserRound } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useMemo, useState } from 'react'
 import { featureRoutes } from '../navigation'
 import { useSelectedLocation } from '../../lib/geo/location'
-import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord } from '../../lib/nasa/power'
+import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
+import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 
 function coordinate(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(2).replace('.', ',')}° ${value < 0 ? negative : positive}`
@@ -13,24 +14,9 @@ export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const { location } = useSelectedLocation()
-  const [latest, setLatest] = useState<PowerMonthlyRecord | undefined>()
-  const [loading, setLoading] = useState(true)
-  const [unavailable, setUnavailable] = useState(false)
-
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    setUnavailable(false)
-    fetchPowerMonthly(location, 5).then(series => {
-      if (active) setLatest(latestCompleteRecord(series.records))
-    }).catch(() => {
-      if (active) {
-        setLatest(undefined)
-        setUnavailable(true)
-      }
-    }).finally(() => { if (active) setLoading(false) })
-    return () => { active = false }
-  }, [location])
+  const { series, loading, error } = usePowerMonthly(location)
+  const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
+  const unavailable = Boolean(error)
 
   return (
     <div className="app-frame">

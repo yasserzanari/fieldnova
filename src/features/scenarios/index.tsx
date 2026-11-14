@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { Activity, CloudRain, Droplets, ExternalLink, LocateFixed, MapPinned, RefreshCw, ShieldCheck, ThermometerSun } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
-import { fetchPowerMonthly, formatPowerMonth, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { formatPowerMonth, type PowerMonthlyRecord } from '../../lib/nasa/power'
+import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { RotationExplorer } from './RotationExplorer'
 import './scenarios.css'
 
@@ -94,28 +95,11 @@ function ClimateScenariosPage() {
   const [showNdvi, setShowNdvi] = useState(false)
   const [imageryDate, setImageryDate] = useState(daysAgo(11))
   const [map, setMap] = useState<MapLibreMap | null>(null)
-  const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-  const [refreshKey, setRefreshKey] = useState(0)
+  const { series, loading, error, retry } = usePowerMonthly(location)
   const [activeCases, setActiveCases] = useState<CaseId[]>(['reference', 'dry', 'heat'])
   const [priority, setPriority] = useState<Priority>('water')
   const [range, setRange] = useState(12)
   const [locating, setLocating] = useState(false)
-
-  useEffect(() => {
-    let current = true
-    setLoading(true)
-    setError('')
-    fetchPowerMonthly(location, 5).then(result => {
-      if (current) setSeries(result)
-    }).catch(reason => {
-      if (current) setError(reason instanceof Error ? reason.message : 'Impossible de charger NASA POWER.')
-    }).finally(() => {
-      if (current) setLoading(false)
-    })
-    return () => { current = false }
-  }, [location.latitude, location.longitude, refreshKey])
 
   const cases = useMemo(() => deriveCases(series?.records ?? []), [series])
   const displayedCases = cases.filter(item => activeCases.includes(item.id))
@@ -155,7 +139,7 @@ function ClimateScenariosPage() {
 
       <aside className="scenario-panel scenario-config-panel" aria-label="Périodes historiques à comparer">
         <header className="scenario-panel-heading"><div><span className="scenario-icon"><Activity size={16} /></span><span><h2>Périodes historiques</h2><small>Statistiques calculées sur NASA POWER</small></span></div><span className="scenario-count">{activeCases.length}/{cases.length}</span></header>
-        {loading ? <div className="scenario-data-state" role="status">Chargement des séries NASA…</div> : error ? <div className="scenario-data-error" role="alert">{error}<button type="button" onClick={() => setRefreshKey(value => value + 1)}><RefreshCw size={12} />Réessayer</button></div> : <>
+        {loading ? <div className="scenario-data-state" role="status">Chargement des séries NASA…</div> : error ? <div className="scenario-data-error" role="alert">{error}<button type="button" onClick={retry}><RefreshCw size={12} />Réessayer</button></div> : <>
           <div className="scenario-select-list">{cases.map(item => { const Icon = caseCopy[item.id].icon; return <label key={item.id} className={`scenario-choice ${item.id} ${activeCases.includes(item.id) ? 'is-selected' : ''}`}><input type="checkbox" checked={activeCases.includes(item.id)} onChange={() => toggleCase(item.id)} /><span className="scenario-choice-icon"><Icon size={15} /></span><span><strong>{item.title}</strong><small>{item.period} · {item.count} valeurs</small></span></label> })}</div>
           <div className="scenario-priority-heading"><strong>Classer les périodes par</strong><span>Critère de surveillance historique</span></div>
           <div className="scenario-priority-list" role="radiogroup" aria-label="Critère de surveillance">{(Object.keys(priorityCopy) as Priority[]).map(id => { const Icon = priorityCopy[id].icon; return <label key={id} className={`scenario-priority ${priority === id ? 'is-active' : ''}`}><input type="radio" name="scenario-priority" checked={priority === id} onChange={() => setPriority(id)} /><Icon size={14} /><span>{priorityCopy[id].title}</span></label> })}</div>
