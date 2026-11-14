@@ -115,18 +115,21 @@ export function evaluateRotation(plan: RotationPlan) {
   }
 }
 
+export function rotationPriorityValue(metrics: ReturnType<typeof evaluateRotation>, priority: RotationPriority) {
+  return priority === 'diversity'
+    ? metrics.distinctFamilies
+    : priority === 'alternation'
+      ? -metrics.repeatedFamilyTransitions
+      : priority === 'legume'
+        ? metrics.legumeSeasons
+        : metrics.knownRootTransitions
+}
+
 export function topRotations(plans: RotationPlan[], priority: RotationPriority, unavailableCropIds: CropId[] = []) {
   const complete = plans.map(plan => ({ plan, metrics: evaluateRotation(plan) })).filter(item => item.metrics.complete && !item.plan.crops.some(id => id && unavailableCropIds.includes(id)))
   if (!complete.length) return []
-  const value = (item: typeof complete[number]) => priority === 'diversity'
-    ? item.metrics.distinctFamilies
-    : priority === 'alternation'
-      ? -item.metrics.repeatedFamilyTransitions
-      : priority === 'legume'
-        ? item.metrics.legumeSeasons
-        : item.metrics.knownRootTransitions
-  const best = Math.max(...complete.map(value))
-  return complete.filter(item => value(item) === best).map(item => item.plan.id)
+  const best = Math.max(...complete.map(item => rotationPriorityValue(item.metrics, priority)))
+  return complete.filter(item => rotationPriorityValue(item.metrics, priority) === best).map(item => item.plan.id)
 }
 
 export function generateRotationOptions(reference: RotationPlan, priority: RotationPriority, unavailableCropIds: CropId[]): [RotationPlan, RotationPlan] | null {
@@ -135,20 +138,12 @@ export function generateRotationOptions(reference: RotationPlan, priority: Rotat
 
   const referenceKey = reference.crops.join('|')
   const candidates: Array<{ crops: CropId[]; metrics: ReturnType<typeof evaluateRotation>; score: number; key: string }> = []
-  const scoreMetrics = (metrics: ReturnType<typeof evaluateRotation>) => priority === 'diversity'
-    ? metrics.distinctFamilies
-    : priority === 'alternation'
-      ? -metrics.repeatedFamilyTransitions
-      : priority === 'legume'
-        ? metrics.legumeSeasons
-        : metrics.knownRootTransitions
-
   const visit = (crops: CropId[]) => {
     if (crops.length === 5) {
       const key = crops.join('|')
       if (key === referenceKey) return
       const metrics = evaluateRotation({ id: 'option-a', title: 'Option A', crops })
-      candidates.push({ crops: [...crops], metrics, score: scoreMetrics(metrics), key })
+      candidates.push({ crops: [...crops], metrics, score: rotationPriorityValue(metrics, priority), key })
       return
     }
     for (const crop of available) visit([...crops, crop.id])

@@ -5,6 +5,7 @@ The Assistant route pairs a French chat with the shared interactive map. Clickin
 ## Live data and limits
 
 - Climate questions read the selected point's NASA POWER monthly temperature, corrected precipitation, and modeled soil-wetness series. The displayed month and grid coordinate travel with the response.
+- Rotation questions include per-plan family, legume and documented-root counts, raw differences from the current reference, and any user-declared crop exclusions. These counts are descriptive; they do not predict yield or soil improvement.
 - Soil-profile questions read only the locally saved user profile, including any entered depth horizons; missing depth intervals remain unknown. Rotation questions read the locally saved rotation workspace and calculate the same family/repetition/legume counts shown in Scenarios.
 - Tool traces distinguish the loaded NASA series, a NASA request when required, and local browser data reads, including user-declared unavailable crops that constrain candidate rotations. A map-layer action is shown as an interface step. Errors and missing values stay visible; no example measurement is substituted.
 - NASA map layers are coarse regional pixels. They do not outline or diagnose a farm parcel. POWER precipitation is a monthly mean daily rate, not a 7-day total or forecast.
