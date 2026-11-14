@@ -16,7 +16,7 @@ import { cropCatalog, evaluateRotation, priorityLabels, readRotationWorkspace, r
 import './assistant.css'
 
 type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
-type Message = { id: number; role: 'user' | 'assistant'; text: string; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[] }
+type Message = { id: number; role: 'user' | 'assistant'; text: string; point?: GeoPoint; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[] }
 type CodexStatus = 'checking' | 'ready' | 'unavailable'
 
 const sources: AISource[] = [
@@ -228,9 +228,10 @@ export function AssistantPage() {
     const id = ++lastId.current
     const userId = ++lastId.current
     const route = classifyQuestion(question)
+    const messagePoint = { latitude: location.latitude, longitude: location.longitude }
     const requestedLayer = route.asksLayer ?? layer
     if (route.asksLayer) setLayer(route.asksLayer)
-    setMessages(current => [...current, { id: userId, role: 'user', text: question }, { id, role: 'assistant', text: '', running: true }])
+    setMessages(current => [...current, { id: userId, role: 'user', text: question, point: messagePoint }, { id, role: 'assistant', text: '', point: messagePoint, running: true }])
     const trace: TraceNode[] = []
     let currentSeries = series
     let answer: string
@@ -350,6 +351,7 @@ export function AssistantPage() {
             {message.role === 'assistant' && <div className="assistant-message-mark"><Sparkles size={14} /></div>}
             <div className="assistant-message-body">
               {message.role === 'user' ? <div className="assistant-user-bubble">{message.text}</div> : <>
+                {message.point && <small className="assistant-answer-point">Point utilisé · {message.point.latitude.toFixed(5).replace('.', ',')}° · {message.point.longitude.toFixed(5).replace('.', ',')}°</small>}
                 {Boolean(message.trace?.length) && <ThinkingState nodes={message.trace!} autoPlay={Boolean(message.running)} defaultExpanded={Boolean(message.running)} workingLabel={message.running ? 'Exécution des outils FieldNova' : message.traceHeading ?? 'Activité de l’assistant'} onSettled={() => setMessages(current => current.map(item => item.id === message.id ? { ...item, running: false } : item))} className="assistant-trace" />}
                 {message.text ? <p className="assistant-answer-text">{message.text}</p> : message.running ? <p className="assistant-pending">Consultation des données sélectionnées…</p> : null}
                 {message.sources && <AISources className="assistant-sources" label="Sources utilisées" sources={message.sources} />}
