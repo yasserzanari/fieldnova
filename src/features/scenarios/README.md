@@ -2,6 +2,8 @@
 
 - **Route :** `/app/scenarios`
 - **Explorateur de rotations :** compare une rotation de référence et deux options modifiables sur cinq années. Les profils enregistrés à trois années sont conservés et restent à compléter pour les années 4 et 5.
+- **Générateur exploratoire :** produit deux séquences parmi les combinaisons du catalogue, après exclusion des cultures déclarées indisponibles. L’option A maximise le critère sélectionné; l’option B favorise la diversité parmi les résultats à un point du meilleur critère. Les options sont éditables et sauvegardées localement par point. Les règles ne modélisent ni le climat, ni le sol, ni le calendrier ou la faisabilité agronomique.
+- **Contraintes de ferme saisies :** l’utilisateur peut marquer les cultures indisponibles pour les options candidates. Ces contraintes sont stockées localement par point et restent distinctes de la rotation de référence, qui représente la pratique actuelle.
 - **Traits documentés des cultures :** famille botanique, statut de légumineuse et architecture racinaire (fasciculée, pivotante ou inconnue). Les inconnues sont exclues du compte des alternances racinaires. Les références DRAAF Hauts-de-France et INRAE sont affichées; elles ne valident pas une variété ni un conseil pour une parcelle donnée.
 - **Critères de comparaison :** familles distinctes, répétitions de famille, présence de légumineuses, alternance entre racines documentées. Le classement ne transforme pas ces comptes en score de rendement ou en bénéfice de sol.
 - **Climat NASA POWER :** série et repères historiques du point suivis comme contexte visible à côté des rotations; ils ne changent pas le classement et ne sont pas interprétés comme une prévision.

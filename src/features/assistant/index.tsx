@@ -8,8 +8,9 @@ import { LiquidMultimodalInput } from '../../components/ai-chat/liquid-multimoda
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { readSoilProfile, soilSourceLabels } from '../../lib/farm/soil-profile'
+import { readRotationConstraints } from '../scenarios/rotation-constraints'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
-import { cropCatalog, evaluateRotation, priorityLabels, readRotationWorkspace, rotationSources } from '../scenarios/rotation-model'
+import { cropCatalog, evaluateRotation, priorityLabels, readRotationWorkspace, rotationSources, type CropId } from '../scenarios/rotation-model'
 import './assistant.css'
 
 type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
@@ -114,6 +115,7 @@ function formatSoilAnswer(point: GeoPoint) {
 
 function formatRotationAnswer(point: GeoPoint) {
   const workspace = readRotationWorkspace(point)
+  const constraints = readRotationConstraints(point)
   const plans = workspace.plans.map(plan => {
     const metrics = evaluateRotation(plan)
     if (!metrics.complete) return `${plan.title} : succession incomplète.`
@@ -123,9 +125,12 @@ function formatRotationAnswer(point: GeoPoint) {
       const root = crop.rootArchitecture === 'fibrous' ? 'racines fasciculées' : crop.rootArchitecture === 'taproot' ? 'racines pivotantes' : 'racines non documentées'
       return `${crop.label} (${crop.familyLabel}${crop.isLegume ? ', légumineuse' : ''}, ${root})`
     }).join(' → ')
-    return `${plan.title} (${crops}) : ${metrics.distinctFamilies} familles botaniques distinctes, ${metrics.repeatedFamilyTransitions} répétition(s) de famille, ${metrics.legumeSeasons} année(s) avec légumineuse et ${metrics.knownRootTransitions} transition(s) entre architectures racinaires connues.`
+    const unavailable = plan.id === 'reference' ? [] : [...new Set(plan.crops.filter((id): id is CropId => Boolean(id && constraints.unavailableCropIds.includes(id))))]
+    const constraintStatus = unavailable.length ? ` Option exclue du classement car le profil déclare ${unavailable.map(id => cropCatalog.find(crop => crop.id === id)?.label ?? id).join(', ')} indisponible(s).` : ''
+    return `${plan.title} (${crops}) : ${metrics.distinctFamilies} familles botaniques distinctes, ${metrics.repeatedFamilyTransitions} répétition(s) de famille, ${metrics.legumeSeasons} année(s) avec légumineuse et ${metrics.knownRootTransitions} transition(s) entre architectures racinaires connues.${constraintStatus}`
   })
-  return `${workspace.isExample ? 'Les scénarios affichés sont des exemples sur cinq années.' : 'Voici les scénarios enregistrés pour ce point.'} Critère sélectionné : ${priorityLabels[workspace.priority]}. ${plans.join(' ')} Les architectures racinaires absentes de la référence sont laissées inconnues. Ces indicateurs décrivent la séquence; ils ne prédisent ni rendement ni amélioration du sol. La référence racinaire est régionale et doit être confirmée localement. Vous pouvez modifier les cultures dans l’onglet Scénarios.`
+  const unavailableLabels = constraints.unavailableCropIds.map(id => cropCatalog.find(crop => crop.id === id)?.label ?? id)
+  return `${workspace.isExample ? 'Les scénarios affichés sont des exemples sur cinq années.' : 'Voici les scénarios enregistrés pour ce point.'} Critère sélectionné : ${priorityLabels[workspace.priority]}. ${unavailableLabels.length ? `Cultures déclarées indisponibles pour les options : ${unavailableLabels.join(', ')}. ` : 'Aucune culture déclarée indisponible. '}${plans.join(' ')} Les architectures racinaires absentes de la référence sont laissées inconnues. Ces indicateurs décrivent la séquence; ils ne prédisent ni rendement ni amélioration du sol. La référence racinaire est régionale et doit être confirmée localement. Vous pouvez modifier les cultures et contraintes dans l’onglet Scénarios.`
 }
 
 function traceNode(id: string, toolName: string, label: string, primary: string, secondary: string, status: 'completed' | 'failed' = 'completed'): TraceNode {
@@ -203,8 +208,9 @@ export function AssistantPage() {
       evidence = answer
     } else if (route.intent === 'rotation') {
       const workspace = readRotationWorkspace(location)
+      const constraints = readRotationConstraints(location)
       const completePlans = workspace.plans.filter(plan => evaluateRotation(plan).complete).length
-      trace.push(traceNode(`rotation-${id}`, 'read', 'Scénarios de rotation · navigateur', 'Rotations consultées', `${completePlans}/3 scénario(s) complet(s) · priorité ${workspace.priority}`, 'completed'))
+      trace.push(traceNode(`rotation-${id}`, 'read', 'Scénarios de rotation · navigateur', 'Rotations et contraintes consultées', `${completePlans}/3 scénario(s) complet(s) · priorité ${workspace.priority} · ${constraints.unavailableCropIds.length} culture(s) indisponible(s)`, 'completed'))
       traceHeading = 'Scénarios de rotation consultés'
       answer = formatRotationAnswer(location)
       evidence = answer
