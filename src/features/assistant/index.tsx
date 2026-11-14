@@ -75,8 +75,10 @@ function classifyQuestion(question: string) {
   const lower = question.toLocaleLowerCase('fr')
   const asksSoilProfile = /profil|texture|\bph\b|matière organique|drainage|profondeur|analyse de sol/.test(lower)
   const asksRotation = /rotation|succession|famille botanique|légumineuse|alternance|cultures?/.test(lower)
-  const asksLayer: LayerId | undefined = /ndvi|vigueur/.test(lower) ? 'ndvi' : /humidité de surface|surface/.test(lower) ? 'surface' : /humidité racinaire|racine/.test(lower) ? 'root' : undefined
-  return { lower, intent: asksSoilProfile ? 'soil' : asksRotation ? 'rotation' : 'climate', asksLayer }
+  const asksClimate = /pluie|précip|température|\bchaud\b|\bfroid\b|humidité|climat|météo|nasa|ndvi|vigueur|satellite|imagerie/.test(lower)
+  const asksLayer: LayerId | undefined = /ndvi|vigueur/.test(lower) ? 'ndvi' : /humidité de surface|smap surface/.test(lower) ? 'surface' : /humidité racinaire|humidité du sol|racine/.test(lower) ? 'root' : undefined
+  const intent = asksSoilProfile ? 'soil' : asksRotation ? 'rotation' : asksClimate ? 'climate' : 'unknown'
+  return { intent, asksLayer }
 }
 
 function formatSoilAnswer(point: GeoPoint) {
@@ -172,6 +174,8 @@ export function AssistantPage() {
       trace.push(traceNode(`rotation-${id}`, 'read', 'Scénarios de rotation · navigateur', 'Rotations consultées', `${completePlans}/3 scénario(s) complet(s) · priorité ${workspace.priority}`, 'completed'))
       traceHeading = 'Scénarios de rotation consultés'
       answer = formatRotationAnswer(location)
+    } else if (route.intent === 'unknown') {
+      answer = 'Je peux agir sur les données NASA POWER mensuelles, les couches NASA de la carte, le profil de sol saisi localement et les rotations enregistrées. Posez une question sur la pluie, la température, l’humidité, le NDVI, le sol ou une rotation; aucune donnée n’a été consultée pour cette question.'
     } else {
       let failed = false
       const seriesAlreadyLoaded = Boolean(currentSeries && currentSeries.point.latitude === location.latitude && currentSeries.point.longitude === location.longitude)

@@ -9,6 +9,7 @@ The Assistant route pairs a French chat with the shared interactive map. Clickin
 - Tool traces distinguish the loaded NASA series, a NASA request when required, and local browser data reads. A map-layer action is shown as an interface step. Errors and missing values stay visible; no example measurement is substituted.
 - NASA map layers are coarse regional pixels. They do not outline or diagnose a farm parcel. POWER precipitation is a monthly mean daily rate, not a 7-day total or forecast.
 - A local question router chooses among those implemented data tools and map-layer actions. No LLM service is connected, and attached file contents are not parsed; the UI says this before upload.
+- Questions outside those topics receive a capability explanation and do not silently trigger a NASA lookup.
 - Irrigation dose or timing, yield, and crop-health conclusions are not inferred from these regional data.
 
 ## Source references
