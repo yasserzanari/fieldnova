@@ -1,11 +1,9 @@
 # Vue d’ensemble
 
 - **Route :** `/app/overview`
-- **Entrée :** `index.tsx`
-- **Objectif :** afficher la carte des parcelles, le contexte de la saison, les principaux signaux eau/climat, le profil de sol et le calendrier au même endroit sans défilement vertical du document.
-- **Interactions :** sélectionner une parcelle sur la carte ou dans la liste, déplacer/zoomer/recentrer la carte, basculer la couche satellite/risque hydrique et choisir une étape du calendrier.
-- **Données :** toutes les valeurs et limites de parcelles sont des données illustratives de démonstration. Elles ne sont pas des observations NASA ni des mesures de ferme.
-- **Graphique :** `ClimateChart.tsx` adapte étroitement la composition Recharts archivée dans FrontUI à la pluie mensuelle observée et à une médiane de comparaison illustrative. L’archive `recharts-chart` fournit le conteneur et l’infobulle ; `recharts` fournit le rendu et le redimensionnement.
-- **Source cartographique :** l’image `public/images/landing-fields.png` est un fond visuel de démonstration. La carte n’est pas géoréférencée et n’effectue aucun appel réseau.
-- **Bookmarks évalués :** `Circular Split Roll` est une galerie orbitale épinglée au défilement ; `Market Heatmap` organise des valeurs boursières en treemap. Leur sémantique ne correspond pas aux parcelles agricoles ou à un panneau météo.
-- **À raccorder :** polygones cadastraux, couches d’observation satellite, météo et références de sol avec provenance, période et niveau de confiance.
+- **Carte :** MapLibre avec fond OpenStreetMap, imagerie MODIS/Terra True Color et couche NDVI 8 jours servies par NASA GIBS. La carte se déplace, zoome, accepte une sélection de point au clic et permet de saisir des coordonnées ou de demander la position du navigateur.
+- **Données climatiques :** séries mensuelles NASA POWER pour le point sélectionné (`PRECTOTCORR`, `T2M`, `T2M_MAX`, `T2M_MIN`, `GWETROOT`). Les valeurs de remplissage NASA sont ignorées. Le point est rapproché de la cellule de grille renvoyée par l’API.
+- **Graphiques :** précipitations moyennes quotidiennes mensuelles, température moyenne et humidité racinaire modélisée ; les tracés proviennent directement des séries NASA reçues. Les infobulles SVG exposent la valeur exacte et la période.
+- **Persistance :** le point choisi est mémorisé en local et partagé entre onglets via `useSelectedLocation`.
+- **Limite métier :** le centre par défaut est une position de départ en France, pas une ferme connue. Un point de carte et une cellule NASA ne sont pas des limites ou une mesure de parcelle. `GWETROOT` est un indicateur modélisé, pas une sonde de terrain.
+- **Dépendances partagées :** `src/components/maps/FieldMap.tsx`, `src/lib/geo/location.ts`, `src/lib/nasa/power.ts`.

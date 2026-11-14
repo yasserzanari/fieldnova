@@ -1,143 +1,154 @@
-import { useRef, useState, type PointerEvent } from 'react'
-import { ArrowDownRight, ArrowUpRight, CloudRain, Droplets, Layers2, LocateFixed, Minus, Plus, Sprout, ThermometerSun } from 'lucide-react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Activity, CloudRain, Droplets, ExternalLink, LocateFixed, MapPinned, Minus, Plus, RefreshCw, Satellite, Search, ShieldCheck, ThermometerSun } from 'lucide-react'
+import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
+import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
+import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
+import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { ClimateChart } from './ClimateChart'
 import './overview.css'
 
-type Parcel = { id: string; name: string; crop: string; area: string; moisture: string; risk: 'Bas' | 'Modéré'; soil: { clay: number; silt: number; sand: number; storage: number } }
+function daysAgo(days: number) {
+  const date = new Date()
+  date.setDate(date.getDate() - days)
+  return date.toISOString().slice(0, 10)
+}
 
-const parcels: Parcel[] = [
-  { id: 'P-03', name: 'La Grande Pièce', crop: 'Maïs', area: '7,4 ha', moisture: '31 %', risk: 'Modéré', soil: { clay: 28, silt: 46, sand: 26, storage: 130 } },
-  { id: 'P-04', name: 'Les Chênes', crop: 'Blé', area: '5,8 ha', moisture: '38 %', risk: 'Bas', soil: { clay: 22, silt: 49, sand: 29, storage: 117 } },
-  { id: 'P-07', name: 'Le Haut Champ', crop: 'Couvert', area: '4,2 ha', moisture: '35 %', risk: 'Bas', soil: { clay: 31, silt: 42, sand: 27, storage: 145 } },
-]
-
-const steps = [
-  { id: 'semis', date: '12 avr.', name: 'Semis du maïs', status: 'Terminé' },
-  { id: 'suivi', date: '19 mai', name: 'Contrôle de levée', status: 'Terminé' },
-  { id: 'irrigation', date: '08 août', name: 'Point irrigation', status: 'À vérifier' },
-]
-
-const polygonPoints: Record<string, string> = {
-  'P-03': '324,248 493,185 601,228 596,376 449,425 334,375',
-  'P-04': '590,146 765,172 806,301 602,365 600,228',
-  'P-07': '180,385 332,376 448,428 401,564 215,531 150,455',
+function formatCoord(value: number, suffix: string) {
+  return `${Math.abs(value).toFixed(3).replace('.', ',')}° ${suffix}`
 }
 
 export function OverviewPage() {
-  const [selectedId, setSelectedId] = useState('P-03')
-  const [mapMode, setMapMode] = useState<'satellite' | 'water'>('satellite')
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [dragging, setDragging] = useState(false)
-  const [selectedStep, setSelectedStep] = useState('irrigation')
-  const dragStart = useRef({ pointerX: 0, pointerY: 0, panX: 0, panY: 0 })
-  const selectedParcel = parcels.find(parcel => parcel.id === selectedId) ?? parcels[0]
+  const { location, selectLocation } = useSelectedLocation()
+  const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('streets')
+  const [showNdvi, setShowNdvi] = useState(false)
+  const [imageryDate, setImageryDate] = useState(daysAgo(2))
+  const [map, setMap] = useState<MapLibreMap | null>(null)
+  const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [latitude, setLatitude] = useState(String(location.latitude))
+  const [longitude, setLongitude] = useState(String(location.longitude))
+  const [coordError, setCoordError] = useState('')
+  const [locating, setLocating] = useState(false)
 
-  const beginPan = (event: PointerEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest('.overview-panel, .map-control, .map-mode-switch')) return
-    event.currentTarget.setPointerCapture(event.pointerId)
-    dragStart.current = { pointerX: event.clientX, pointerY: event.clientY, panX: pan.x, panY: pan.y }
-    setDragging(true)
+  useEffect(() => {
+    let current = true
+    setLoading(true)
+    setError('')
+    fetchPowerMonthly(location, 5).then(result => {
+      if (current) setSeries(result)
+    }).catch(reason => {
+      if (current) setError(reason instanceof Error ? reason.message : 'Impossible de charger les données NASA POWER.')
+    }).finally(() => {
+      if (current) setLoading(false)
+    })
+    return () => { current = false }
+  }, [location.latitude, location.longitude])
+
+  useEffect(() => {
+    setLatitude(String(location.latitude))
+    setLongitude(String(location.longitude))
+    setCoordError('')
+  }, [location.latitude, location.longitude])
+
+  const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
+  const updatePoint = (point: GeoPoint) => {
+    selectLocation(point)
+    setCoordError('')
   }
-  const movePan = (event: PointerEvent<HTMLDivElement>) => {
-    if (!dragging) return
-    setPan({ x: dragStart.current.panX + event.clientX - dragStart.current.pointerX, y: dragStart.current.panY + event.clientY - dragStart.current.pointerY })
+
+  const applyCoordinates = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const point = { latitude: Number(latitude.replace(',', '.')), longitude: Number(longitude.replace(',', '.')) }
+    if (!Number.isFinite(point.latitude) || !Number.isFinite(point.longitude) || Math.abs(point.latitude) > 90 || Math.abs(point.longitude) > 180) {
+      setCoordError('Latitude : −90 à 90 · longitude : −180 à 180.')
+      return
+    }
+    updatePoint(point)
+    map?.flyTo({ center: [point.longitude, point.latitude], zoom: Math.max(map.getZoom(), 7), duration: 850 })
   }
-  const stopPan = () => setDragging(false)
+
+  const locateMe = () => {
+    if (!navigator.geolocation) { setCoordError('La géolocalisation n’est pas disponible sur cet appareil.'); return }
+    setLocating(true)
+    setCoordError('')
+    navigator.geolocation.getCurrentPosition(position => {
+      const point = { latitude: Number(position.coords.latitude.toFixed(5)), longitude: Number(position.coords.longitude.toFixed(5)) }
+      updatePoint(point)
+      map?.flyTo({ center: [point.longitude, point.latitude], zoom: 9, duration: 900 })
+      setLocating(false)
+    }, reason => {
+      setCoordError(reason.code === reason.PERMISSION_DENIED ? 'Autorisez la position dans votre navigateur ou cliquez sur la carte.' : 'Position indisponible. Cliquez sur la carte pour choisir un point.')
+      setLocating(false)
+    }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 })
+  }
+
+  const latestDate = latest ? formatPowerMonth(latest.date) : 'aucune période valide'
+  const dataPoint = series?.gridPoint
 
   return (
-    <section className="overview-page" aria-label="Vue d’ensemble de l’exploitation">
+    <section className="overview-page" aria-label="Vue d’ensemble avec données NASA en direct">
       <header className="overview-heading">
-        <div>
-          <h1>Vue d’ensemble</h1>
-          <p>La situation de vos parcelles, du climat à la prochaine intervention.</p>
-        </div>
-        <div className="overview-context">
-          <span className="overview-context-farm">Ferme des Chênes <span>·</span> Saison maïs 2025</span>
-        </div>
+        <div><h1>Vue d’ensemble</h1><p>Choisissez un point sur la carte pour charger le climat NASA à cet emplacement.</p></div>
+        <div className="overview-live-badge"><span />NASA POWER · service en direct</div>
       </header>
 
-      <div className={`overview-map-stage ${dragging ? 'is-dragging' : ''} ${mapMode === 'water' ? 'map-mode-water' : ''}`} onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={stopPan} onPointerCancel={stopPan}>
-        <div className="overview-map-world" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
-          <img className="overview-map-image" src="/images/landing-fields.png" alt="Vue satellite illustrative des parcelles agricoles" draggable={false} />
-          {mapMode === 'water' && <div className="map-water-overlay" aria-hidden="true" />}
-          <svg className="overview-parcel-map" viewBox="0 0 1000 700" role="group" aria-label="Parcelles agricoles de démonstration">
-            {parcels.map(parcel => (
-              <g key={parcel.id} className={`parcel-shape ${selectedId === parcel.id ? 'is-selected' : ''}`} onClick={() => setSelectedId(parcel.id)} tabIndex={0} role="button" aria-label={`Sélectionner ${parcel.id}, ${parcel.name}, ${parcel.area}`} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedId(parcel.id) } }}>
-                <polygon points={polygonPoints[parcel.id]} />
-                <text x={parcel.id === 'P-03' ? 455 : parcel.id === 'P-04' ? 690 : 280} y={parcel.id === 'P-03' ? 322 : parcel.id === 'P-04' ? 250 : 476}>{parcel.id}</text>
-              </g>
-            ))}
-          </svg>
-        </div>
-
+      <div className="overview-map-stage">
+        <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} imageryDate={imageryDate} onPointSelect={updatePoint} onMapReady={setMap} ariaLabel="Carte interactive OpenStreetMap et couches NASA GIBS" />
         <div className="overview-map-topline">
-          <span className="map-location"><LocateFixed size={15} /> Ferme des Chênes <span>·</span> France</span>
-          <div className="map-mode-switch" role="group" aria-label="Couche de carte">
-            <button type="button" className={mapMode === 'satellite' ? 'is-active' : ''} onClick={() => setMapMode('satellite')}><Layers2 size={14} /> Satellite</button>
-            <button type="button" className={mapMode === 'water' ? 'is-active' : ''} onClick={() => setMapMode('water')}><Droplets size={14} /> Déficit hydrique</button>
+          <div className="map-location"><MapPinned size={15} /><span>{formatCoord(location.latitude, location.latitude < 0 ? 'S' : 'N')} · {formatCoord(location.longitude, location.longitude < 0 ? 'O' : 'E')}</span><small>Point suivi</small></div>
+          <div className="overview-map-options">
+            <div className="map-mode-switch" role="group" aria-label="Fond de carte">
+              <button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}><MapPinned size={13} />Plan</button>
+              <button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}><Satellite size={13} />NASA</button>
+              <button type="button" className={showNdvi ? 'is-active' : ''} onClick={() => setShowNdvi(value => !value)}><Activity size={13} />NDVI</button>
+            </div>
+            <label className="overview-imagery-date">Date imagerie <input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label>
           </div>
         </div>
+
         <div className="overview-map-controls" role="group" aria-label="Contrôles de la carte">
-          <button className="map-control" type="button" aria-label="Zoomer" onClick={() => setZoom(value => Math.min(1.7, +(value + 0.15).toFixed(2)))}><Plus size={17} /></button>
-          <button className="map-control" type="button" aria-label="Dézoomer" onClick={() => setZoom(value => Math.max(.85, +(value - 0.15).toFixed(2)))}><Minus size={17} /></button>
-          <button className="map-control" type="button" aria-label="Recentrer la carte" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}><LocateFixed size={16} /></button>
+          <button className="map-control" type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 250 })}><Plus size={17} /></button>
+          <button className="map-control" type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 250 })}><Minus size={17} /></button>
+          <button className="map-control" type="button" aria-label="Centrer sur ma position" title="Ma position" onClick={locateMe} disabled={locating}><LocateFixed size={16} /></button>
         </div>
-        <div className="overview-map-scale"><span /><span>100 m</span></div>
-        <div className="overview-map-disclaimer">Fond satellite et parcelles illustratifs</div>
+        <span className="overview-map-click-hint">Cliquez sur la carte pour interroger NASA POWER à cet endroit</span>
 
-        <aside className="overview-panel overview-parcels-panel" aria-label="Parcelles">
-          <header className="overview-panel-heading"><div><h2>Mes parcelles</h2><p>42 ha exploitation · 3 parcelles</p></div><span className="panel-icon"><Sprout size={17} /></span></header>
-          <div className="parcel-list">
-            {parcels.map(parcel => (
-              <button key={parcel.id} type="button" className={`parcel-row ${parcel.id === selectedId ? 'is-active' : ''}`} onClick={() => setSelectedId(parcel.id)}>
-                <span className="parcel-row-color" />
-                <span className="parcel-row-main"><strong>{parcel.name}</strong><small>{parcel.id} · {parcel.crop} · {parcel.area}</small></span>
-                <span className={`parcel-risk risk-${parcel.risk.toLowerCase()}`}>{parcel.risk}</span>
-              </button>
-            ))}
-          </div>
-          <div className="selected-parcel-summary">
-            <div><span>Humidité estimée</span><strong>{selectedParcel.moisture}</strong></div>
-            <div><span>Stress hydrique</span><strong>{selectedParcel.risk === 'Bas' ? 'Faible' : 'À surveiller'}</strong></div>
-          </div>
-          <Link to="/app/atlas" className="overview-panel-link">Ouvrir l’Atlas <ArrowUpRight size={15} /></Link>
+        <aside className="overview-panel overview-parcels-panel" aria-label="Point suivi et coordonnées">
+          <header className="overview-panel-heading"><div><h2>Point d’analyse</h2><p>{dataPoint ? `Cellule NASA · ${dataPoint.latitude.toFixed(3)}, ${dataPoint.longitude.toFixed(3)}` : 'Chargement de la cellule NASA…'}</p></div><span className="panel-icon"><MapPinned size={17} /></span></header>
+          <form className="overview-coordinate-form" onSubmit={applyCoordinates}>
+            <label><span>Latitude</span><input inputMode="decimal" value={latitude} onChange={event => setLatitude(event.target.value)} aria-label="Latitude" /></label>
+            <label><span>Longitude</span><input inputMode="decimal" value={longitude} onChange={event => setLongitude(event.target.value)} aria-label="Longitude" /></label>
+            <button type="submit" aria-label="Appliquer les coordonnées"><Search size={14} /></button>
+          </form>
+          {coordError && <p className="overview-coordinate-error" role="alert">{coordError}</p>}
+          <button className="overview-locate-action" type="button" onClick={locateMe} disabled={locating}><LocateFixed size={14} />{locating ? 'Localisation…' : 'Utiliser ma position'}</button>
+          <div className="overview-point-note"><ShieldCheck size={13} /><span>Le point cliqué est rapproché de la cellule de grille NASA correspondante. Ce n’est pas une mesure de parcelle.</span></div>
+          <Link to="/app/atlas" className="overview-panel-link">Ouvrir l’Atlas NASA <ExternalLink size={14} /></Link>
         </aside>
 
-        <aside className="overview-panel overview-climate-panel" aria-label="Climat et tendance des pluies">
-          <header className="overview-panel-heading"><div><h2>Climat & eau</h2><p>Indicateurs de la saison</p></div><span className="panel-icon climate-icon"><CloudRain size={18} /></span></header>
-          <div className="climate-indicators">
-            <div className="climate-indicator"><span className="climate-symbol rain-symbol"><CloudRain size={17} /></span><span><small>Pluie · 7 prochains jours</small><strong>12 mm</strong></span><span className="indicator-delta"><ArrowDownRight size={13} /> −22 %</span></div>
-            <div className="climate-indicator"><span className="climate-symbol temp-symbol"><ThermometerSun size={17} /></span><span><small>Température moyenne</small><strong>18,6 °C</strong></span><span className="indicator-delta delta-warm"><ArrowUpRight size={13} /> +0,7 °C</span></div>
-          </div>
-          <div className="overview-rain-title"><span>Pluie mensuelle</span><span>mm</span></div>
-          <ClimateChart />
-          <button className="overview-risk-action" type="button" onClick={() => setMapMode(value => value === 'water' ? 'satellite' : 'water')}>
-            <span className="risk-action-icon"><Droplets size={17} /></span><span><strong>{mapMode === 'water' ? 'Masquer la couche hydrique' : 'Voir le déficit hydrique'}</strong><small>P-03 : réserve à surveiller</small></span><ArrowUpRight size={16} />
-          </button>
+        <aside className="overview-panel overview-climate-panel" aria-label="Dernière période climatique NASA POWER">
+          <header className="overview-panel-heading"><div><h2>Climat & eau · NASA POWER</h2><p>{loading ? 'Chargement de la série mensuelle…' : `Dernière période disponible · ${latestDate}`}</p></div><span className="panel-icon climate-icon"><CloudRain size={18} /></span></header>
+          {loading ? <div className="overview-loading"><span className="overview-spinner" />Récupération de données NASA…</div> : error ? <div className="overview-api-error" role="alert"><span>{error}</span><button type="button" onClick={() => { setSeries(null); setLoading(true); setError(''); fetchPowerMonthly(location, 5).then(setSeries).catch(reason => setError(reason instanceof Error ? reason.message : 'Erreur NASA POWER.')).finally(() => setLoading(false)) }}><RefreshCw size={13} />Réessayer</button></div> : <>
+            <div className="climate-indicators">
+              <Metric icon={<CloudRain size={17} />} tone="rain" label="Pluie moyenne mensuelle" value={latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(2).replace('.', ',')} mm/j`} detail="NASA POWER · PRECTOTCORR" />
+              <Metric icon={<ThermometerSun size={17} />} tone="temp" label="Température moyenne" value={latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`} detail="NASA POWER · T2M" />
+              <Metric icon={<Droplets size={17} />} tone="water" label="Humidité racinaire modélisée" value={latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`} detail="NASA POWER · GWETROOT" />
+            </div>
+            {series && <div className="overview-data-footnote">Mois de {latestDate} · NASA POWER · {series.source.join(' + ')} · UTC</div>}
+          </>}
         </aside>
-
-        <div className="overview-map-center-label" aria-live="polite"><span className="map-pin"><LocateFixed size={16} /></span><span><strong>{selectedParcel.id} · {selectedParcel.name}</strong><small>{selectedParcel.area} · {selectedParcel.crop} 2025</small></span></div>
       </div>
 
       <div className="overview-bottom-grid">
-        <section className="overview-bottom-panel soil-panel" aria-labelledby="soil-title">
-          <header className="overview-bottom-heading"><div><span className="bottom-icon soil-icon"><Layers2 size={16} /></span><div><h2 id="soil-title">Composition du sol · {selectedParcel.id}</h2><p>Profil indicatif de la parcelle sélectionnée</p></div></div><span className="data-quality">Profil de démonstration</span></header>
-          <div className="soil-content">
-            <div className="soil-layer-visual" role="img" aria-label={`Composition illustrative : ${selectedParcel.soil.clay} pour cent argile, ${selectedParcel.soil.silt} pour cent limon, ${selectedParcel.soil.sand} pour cent sable`}><span className="soil-layer-clay" style={{ width: `${selectedParcel.soil.clay}%` }} /><span className="soil-layer-silt" style={{ width: `${selectedParcel.soil.silt}%` }} /><span className="soil-layer-sand" style={{ width: `${selectedParcel.soil.sand}%` }} /></div>
-            <div className="soil-composition"><div><i className="soil-clay" /><span>Argile</span><strong>{selectedParcel.soil.clay} %</strong></div><div><i className="soil-silt" /><span>Limon</span><strong>{selectedParcel.soil.silt} %</strong></div><div><i className="soil-sand" /><span>Sable</span><strong>{selectedParcel.soil.sand} %</strong></div></div>
-            <div className="soil-note"><Droplets size={16} /><span><small>Réserve utile indicative</small><strong>{selectedParcel.soil.storage} mm</strong></span></div>
-          </div>
-        </section>
-
-        <section className="overview-bottom-panel calendar-panel" aria-labelledby="calendar-title">
-          <header className="overview-bottom-heading"><div><span className="bottom-icon calendar-icon"><Sprout size={16} /></span><div><h2 id="calendar-title">Calendrier cultural · Maïs 2025</h2><p>Les étapes restent modifiables à tout moment.</p></div></div><span className="next-step">Prochaine étape · 08 août</span></header>
-          <div className="calendar-steps" role="group" aria-label="Étapes du calendrier cultural">
-            {steps.map(step => <button key={step.id} type="button" onClick={() => setSelectedStep(step.id)} className={`calendar-step ${selectedStep === step.id ? 'is-selected' : ''} ${step.status === 'Terminé' ? 'is-complete' : ''}`}><span className="step-date">{step.date}</span><strong>{step.name}</strong><small>{selectedStep === step.id ? 'Étape sélectionnée' : step.status}</small></button>)}
-          </div>
-        </section>
+        <ClimateChart records={series?.records ?? []} title="Série climatique NASA · 12 derniers mois" source={series?.source.join(' + ') ?? 'en attente'} />
+        <ClimateChart records={series?.records ?? []} mode="soil" source={series?.source.join(' + ') ?? 'en attente'} />
       </div>
     </section>
   )
+}
+
+function Metric({ icon, tone, label, value, detail }: { icon: React.ReactNode; tone: string; label: string; value: string; detail: string }) {
+  return <div className="climate-indicator"><span className={`climate-symbol ${tone}`}>{icon}</span><span><small>{label}</small><strong>{value}</strong><em>{detail}</em></span></div>
 }
