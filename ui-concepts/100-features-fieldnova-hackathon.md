@@ -147,7 +147,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 ### H. Validité, confiance et qualité des données — 71 à 80
 
 71. **[LIVRÉ · PARTIEL] Registre des sources et méthode** : registre suivi avec produits, paramètres, périodes, résolutions, liens et limites pour les sources actuelles; chaque vue ne référence pas encore tous les détails propres à chaque requête.
-72. **[P0] Fiche de méthode du classement** : formule ou règles visibles, unités et exemples reproductibles.
+72. **[P0 · LIVRÉ] Fiche de méthode du classement** : règles du critère principal, unités, filtres, départages et sélection de l’option alternative consultables depuis le panneau Scénarios; le rôle du climat et du sol est explicité.
 73. **[P0] Séparation entre observation, modèle et saisie utilisateur** : aucune mesure satellite ne se fait passer pour une analyse de sol.
 74. **[P0] Dates et valeurs manquantes auditables** : l’application précise les mois complets et les périodes exclues.
 75. **[P1] Limites spatiales affichées sur la carte** : résolution régionale ou maille NASA visible près de toute valeur importante.
