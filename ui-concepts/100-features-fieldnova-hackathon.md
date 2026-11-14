@@ -121,7 +121,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 ### F. Assistant agricole explicable — 51 à 60
 
 51. **[P0] Réponse liée au scénario et à la parcelle sélectionnés** : le chat ne perd pas son contexte lorsque la carte change.
-52. **[P0] Réponse avec citations internes** : relier chaque chiffre ou affirmation à une source consultable dans l’application.
+52. **[P0 · LIVRÉ] Réponse avec sources consultables** : chaque réponse fondée sur un outil affiche les sources associées à ses données — NASA POWER/GIBS, profil local FieldNova ou références agronomiques — avec distinction explicite entre déclaration locale et source externe.
 53. **[P0] Trace d’outils réelle** : montrer les requêtes exécutées et leur statut, et non une animation prétendant avoir interrogé un outil.
 54. **[P0] Questions de suivi suggérées** : proposer des questions adaptées aux données réellement chargées.
 55. **[P1] Réponses séparant fait, calcul et hypothèse** : utiliser des étiquettes visuelles différentes.

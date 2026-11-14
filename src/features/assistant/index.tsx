@@ -24,9 +24,38 @@ const sources: AISource[] = [
   { id: 'gibs', title: 'NASA GIBS · imagerie et humidité du sol', url: 'https://nasa-gibs.github.io/gibs-api-docs/access-basics/', snippet: 'Tuiles cartographiques MODIS et SMAP affichées à leur résolution native.' },
 ]
 const rotationReferences: AISource[] = [
+  { id: 'fieldnova-rotations', title: 'FieldNova · scénarios enregistrés', url: '/app/scenarios', snippet: 'Séquences, priorité, métriques descriptives et contraintes consultées pour le point sélectionné.' },
   { id: 'draaf-rotation', title: rotationSources.rootArchitecture.label, url: rotationSources.rootArchitecture.url, snippet: 'La DRAAF décrit les rotations, l’alternance des familles et des architectures racinaires; référence régionale à confirmer pour la parcelle.' },
   { id: 'inrae-rotation', title: rotationSources.legumes.label, url: rotationSources.legumes.url, snippet: 'INRAE explique la diversification végétale, les successions pluriannuelles et le rôle des légumineuses.' },
 ]
+const rotationWorkspaceSource: AISource = { id: 'fieldnova-rotations', title: 'FieldNova · scénarios enregistrés', url: '/app/scenarios', snippet: 'Cultures, critères et contraintes enregistrés localement pour le point sélectionné.' }
+
+function soilProfileSource(point: GeoPoint): AISource {
+  const profile = readSoilProfile(point)
+  const fieldCount = [profile.texture, profile.ph, profile.organicMatterPercent, profile.effectiveDepthCm, profile.drainage].filter(value => value !== undefined).length
+  const horizonCount = profile.horizons?.length ?? 0
+  const origin = fieldCount ? soilSourceLabels[profile.sourceType ?? 'farmer-reported'] : horizonCount ? 'origine propre à chaque horizon' : 'aucune valeur déclarée'
+  const reference = profile.sourceName ? ` · ${profile.sourceName}` : ''
+  const date = profile.sampleDate ? ` · échantillon ${profile.sampleDate}` : ''
+  return {
+    id: 'fieldnova-soil',
+    title: 'FieldNova · profil local du sol',
+    url: '/app/terrain',
+    snippet: `${fieldCount} caractéristique(s) générale(s) · ${horizonCount} horizon(s) · origine déclarée : ${origin}${reference}${date}. Données locales, non vérifiées.`,
+  }
+}
+
+function farmProfileSource(point: GeoPoint): AISource {
+  const profile = readFarmProfile(point)
+  return {
+    id: 'fieldnova-farm',
+    title: 'FieldNova · profil de ferme',
+    url: '/app/overview',
+    snippet: profile
+      ? `${profile.isExample ? 'Profil fictif de démonstration' : 'Profil déclaré localement'} · ${profile.name} · accès et restrictions d’eau déclarés${profile.updatedAt ? ` · mis à jour le ${new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(profile.updatedAt))}` : ''}.`
+      : 'Aucun profil de ferme enregistré pour ce point.',
+  }
+}
 
 const layerOptions: Array<{ id: LayerId; label: string; short: string; icon: typeof Activity }> = [
   { id: 'truecolor', label: 'Image MODIS', short: 'Satellite', icon: Layers3 },
@@ -217,6 +246,7 @@ export function AssistantPage() {
       traceHeading = 'Profil de sol local consulté'
       answer = formatSoilAnswer(location)
       evidence = answer
+      usedSources = [soilProfileSource(location)]
     } else if (route.intent === 'rotation') {
       const workspace = readRotationWorkspace(location)
       const constraints = readRotationConstraints(location)
@@ -234,6 +264,7 @@ export function AssistantPage() {
       traceHeading = 'Profil et contraintes de ferme consultés'
       answer = formatFarmProfileAnswer(location)
       evidence = answer
+      usedSources = [farmProfileSource(location), soilProfileSource(location), rotationWorkspaceSource]
     } else if (route.intent === 'unknown') {
       answer = 'Je peux agir sur les données NASA POWER mensuelles, les couches NASA de la carte, le profil de sol saisi localement et les rotations enregistrées. Posez une question sur la pluie, la température, l’humidité, le NDVI, le sol ou une rotation; aucune donnée n’a été consultée pour cette question.'
       evidence = 'Capacités disponibles : NASA POWER mensuel, couches MODIS/SMAP de la carte, profil de sol local saisi par l’utilisateur, scénarios de rotation locaux. Aucun outil n’a été exécuté pour cette question.'
