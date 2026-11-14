@@ -100,7 +100,7 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
           },
         },
         layers: [
-          { id: 'osm-streets', type: 'raster', source: 'osm', layout: { visibility: baseLayer === 'streets' ? 'visible' : 'none' } },
+          { id: 'osm-streets', type: 'raster', source: 'osm', layout: { visibility: 'visible' } },
           { id: 'nasa-truecolor', type: 'raster', source: 'nasaTrueColor', layout: { visibility: baseLayer === 'nasa' ? 'visible' : 'none' }, paint: { 'raster-opacity': 1 } },
           { id: 'nasa-ndvi', type: 'raster', source: 'nasaNdvi', layout: { visibility: showNdvi ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.82 } },
           { id: 'smap-surface-soil', type: 'raster', source: 'smapSurface', layout: { visibility: showSurfaceSoil ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.56 } },
@@ -130,14 +130,14 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
     const map = mapRef.current
     if (!map) return
     if (map.isStyleLoaded()) {
-      map.setLayoutProperty('osm-streets', 'visibility', baseLayer === 'streets' ? 'visible' : 'none')
+      map.setLayoutProperty('osm-streets', 'visibility', 'visible')
       map.setLayoutProperty('nasa-truecolor', 'visibility', baseLayer === 'nasa' ? 'visible' : 'none')
       map.setLayoutProperty('nasa-ndvi', 'visibility', showNdvi ? 'visible' : 'none')
       map.setLayoutProperty('smap-surface-soil', 'visibility', showSurfaceSoil ? 'visible' : 'none')
       map.setLayoutProperty('smap-root-soil', 'visibility', showRootSoil ? 'visible' : 'none')
     } else {
       map.once('load', () => {
-        map.setLayoutProperty('osm-streets', 'visibility', baseLayer === 'streets' ? 'visible' : 'none')
+        map.setLayoutProperty('osm-streets', 'visibility', 'visible')
         map.setLayoutProperty('nasa-truecolor', 'visibility', baseLayer === 'nasa' ? 'visible' : 'none')
         map.setLayoutProperty('nasa-ndvi', 'visibility', showNdvi ? 'visible' : 'none')
         map.setLayoutProperty('smap-surface-soil', 'visibility', showSurfaceSoil ? 'visible' : 'none')
