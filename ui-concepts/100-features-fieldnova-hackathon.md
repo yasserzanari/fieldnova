@@ -15,7 +15,7 @@ FieldNova dispose déjà d’une base utile : carte interactive, couches NASA GI
 Cette liste reste un portefeuille de 100 idées, pas un engagement à toutes les livrer. Au 14 novembre 2026, les modules suivants ont été intégrés dans `main` :
 
 - **Rotation au centre du MVP :** rotation actuelle et deux options éditables sur cinq années; priorité modifiable; métriques sur familles, répétitions, légumineuses et alternance de systèmes racinaires documentés.
-- **Contexte de décision :** séries NASA POWER mensuelles avec coordonnées de grille et valeurs comparées aux mêmes mois des années précédentes; profil de sol local avec origine, date et référence déclarées.
+- **Contexte de décision :** séries NASA POWER mensuelles avec coordonnées de grille et valeurs comparées aux mêmes mois des années précédentes; profil de sol local avec origine, date et référence déclarées; coupe par horizons saisie localement, avec intervalles manquants visibles comme inconnus.
 - **Parcelle et preuves :** import GeoJSON WGS84, contour synchronisé sur les cartes, superficie géodésique approximative et export d’une fiche Markdown contenant sources, calculs, valeurs manquantes et limites.
 - **Assistant outillé :** chat à gauche et carte à droite; lectures de NASA POWER, du profil local et des rotations; changements de couche réels; questions hors périmètre sans appel NASA automatique.
 - **Réponses conversationnelles démo :** Codex CLI rédige les réponses à partir des résultats retournés par les outils locaux FieldNova; la connexion est limitée au serveur Vite de développement.
@@ -82,7 +82,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 21. **[P0] Profil de sol avec inconnues explicites** : texture, profondeur utile, drainage, matière organique et pH ne sont jamais remplis par défaut.
 22. **[P0] Import d’une analyse de sol** : saisir ou joindre une analyse de laboratoire avec date, profondeur, unité et laboratoire.
 23. **[P0] Étiquette de fiabilité par champ** : « mesuré », « déclaré », « produit satellite/modèle », « estimé » ou « inconnu ».
-24. **[P1] Vue des horizons du sol** : représenter les profondeurs mesurées séparément des horizons non documentés.
+24. **[Livrée] Vue des horizons du sol** : saisir jusqu’à cinq couches de 0 à 400 cm, leurs textures/pH/matière organique connus, et distinguer les intervalles manquants ainsi que la profondeur sous la dernière couche comme non documentés. Provenance déclarée partagée avec le profil local.
 25. **[P1] Indicateurs de santé du sol définis** : expliquer chaque indicateur, sa méthode et les données requises avant de le calculer.
 26. **[P1] Historique des analyses** : comparer deux prélèvements comparables et avertir si les profondeurs ou méthodes diffèrent.
 27. **[P1] Fiche de prélèvement** : aider à noter lieu, profondeur, date et méthode pour de futures mesures de terrain.

@@ -78,7 +78,7 @@ function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, 
 
 function classifyQuestion(question: string) {
   const lower = question.toLocaleLowerCase('fr')
-  const asksSoilProfile = /profil|texture|\bph\b|matière organique|drainage|profondeur|analyse de sol/.test(lower)
+  const asksSoilProfile = /profil|texture|\bph\b|matière organique|drainage|profondeur|horizon|couche|analyse de sol/.test(lower)
   const asksRotation = /rotation|succession|famille botanique|légumineuse|alternance|cultures?/.test(lower)
   const asksClimate = /pluie|précip|température|\bchaud\b|\bfroid\b|humidité|climat|météo|nasa|ndvi|vigueur|satellite|imagerie/.test(lower)
   const asksLayer: LayerId | undefined = /ndvi|vigueur/.test(lower) ? 'ndvi' : /humidité de surface|smap surface/.test(lower) ? 'surface' : /humidité racinaire|humidité du sol|racine/.test(lower) ? 'root' : undefined
@@ -95,10 +95,16 @@ function formatSoilAnswer(point: GeoPoint) {
     profile.effectiveDepthCm !== undefined ? `${profile.effectiveDepthCm} cm de profondeur utile` : '',
     profile.drainage && profile.drainage !== 'unknown' ? `drainage ${({ poor: 'lent', moderate: 'modéré', good: 'rapide' } as const)[profile.drainage]}` : '',
   ].filter(Boolean)
-  if (!entries.length) return 'Aucune caractéristique de sol n’est renseignée pour ce point. Ces champs restent inconnus tant qu’ils ne sont pas saisis; vous pouvez les compléter dans « Mon terrain ». Les données NASA de la carte ne remplacent pas une analyse de sol.'
+  const horizons = profile.horizons?.map((horizon, index) => {
+    const texture = horizon.texture && horizon.texture !== 'unknown' ? ({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[horizon.texture] : 'inconnue'
+    const ph = horizon.ph === undefined ? 'pH inconnu' : `pH ${horizon.ph.toLocaleString('fr-FR')}`
+    const organicMatter = horizon.organicMatterPercent === undefined ? 'matière organique inconnue' : `${horizon.organicMatterPercent.toLocaleString('fr-FR')} % de matière organique`
+    return `Horizon ${index + 1} (${horizon.topCm}–${horizon.bottomCm} cm) : texture ${texture}, ${ph}, ${organicMatter}.`
+  }) ?? []
+  if (!entries.length && !horizons.length) return 'Aucune caractéristique de sol n’est renseignée pour ce point. Ces champs restent inconnus tant qu’ils ne sont pas saisis; vous pouvez les compléter dans « Mon terrain ». Les données NASA de la carte ne remplacent pas une analyse de sol.'
   const sample = profile.sampleDate ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${profile.sampleDate}T12:00:00Z`)) : 'date d’échantillon non précisée'
   const reference = profile.sourceName ? ` Référence fournie : ${profile.sourceName}.` : ''
-  return `Pour ce point, le profil local saisi dans FieldNova indique : ${entries.join(' · ')}. Origine déclarée : ${soilSourceLabels[profile.sourceType ?? 'farmer-reported']}; ${sample}.${reference} Cette origine est fournie par l’utilisateur et n’est pas vérifiée par FieldNova; les valeurs ne sont pas des mesures NASA.`
+  return `Pour ce point, le profil local saisi dans FieldNova indique : ${entries.length ? `${entries.join(' · ')}. ` : ''}${horizons.length ? `${horizons.join(' ')} Les profondeurs non couvertes restent inconnues. ` : ''}Origine déclarée : ${soilSourceLabels[profile.sourceType ?? 'farmer-reported']}; ${sample}.${reference} Cette origine est fournie par l’utilisateur et n’est pas vérifiée par FieldNova; les valeurs ne sont pas des mesures NASA.`
 }
 
 function formatRotationAnswer(point: GeoPoint) {

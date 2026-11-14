@@ -30,6 +30,7 @@ function soilSummary(profile: FarmSoilProfile) {
   if (profile.organicMatterPercent !== undefined) labels.push(`${profile.organicMatterPercent.toLocaleString('fr-FR')} % MO`)
   if (profile.effectiveDepthCm !== undefined) labels.push(`${profile.effectiveDepthCm} cm`)
   if (profile.drainage) labels.push(drainage[profile.drainage])
+  if (profile.horizons?.length) labels.push(`${profile.horizons.length} horizon${profile.horizons.length > 1 ? 's' : ''} · 0–${profile.horizons[profile.horizons.length - 1].bottomCm} cm`)
   return labels
 }
 
@@ -168,6 +169,11 @@ export function RotationExplorer() {
       `- Référence déclarée : ${soilValues.length ? soil.sourceName || 'non précisée' : 'non applicable'}.`,
       `- Date d’échantillon ou d’observation : ${soilValues.length ? soil.sampleDate || 'non précisée' : 'non applicable'}.`,
       `- Enregistré localement le : ${soil.updatedAt ? new Date(soil.updatedAt).toLocaleDateString('fr-FR') : 'aucune date enregistrée'}.`,
+      ...(soil.horizons?.length ? soil.horizons.map((horizon, index) => {
+        const texture = horizon.texture && horizon.texture !== 'unknown' ? ({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[horizon.texture] : 'inconnue'
+        return `- Horizon ${index + 1} · ${horizon.topCm}–${horizon.bottomCm} cm : texture ${texture}; pH ${horizon.ph === undefined ? 'inconnu' : horizon.ph.toLocaleString('fr-FR')}; matière organique ${horizon.organicMatterPercent === undefined ? 'inconnue' : `${horizon.organicMatterPercent.toLocaleString('fr-FR')} %`}.`
+      }) : ['- Aucun horizon local détaillé n’est renseigné.']),
+      '- Les profondeurs non couvertes par les horizons déclarés restent inconnues.',
     ]
     const rotationLines = currentWorkspace.plans.map(plan => {
       const metrics = evaluateRotation(plan)
