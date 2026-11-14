@@ -47,4 +47,4 @@ Ces sources ne doivent pas apparaître comme connectées, ne doivent alimenter a
 - [NASA Space Apps Challenge — Field Shift: Adapting Farms with NASA Data](https://www.spaceappschallenge.org/2026/challenges/field-shift-adapting-farms-with-nasa-data/).
 - [Conditions officielles Space Apps 2026](https://www.spaceappschallenge.org/legal/) — vérifier et documenter les licences des éléments effectivement soumis et citer les sources utilisées.
 
-Le code du projet n’a pas de licence déclarée dans ce registre : cette décision appartient à l’équipe. Les conditions applicables aux produits de données doivent être vérifiées pour chaque produit et ne sont pas remplacées par la licence du code.
+Le code FieldNova est publié sous licence MIT (voir [`LICENSE`](../LICENSE)). Cette licence couvre le code du projet, pas les produits de données, fonds de carte, bibliothèques ou contenus tiers. Les conditions applicables aux produits de données et les attributions requises doivent être vérifiées pour chaque produit et restent indépendantes de la licence du code.

@@ -46,3 +46,7 @@ Le shell partagé, la landing page, la connexion de démonstration et les six vu
 - Le mode démo distingue le profil et les rotations fictifs des observations NASA POWER consultées en direct. Il remplace temporairement, au point de démo, les informations agricoles locales et la limite de parcelle; « Quitter » restaure les valeurs qui existaient avant le lancement.
 
 Les valeurs d’exemple sont étiquetées dans l’interface et séparées des observations NASA et des entrées locales de l’utilisateur.
+
+## Licence
+
+Le code FieldNova est publié sous licence MIT. Voir [LICENSE](LICENSE). Cette licence couvre le code du projet; elle ne remplace pas les conditions et attributions propres aux jeux de données, fonds de carte, bibliothèques et autres contenus tiers référencés dans [`ui-concepts/references-and-data-sources.md`](ui-concepts/references-and-data-sources.md).
