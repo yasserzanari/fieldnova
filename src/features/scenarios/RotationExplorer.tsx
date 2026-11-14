@@ -5,7 +5,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
-import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { readSoilProfile, type FarmSoilProfile } from '../../lib/farm/soil-profile'
 import { cropCatalog, evaluateRotation, exampleRotationWorkspace, priorityLabels, readRotationWorkspace, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
 import { clearSavedParcelBoundary, parseParcelGeoJSON, readSavedParcelBoundary, saveParcelBoundary, type ParsedParcel } from '../../lib/geo/parcel-boundary'
@@ -31,6 +31,19 @@ function soilSummary(profile: FarmSoilProfile) {
   if (profile.effectiveDepthCm !== undefined) labels.push(`${profile.effectiveDepthCm} cm`)
   if (profile.drainage) labels.push(drainage[profile.drainage])
   return labels
+}
+
+function sameMonthReference(records: PowerMonthlyRecord[], current: PowerMonthlyRecord | undefined, field: 'precipitationMmPerDay' | 'temperatureC' | 'rootZoneWetness', unit: string) {
+  if (!current) return 'Repère indisponible'
+  const month = current.date.slice(-2)
+  const values = records.filter(record => record.date < current.date && record.date.slice(-2) === month).map(record => record[field]).filter((value): value is number => typeof value === 'number')
+  if (!values.length) return 'Pas de mois comparable'
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length
+  const minimum = Math.min(...values)
+  const maximum = Math.max(...values)
+  const format = (value: number) => value.toLocaleString('fr-FR', { maximumFractionDigits: field === 'rootZoneWetness' ? 0 : 1 })
+  const rootValues = field === 'rootZoneWetness' ? [average, minimum, maximum].map(value => value * 100) : [average, minimum, maximum]
+  return `Années précédentes · n=${values.length} · moy. ${format(rootValues[0])} · ${format(rootValues[1])}–${format(rootValues[2])} ${unit}`
 }
 
 export function RotationExplorer() {
@@ -81,6 +94,11 @@ export function RotationExplorer() {
   const currentWorkspace = workspace.pointKey === pointKey ? workspace.value : readRotationWorkspace(location)
   const currentSeries = series && series.point.latitude === location.latitude && series.point.longitude === location.longitude ? series : null
   const latest = useMemo(() => currentSeries ? latestCompleteRecord(currentSeries.records) : undefined, [currentSeries])
+  const climateReferences = {
+    precipitation: sameMonthReference(currentSeries?.records ?? [], latest, 'precipitationMmPerDay', 'mm/j'),
+    temperature: sameMonthReference(currentSeries?.records ?? [], latest, 'temperatureC', '°C'),
+    roots: sameMonthReference(currentSeries?.records ?? [], latest, 'rootZoneWetness', '%'),
+  }
   const leaders = topRotations(currentWorkspace.plans, currentWorkspace.priority)
   const soil = soilState.pointKey === pointKey ? soilState.value : readSoilProfile(location)
   const soilValues = soilSummary(soil)
@@ -220,7 +238,7 @@ export function RotationExplorer() {
         {parcel && <small className="rotation-parcel-note">Contour importé localement · surface géodésique approximative. Aucune statistique NASA zonale calculée.</small>}
         <div className="rotation-context-divider" />
         <header className="rotation-panel-heading"><span className="rotation-panel-icon climate"><Activity size={15} /></span><span><strong>Contexte NASA POWER</strong><small>{climateLoading ? 'Chargement des données…' : latest ? `${formatPowerMonth(latest.date)} · valeur mensuelle` : 'Données non disponibles'}</small></span></header>
-        {climateLoading ? <div className="rotation-context-empty" role="status">Récupération de la série climatique…</div> : climateError ? <div className="rotation-context-error" role="alert">{climateError}<button type="button" onClick={() => setRefreshKey(value => value + 1)}>Réessayer</button></div> : <div className="rotation-climate-metrics"><span><CloudRain size={13} /><small>Pluie moyenne</small><strong>{latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j`}</strong></span><span><ThermometerSun size={13} /><small>Température</small><strong>{latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`}</strong></span><span><Droplets size={13} /><small>Humidité racinaire</small><strong>{latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`}</strong></span></div>}
+        {climateLoading ? <div className="rotation-context-empty" role="status">Récupération de la série climatique…</div> : climateError ? <div className="rotation-context-error" role="alert">{climateError}<button type="button" onClick={() => setRefreshKey(value => value + 1)}>Réessayer</button></div> : <><div className="rotation-climate-metrics"><span><CloudRain size={13} /><div><small>Pluie moyenne</small><small className="rotation-climate-reference">{climateReferences.precipitation}</small></div><strong>{latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j`}</strong></span><span><ThermometerSun size={13} /><div><small>Température</small><small className="rotation-climate-reference">{climateReferences.temperature}</small></div><strong>{latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`}</strong></span><span><Droplets size={13} /><div><small>Humidité racinaire</small><small className="rotation-climate-reference">{climateReferences.roots}</small></div><strong>{latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`}</strong></span></div><small className="rotation-climate-footnote">Repère historique du même mois · pas une prévision</small></>}
         <p className="rotation-context-source">Cellule NASA POWER {currentSeries?.gridPoint.latitude.toFixed(3)}, {currentSeries?.gridPoint.longitude.toFixed(3)} · {currentSeries?.source.join(' + ') ?? 'source en attente'}</p>
       </aside>
 
