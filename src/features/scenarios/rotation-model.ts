@@ -115,8 +115,8 @@ export function evaluateRotation(plan: RotationPlan) {
   }
 }
 
-export function topRotations(plans: RotationPlan[], priority: RotationPriority) {
-  const complete = plans.map(plan => ({ plan, metrics: evaluateRotation(plan) })).filter(item => item.metrics.complete)
+export function topRotations(plans: RotationPlan[], priority: RotationPriority, unavailableCropIds: CropId[] = []) {
+  const complete = plans.map(plan => ({ plan, metrics: evaluateRotation(plan) })).filter(item => item.metrics.complete && !item.plan.crops.some(id => id && unavailableCropIds.includes(id)))
   if (!complete.length) return []
   const value = (item: typeof complete[number]) => priority === 'diversity'
     ? item.metrics.distinctFamilies
@@ -127,6 +127,56 @@ export function topRotations(plans: RotationPlan[], priority: RotationPriority) 
         : item.metrics.knownRootTransitions
   const best = Math.max(...complete.map(value))
   return complete.filter(item => value(item) === best).map(item => item.plan.id)
+}
+
+export function generateRotationOptions(reference: RotationPlan, priority: RotationPriority, unavailableCropIds: CropId[]): [RotationPlan, RotationPlan] | null {
+  const available = cropCatalog.filter(crop => !unavailableCropIds.includes(crop.id))
+  if (available.length < 2) return null
+
+  const referenceKey = reference.crops.join('|')
+  const candidates: Array<{ crops: CropId[]; metrics: ReturnType<typeof evaluateRotation>; score: number; key: string }> = []
+  const scoreMetrics = (metrics: ReturnType<typeof evaluateRotation>) => priority === 'diversity'
+    ? metrics.distinctFamilies
+    : priority === 'alternation'
+      ? -metrics.repeatedFamilyTransitions
+      : priority === 'legume'
+        ? metrics.legumeSeasons
+        : metrics.knownRootTransitions
+
+  const visit = (crops: CropId[]) => {
+    if (crops.length === 5) {
+      const key = crops.join('|')
+      if (key === referenceKey) return
+      const metrics = evaluateRotation({ id: 'option-a', title: 'Option A', crops })
+      candidates.push({ crops: [...crops], metrics, score: scoreMetrics(metrics), key })
+      return
+    }
+    for (const crop of available) visit([...crops, crop.id])
+  }
+  visit([])
+  if (candidates.length < 2) return null
+
+  const byPriority = [...candidates].sort((left, right) => right.score - left.score
+    || right.metrics.distinctFamilies - left.metrics.distinctFamilies
+    || right.metrics.legumeSeasons - left.metrics.legumeSeasons
+    || right.metrics.knownRootTransitions - left.metrics.knownRootTransitions
+    || left.metrics.repeatedFamilyTransitions - right.metrics.repeatedFamilyTransitions
+    || left.key.localeCompare(right.key))
+  const first = byPriority[0]
+  const secondary = candidates
+    .filter(candidate => candidate.key !== first.key && candidate.score >= first.score - 1)
+    .sort((left, right) => right.metrics.distinctFamilies - left.metrics.distinctFamilies
+      || right.metrics.legumeSeasons - left.metrics.legumeSeasons
+      || right.score - left.score
+      || left.metrics.repeatedFamilyTransitions - right.metrics.repeatedFamilyTransitions
+      || left.key.localeCompare(right.key))[0]
+  const second = secondary ?? byPriority[1]
+  if (!second) return null
+
+  return [
+    { id: 'option-a', title: 'Option A', crops: first.crops },
+    { id: 'option-b', title: 'Option B', crops: second.crops },
+  ]
 }
 
 function rotationStorageKey(point: GeoPoint) {

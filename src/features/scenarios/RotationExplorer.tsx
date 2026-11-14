@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent } from 'react'
-import { Activity, ArrowUpRight, CloudRain, Download, Droplets, LocateFixed, MapPinned, Minus, Plus, RotateCcw, ShieldCheck, Sprout, ThermometerSun, Trash2, Upload } from 'lucide-react'
+import { Activity, ArrowUpRight, CloudRain, Download, Droplets, LocateFixed, MapPinned, Minus, Plus, RotateCcw, ShieldCheck, Sparkles, Sprout, ThermometerSun, Trash2, Upload } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { readSoilProfile, soilSourceLabels, type FarmSoilProfile } from '../../lib/farm/soil-profile'
-import { cropCatalog, evaluateRotation, exampleRotationWorkspace, priorityLabels, readRotationWorkspace, rotationSources, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
+import { cropCatalog, evaluateRotation, exampleRotationWorkspace, generateRotationOptions, priorityLabels, readRotationWorkspace, rotationSources, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
+import { emptyRotationConstraints, readRotationConstraints, writeRotationConstraints } from './rotation-constraints'
 import { clearSavedParcelBoundary, parseParcelGeoJSON, saveParcelBoundary, useParcelBoundary } from '../../lib/geo/parcel-boundary'
 import './rotation-explorer.css'
 
@@ -59,9 +60,12 @@ export function RotationExplorer() {
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [soilState, setSoilState] = useState(() => ({ pointKey, value: readSoilProfile(location) }))
   const [workspace, setWorkspace] = useState(() => ({ pointKey, value: readRotationWorkspace(location) }))
+  const [constraintState, setConstraintState] = useState(() => ({ pointKey, value: readRotationConstraints(location) }))
   const parcel = useParcelBoundary()
   const [parcelError, setParcelError] = useState('')
   const [saveError, setSaveError] = useState('')
+  const [constraintError, setConstraintError] = useState('')
+  const [generationMessage, setGenerationMessage] = useState('')
   const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
   const [climateLoading, setClimateLoading] = useState(true)
   const [climateError, setClimateError] = useState('')
@@ -71,7 +75,10 @@ export function RotationExplorer() {
   useEffect(() => {
     setSoilState({ pointKey, value: readSoilProfile(location) })
     setWorkspace({ pointKey, value: readRotationWorkspace(location) })
+    setConstraintState({ pointKey, value: readRotationConstraints(location) })
     setSaveError('')
+    setConstraintError('')
+    setGenerationMessage('')
   }, [pointKey])
 
   useEffect(() => {
@@ -83,6 +90,16 @@ export function RotationExplorer() {
       setSaveError('Impossible de sauvegarder ce scénario dans le navigateur.')
     }
   }, [location, pointKey, workspace])
+
+  useEffect(() => {
+    if (constraintState.pointKey !== pointKey) return
+    try {
+      writeRotationConstraints(location, constraintState.value)
+      setConstraintError('')
+    } catch {
+      setConstraintError('Impossible d’enregistrer ces contraintes dans ce navigateur.')
+    }
+  }, [constraintState, location, pointKey])
 
   useEffect(() => {
     let current = true
@@ -97,6 +114,7 @@ export function RotationExplorer() {
   }, [location.latitude, location.longitude, refreshKey])
 
   const currentWorkspace = workspace.pointKey === pointKey ? workspace.value : readRotationWorkspace(location)
+  const constraints = constraintState.pointKey === pointKey ? constraintState.value : emptyRotationConstraints()
   const currentSeries = series && series.point.latitude === location.latitude && series.point.longitude === location.longitude ? series : null
   const latest = useMemo(() => currentSeries ? latestCompleteRecord(currentSeries.records) : undefined, [currentSeries])
   const climateReferences = {
@@ -104,7 +122,7 @@ export function RotationExplorer() {
     temperature: sameMonthReference(currentSeries?.records ?? [], latest, 'temperatureC', '°C'),
     roots: sameMonthReference(currentSeries?.records ?? [], latest, 'rootZoneWetness', '%'),
   }
-  const leaders = topRotations(currentWorkspace.plans, currentWorkspace.priority)
+  const leaders = topRotations(currentWorkspace.plans, currentWorkspace.priority, constraints.unavailableCropIds)
   const soil = soilState.pointKey === pointKey ? soilState.value : readSoilProfile(location)
   const soilValues = soilSummary(soil)
   const soilHasGeneralValues = hasGeneralSoilValues(soil)
@@ -115,6 +133,27 @@ export function RotationExplorer() {
     changeWorkspace(current => ({ ...current, plans: current.plans.map(plan => plan.id === planId ? { ...plan, crops: plan.crops.map((crop, cropIndex) => cropIndex === index ? value as CropId | '' : crop) } : plan) }))
   }
   const updatePriority = (priority: RotationPriority) => changeWorkspace(current => ({ ...current, priority }))
+  const toggleUnavailableCrop = (cropId: CropId) => {
+    setConstraintState(current => {
+      const value = current.pointKey === pointKey ? current.value : readRotationConstraints(location)
+      const unavailableCropIds = value.unavailableCropIds.includes(cropId)
+        ? value.unavailableCropIds.filter(id => id !== cropId)
+        : [...value.unavailableCropIds, cropId]
+      return { pointKey, value: { unavailableCropIds } }
+    })
+    setGenerationMessage('')
+  }
+  const generateOptions = () => {
+    const reference = currentWorkspace.plans.find(plan => plan.id === 'reference')
+    if (!reference) return
+    const generated = generateRotationOptions(reference, currentWorkspace.priority, constraints.unavailableCropIds)
+    if (!generated) {
+      setGenerationMessage('Il faut au moins deux cultures disponibles pour produire deux options distinctes.')
+      return
+    }
+    changeWorkspace(current => ({ ...current, plans: current.plans.map(plan => generated.find(candidate => candidate.id === plan.id) ?? plan) }))
+    setGenerationMessage('Deux options créées parmi les séquences du catalogue, selon votre critère et les cultures déclarées disponibles.')
+  }
   const resetExample = () => {
     try {
       localStorage.removeItem(`fieldnova:rotation-workspace:v1:${pointKey}`)
@@ -203,6 +242,7 @@ export function RotationExplorer() {
       `Point suivi : ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}.`,
       `Données du scénario : ${currentWorkspace.isExample ? 'exemple illustratif' : 'scénario enregistré localement'}.`,
       `Critère choisi : ${priorityLabels[currentWorkspace.priority]}.`,
+      `Cultures exclues des options candidates : ${constraints.unavailableCropIds.length ? constraints.unavailableCropIds.map(id => cropCatalog.find(crop => crop.id === id)?.label ?? id).join(', ') : 'aucune exclusion renseignée'}.`,
       '',
       '## Rotations comparées',
       '',
@@ -222,7 +262,7 @@ export function RotationExplorer() {
       '',
       `Sources des traits génériques : [${rotationSources.rootArchitecture.label}](${rotationSources.rootArchitecture.url}) et [${rotationSources.legumes.label}](${rotationSources.legumes.url}). Ces références ne valident pas les traits pour cette parcelle ou sa variété.`,
       '',
-      'Les indicateurs comptent les familles botaniques, leurs répétitions entre années consécutives, la présence de légumineuses et les transitions entre architectures racinaires documentées. Le critère choisi met en avant les scénarios ayant la meilleure valeur sur cette seule métrique. Le contexte NASA POWER et le profil local ne sont pas intégrés à un score de culture.',
+      'Les indicateurs comptent les familles botaniques, leurs répétitions entre années consécutives, la présence de légumineuses et les transitions entre architectures racinaires documentées. Le générateur explore les combinaisons du catalogue non exclues, met en avant le meilleur résultat pour le critère choisi, puis une option favorisant la diversité à moins d’un point de ce critère. Les exclusions sont des contraintes saisies par l’utilisateur; le contexte NASA POWER et le profil local ne sont pas intégrés à un score de culture.',
       '',
       'Cette fiche ne constitue pas un conseil agronomique. Elle ne prédit ni rendement, ni besoin en eau, ni évolution de la santé du sol. Les calendriers, variétés, contraintes de matériel, disponibilité d’eau et règles de succession locales restent à confirmer.',
       '',
@@ -236,7 +276,7 @@ export function RotationExplorer() {
   }
 
   return <section className="rotation-explorer" aria-label="Explorateur de rotations culturales">
-    <header className="rotation-heading"><div><h1>Explorer les rotations</h1><p>Comparez des successions de cultures selon des critères visibles et modifiables.</p></div><div className="rotation-heading-actions"><span className="rotation-example-badge">{currentWorkspace.isExample ? 'Exemple illustratif' : 'Scénario local'}</span><button type="button" className="rotation-export" onClick={exportDecisionBrief}><Download size={13} />Exporter la fiche</button><button type="button" className="rotation-reset" onClick={resetExample}><RotateCcw size={13} />Charger l’exemple</button></div></header>
+    <header className="rotation-heading"><div><h1>Explorer les rotations</h1><p>Comparez des successions de cultures selon des critères visibles et modifiables.</p></div><div className="rotation-heading-actions"><span className="rotation-example-badge">{currentWorkspace.isExample ? 'Exemple illustratif' : 'Scénario local'}</span><button type="button" className="rotation-generate" onClick={generateOptions}><Sparkles size={13} />Générer 2 options</button><button type="button" className="rotation-export" onClick={exportDecisionBrief}><Download size={13} />Exporter la fiche</button><button type="button" className="rotation-reset" onClick={resetExample}><RotateCcw size={13} />Charger l’exemple</button></div></header>
 
     <div className="rotation-map-stage">
       <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} powerGridCell={currentSeries?.gridCell} imageryDate={dayBefore(11)} onPointSelect={moveToPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA et position de l’exploitation pour comparer les rotations" />
@@ -264,7 +304,10 @@ export function RotationExplorer() {
         <header className="rotation-panel-heading"><span className="rotation-panel-icon goal"><ShieldCheck size={15} /></span><span><strong>Votre priorité</strong><small>Modifie les options mises en avant</small></span></header>
         <label className="rotation-priority-label" htmlFor="rotation-priority">Comparer selon</label>
         <select id="rotation-priority" className="rotation-priority-select" value={currentWorkspace.priority} onChange={event => updatePriority(event.target.value as RotationPriority)}><option value="diversity">Diversité des familles</option><option value="alternation">Alternance des familles</option><option value="legume">Présence de légumineuses</option><option value="root">Alternance des racines connues</option></select>
-        <div className="rotation-best-match" aria-live="polite"><small>Options les plus proches de ce critère</small>{leaders.length ? <strong>{leaders.map(id => currentWorkspace.plans.find(plan => plan.id === id)?.title).join(' · ')}</strong> : <strong>Complétez les 5 années d’une rotation</strong>}</div>
+        <details className="rotation-exclusions"><summary>Cultures indisponibles · {constraints.unavailableCropIds.length}</summary><p>Ces choix excluent une culture des options générées et de leur classement. La référence actuelle reste visible.</p><div>{cropCatalog.map(crop => <label key={crop.id}><input type="checkbox" checked={constraints.unavailableCropIds.includes(crop.id)} onChange={() => toggleUnavailableCrop(crop.id)} /><span>{crop.label}</span></label>)}</div></details>
+        <div className="rotation-best-match" aria-live="polite"><small>Options complètes compatibles · critère « {priorityLabels[currentWorkspace.priority]} »</small>{leaders.length ? <strong>{leaders.map(id => currentWorkspace.plans.find(plan => plan.id === id)?.title).join(' · ')}</strong> : <strong>Aucune option complète compatible</strong>}</div>
+        {generationMessage && <p className="rotation-generation-message" role="status">{generationMessage}</p>}
+        {constraintError && <p className="rotation-save-error" role="alert">{constraintError}</p>}
         <ul className="rotation-rule-list"><li>Familles et légumineuses comptées depuis le catalogue; l’azote fixé n’est pas estimé.</li><li>Racines pivotantes ou fasciculées comptées seulement si la référence les documente; les autres restent inconnues.</li><li>NASA POWER donne un contexte historique régional; il ne classe pas les cultures et ne prédit pas leur rendement.</li></ul>
         <div className="rotation-source-links"><a href={rotationSources.rootArchitecture.url} target="_blank" rel="noreferrer">{rotationSources.rootArchitecture.label}</a><a href={rotationSources.legumes.url} target="_blank" rel="noreferrer">{rotationSources.legumes.label}</a></div>
         <p className="rotation-catalog-note">Catalogue illustratif France métropolitaine · à adapter et valider localement.</p>
@@ -273,20 +316,23 @@ export function RotationExplorer() {
     </div>
 
     <section className="rotation-plans" aria-label="Rotations culturales sur cinq années à comparer">
-      {currentWorkspace.plans.map((plan, planIndex) => <RotationCard key={plan.id} plan={plan} planIndex={planIndex} priority={currentWorkspace.priority} isLeader={leaders.includes(plan.id)} example={currentWorkspace.isExample} onCropChange={updateCrop} />)}
-      <p className="rotation-plans-footnote">Rotation illustrative sur 5 ans · les traits racinaires inconnus sont exclus du classement · aucun rendement, besoin en eau ou effet agronomique n’est prédit.</p>
+      {currentWorkspace.plans.map((plan, planIndex) => <RotationCard key={plan.id} plan={plan} planIndex={planIndex} priority={currentWorkspace.priority} isLeader={leaders.includes(plan.id)} example={currentWorkspace.isExample} unavailableCropIds={constraints.unavailableCropIds} onCropChange={updateCrop} />)}
+      <p className="rotation-plans-footnote">Options exploratoires triées selon les traits du catalogue et vos exclusions · NASA et le profil local ne prédisent pas l’adaptation des cultures.</p>
     </section>
   </section>
 }
 
-function RotationCard({ plan, planIndex, priority, isLeader, example, onCropChange }: { plan: RotationPlan; planIndex: number; priority: RotationPriority; isLeader: boolean; example: boolean; onCropChange: (planId: RotationId, index: number, value: string) => void }) {
+function RotationCard({ plan, planIndex, priority, isLeader, example, unavailableCropIds, onCropChange }: { plan: RotationPlan; planIndex: number; priority: RotationPriority; isLeader: boolean; example: boolean; unavailableCropIds: CropId[]; onCropChange: (planId: RotationId, index: number, value: string) => void }) {
   const metrics = evaluateRotation(plan)
+  const unavailable = [...new Set(plan.crops.filter((id): id is CropId => Boolean(id && unavailableCropIds.includes(id))))]
+  const isReference = plan.id === 'reference'
+  const incompatible = unavailable.length > 0 && !isReference
   const icon = planIndex === 0 ? <Sprout size={15} /> : planIndex === 1 ? <RotateCcw size={15} /> : <Activity size={15} />
-  return <article className={`rotation-plan-card ${isLeader ? 'is-leading' : ''}`}>
-    <header><span className="rotation-card-icon">{icon}</span><span><strong>{plan.title}</strong><small>{example ? 'Cultures d’exemple' : 'Votre scénario'}</small></span>{isLeader && <span className="rotation-leading-tag">Critère choisi</span>}</header>
-    <div className="rotation-season-selects">{plan.crops.map((cropId, index) => <label key={index}><span>Année {index + 1}</span><select aria-label={`${plan.title}, année ${index + 1}`} title={cropCatalog.find(crop => crop.id === cropId)?.label ?? 'Choisir une culture'} value={cropId} onChange={event => onCropChange(plan.id, index, event.target.value)}><option value="">Choisir</option>{cropCatalog.map(crop => <option key={crop.id} value={crop.id}>{crop.shortLabel}</option>)}</select></label>)}</div>
+  return <article className={`rotation-plan-card ${isLeader ? 'is-leading' : ''} ${incompatible ? 'is-incompatible' : ''}`}>
+    <header><span className="rotation-card-icon">{icon}</span><span><strong>{plan.title}</strong><small>{example ? 'Cultures d’exemple' : 'Votre scénario'}</small></span>{incompatible && <span className="rotation-incompatible-tag">Hors profil</span>}{isLeader && <span className="rotation-leading-tag">Critère choisi</span>}</header>
+    <div className="rotation-season-selects">{plan.crops.map((cropId, index) => <label key={index}><span>Année {index + 1}</span><select aria-label={`${plan.title}, année ${index + 1}`} title={cropCatalog.find(crop => crop.id === cropId)?.label ?? 'Choisir une culture'} value={cropId} onChange={event => onCropChange(plan.id, index, event.target.value)}><option value="">Choisir</option>{cropCatalog.map(crop => <option key={crop.id} value={crop.id} disabled={!isReference && unavailableCropIds.includes(crop.id) && cropId !== crop.id}>{crop.shortLabel}{unavailableCropIds.includes(crop.id) ? ' · indisponible' : ''}</option>)}</select></label>)}</div>
     <div className="rotation-card-metrics" aria-label={`Indicateurs de ${plan.title}`}><span><strong>{metrics.complete ? `${metrics.distinctFamilies}/5` : '—'}</strong><small>familles</small></span><span><strong>{metrics.complete ? metrics.repeatedFamilyTransitions : '—'}</strong><small>répétitions</small></span><span><strong>{metrics.complete ? metrics.legumeSeasons : '—'}</strong><small>légumineuses</small></span><span><strong>{metrics.complete ? metrics.knownRootTransitions : '—'}</strong><small>racines alternées</small></span></div>
-    <p className="rotation-card-detail">{metrics.complete ? rotationDetail(metrics.distinctFamilies, metrics.repeatedFamilyTransitions, metrics.legumeSeasons, metrics.knownRootTransitions, priority) : 'Renseignez les 5 années pour comparer ce scénario.'}</p>
+    <p className="rotation-card-detail">{incompatible ? `Non retenue : ${unavailable.map(id => cropCatalog.find(crop => crop.id === id)?.shortLabel).join(', ')} déclaré(s) indisponible(s).` : metrics.complete ? rotationDetail(metrics.distinctFamilies, metrics.repeatedFamilyTransitions, metrics.legumeSeasons, metrics.knownRootTransitions, priority) : 'Renseignez les 5 années pour comparer ce scénario.'}</p>
   </article>
 }
 

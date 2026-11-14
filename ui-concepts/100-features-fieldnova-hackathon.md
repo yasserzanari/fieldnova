@@ -15,6 +15,7 @@ FieldNova dispose déjà d’une base utile : carte interactive, couches NASA GI
 Cette liste reste un portefeuille de 100 idées, pas un engagement à toutes les livrer. Au 14 novembre 2026, les modules suivants ont été intégrés dans `main` :
 
 - **Rotation au centre du MVP :** rotation actuelle et deux options éditables sur cinq années; priorité modifiable; métriques sur familles, répétitions, légumineuses et alternance de systèmes racinaires documentés.
+- **Options de rotation exploratoires :** génération locale de deux séquences depuis le catalogue, avec cultures déclarées indisponibles exclues et règles de classement visibles. Les options restent éditables; le climat, le sol et le calendrier ne sont pas utilisés comme prédicteurs.
 - **Contexte de décision :** séries NASA POWER mensuelles avec coordonnées de grille et valeurs comparées aux mêmes mois des années précédentes; profil de sol local avec origine, date et référence déclarées; coupe par horizons saisie localement, avec intervalles manquants visibles comme inconnus.
 - **Parcelle et preuves :** import GeoJSON WGS84, contour synchronisé sur les cartes, superficie géodésique approximative et export d’une fiche Markdown contenant sources, calculs, valeurs manquantes et limites.
 - **Assistant outillé :** chat à gauche et carte à droite; lectures de NASA POWER, du profil local et des rotations; changements de couche réels; questions hors périmètre sans appel NASA automatique.
@@ -34,7 +35,7 @@ Ces fonctions forment le parcours conseillé pour une démonstration courte. Ell
 4. **Fiche sol avec niveaux de confiance** : données saisies par l’agriculteur, analyse de laboratoire importée, données cartographiques et champs inconnus clairement différenciés.
 5. **Bibliothèque courte de cultures** : besoins et caractéristiques accompagnés d’une source agronomique locale pour chaque valeur utilisée.
 6. **Rotation actuelle comme scénario témoin** : l’agriculteur peut comparer une alternative à sa pratique actuelle.
-7. **Générateur de deux ou trois rotations candidates** : respecter les cultures autorisées, le calendrier et les contraintes explicitement renseignées.
+7. **[PARTIELLEMENT LIVRÉ] Générateur de deux rotations candidates** : explorer les combinaisons du catalogue, exclure les cultures déclarées indisponibles et classer selon les traits visibles; le calendrier et les règles agronomiques locales ne sont pas modélisés.
 8. **Comparaison côte à côte** : montrer les compromis selon l’eau, la diversité des familles, la couverture du sol, le calendrier et les priorités choisies.
 9. **Justification de chaque résultat** : règle appliquée, données d’entrée, source, unité, période et incertitude visible.
 10. **Stress-test sur des années historiques** : comparer comment les options se comportent durant des périodes observées plus sèches ou plus chaudes, sans prétendre prédire l’avenir.
