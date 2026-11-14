@@ -20,7 +20,7 @@ Le serveur Vite écoute sur `http://localhost:5173` et recharge l’application 
 - `src/features/atlas/` — carte, couches géospatiales et acquisitions.
 - `src/features/terrain/` — parcelles, propriétés du sol et rotation.
 - `src/features/scenarios/` — comparaison de rotations et compromis.
-- `src/features/assistant/` — chat contextualisé et appels d’outils agricoles.
+- `src/features/assistant/` — chat contextualisé, traces d’outils de démo et carte synchronisée.
 - `src/features/data-trust/` — catalogue, provenance et qualité des données.
 - `src/styles/` — tokens visuels et styles globaux partagés.
 - `data/` — contrats de données et exemples clairement étiquetés.
@@ -30,6 +30,6 @@ Le serveur Vite écoute sur `http://localhost:5173` et recharge l’application 
 
 ## État
 
-Le socle React, le shell partagé, la landing page, la connexion de démonstration, la vue d’ensemble, l’Atlas et Mon terrain sont installés. Les autres modules authentifiés sont réalisés un par un ; tant qu’un onglet n’est pas livré, il affiche son concept visuel de référence.
+Le socle React, le shell partagé, la landing page, la connexion de démonstration et les six vues authentifiées sont réalisés : Vue d’ensemble, Atlas, Mon terrain, Scénarios, Assistant et Données & confiance. Les principales interactions fonctionnent localement dans le prototype.
 
-Les nombres visibles dans les visuels de présentation sont illustratifs. Ils ne proviennent pas encore de données de parcelle en direct.
+Les parcelles, couches, réponses de l’assistant, métriques et profils du sol visibles sont illustratifs. Aucun flux NASA, météo, capteur, fournisseur de sol ni modèle LLM n’est connecté. L’interface signale ces limites au lieu de présenter les valeurs de démonstration comme des observations réelles.
