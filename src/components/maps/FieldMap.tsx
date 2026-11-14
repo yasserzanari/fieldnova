@@ -11,6 +11,8 @@ type Props = {
   selectedPoint: GeoPoint
   baseLayer: MapBaseLayer
   showNdvi: boolean
+  showSurfaceSoil?: boolean
+  showRootSoil?: boolean
   imageryDate: string
   onPointSelect: (point: GeoPoint) => void
   onMapReady?: (map: MapLibreMap) => void
@@ -19,13 +21,13 @@ type Props = {
 }
 
 const OSM_ATTRIBUTION = '© OpenStreetMap contributors'
-const NASA_ATTRIBUTION = 'NASA EOSDIS GIBS · MODIS/Terra'
+const NASA_ATTRIBUTION = 'NASA EOSDIS GIBS · MODIS/Terra · SMAP'
 
-function gibsTileUrl(layer: string, date: string, format: 'jpg' | 'png') {
-  return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.${format}`
+function gibsTileUrl(layer: string, date: string, format: 'jpg' | 'png', matrixSet = 'GoogleMapsCompatible_Level9') {
+  return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/${matrixSet}/{z}/{y}/{x}.${format}`
 }
 
-export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
+export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const onSelectRef = useRef(onPointSelect)
@@ -73,6 +75,22 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, imageryDa
             maxzoom: 9,
             attribution: NASA_ATTRIBUTION,
           },
+          smapSurface: {
+            type: 'raster',
+            tiles: [gibsTileUrl('SMAP_L4_Analyzed_Surface_Soil_Moisture', 'default', 'png', 'GoogleMapsCompatible_Level6')],
+            tileSize: 256,
+            minzoom: 0,
+            maxzoom: 6,
+            attribution: NASA_ATTRIBUTION,
+          },
+          smapRoot: {
+            type: 'raster',
+            tiles: [gibsTileUrl('SMAP_L4_Analyzed_Root_Zone_Soil_Moisture', 'default', 'png', 'GoogleMapsCompatible_Level6')],
+            tileSize: 256,
+            minzoom: 0,
+            maxzoom: 6,
+            attribution: NASA_ATTRIBUTION,
+          },
           selectedPoint: {
             type: 'geojson',
             data: {
@@ -85,6 +103,8 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, imageryDa
           { id: 'osm-streets', type: 'raster', source: 'osm', layout: { visibility: baseLayer === 'streets' ? 'visible' : 'none' } },
           { id: 'nasa-truecolor', type: 'raster', source: 'nasaTrueColor', layout: { visibility: baseLayer === 'nasa' ? 'visible' : 'none' }, paint: { 'raster-opacity': 1 } },
           { id: 'nasa-ndvi', type: 'raster', source: 'nasaNdvi', layout: { visibility: showNdvi ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.82 } },
+          { id: 'smap-surface-soil', type: 'raster', source: 'smapSurface', layout: { visibility: showSurfaceSoil ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.56 } },
+          { id: 'smap-root-soil', type: 'raster', source: 'smapRoot', layout: { visibility: showRootSoil ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.56 } },
           { id: 'selected-point-halo', type: 'circle', source: 'selectedPoint', paint: { 'circle-radius': 10, 'circle-color': '#fffefa', 'circle-opacity': 0.9 } },
           { id: 'selected-point', type: 'circle', source: 'selectedPoint', paint: { 'circle-radius': 5, 'circle-color': '#286b45', 'circle-stroke-color': '#fffefa', 'circle-stroke-width': 2 } },
         ],
@@ -113,14 +133,18 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, imageryDa
       map.setLayoutProperty('osm-streets', 'visibility', baseLayer === 'streets' ? 'visible' : 'none')
       map.setLayoutProperty('nasa-truecolor', 'visibility', baseLayer === 'nasa' ? 'visible' : 'none')
       map.setLayoutProperty('nasa-ndvi', 'visibility', showNdvi ? 'visible' : 'none')
+      map.setLayoutProperty('smap-surface-soil', 'visibility', showSurfaceSoil ? 'visible' : 'none')
+      map.setLayoutProperty('smap-root-soil', 'visibility', showRootSoil ? 'visible' : 'none')
     } else {
       map.once('load', () => {
         map.setLayoutProperty('osm-streets', 'visibility', baseLayer === 'streets' ? 'visible' : 'none')
         map.setLayoutProperty('nasa-truecolor', 'visibility', baseLayer === 'nasa' ? 'visible' : 'none')
         map.setLayoutProperty('nasa-ndvi', 'visibility', showNdvi ? 'visible' : 'none')
+        map.setLayoutProperty('smap-surface-soil', 'visibility', showSurfaceSoil ? 'visible' : 'none')
+        map.setLayoutProperty('smap-root-soil', 'visibility', showRootSoil ? 'visible' : 'none')
       })
     }
-  }, [baseLayer, showNdvi])
+  }, [baseLayer, showNdvi, showSurfaceSoil, showRootSoil])
 
   useEffect(() => {
     const map = mapRef.current

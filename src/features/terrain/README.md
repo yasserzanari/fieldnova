@@ -1,9 +1,8 @@
 # Mon terrain
 
 - **Route :** `/app/terrain`
-- **Entrée :** `index.tsx`
-- **Objectif :** réunir la liste des parcelles, l’historique de rotation, les échantillons et le profil des horizons de sol dans un écran à hauteur de viewport.
-- **Interactions :** recherche et sélection de parcelle, déplacement/zoom de carte, sélection S1/S2, ouverture/fermeture de l’historique, navigation vers l’Atlas et modification locale de la culture planifiée.
-- **Données :** hectares, cultures, horizons, composition, pH, matière organique et réserve utile sont des données de démonstration. Les libellés mesuré/cartographié/inconnu décrivent le type de donnée représenté ; ils ne certifient pas une mesure réelle.
-- **Profil visuel :** la coupe en profondeur distingue le sol de surface, l’horizon cartographié et la profondeur inconnue, avec repères de profondeur et propriétés clairement associées.
-- **À raccorder :** polygones et identifiants réels, dossiers d’échantillons, analyses de laboratoire, cartes pédologiques avec échelle/source et historique de rotation validé.
+- **Carte :** carte interactive partagée avec l’overview et l’Atlas ; fond OpenStreetMap ou MODIS/Terra True Color via GIBS. Les couches NASA SMAP L4 montrent l’humidité analysée de surface ou de la zone racinaire. Ces produits sont modélisés à une grille d’environ 9 km et ne sont pas des mesures à la parcelle.
+- **Séries numériques :** NASA POWER mensuel pour le point choisi, avec `GWETTOP` (humidité relative de surface) et `GWETROOT` (humidité relative de la zone racinaire). Ces champs proviennent d’un modèle distinct de la couche SMAP affichée sur la carte.
+- **Point :** clic sur la carte, coordonnées partagées entre les écrans, ou géolocalisation du navigateur. POWER retourne le point de grille utilisé pour les séries.
+- **Composition du sol :** texture, pH, carbone organique et réserve utile restent « non fournis » tant qu’aucune analyse de sol ou source pédologique exploitable n’est liée à ce point. Aucune parcelle ni aucun échantillon ne sont simulés.
+- **Dépendances partagées :** `src/components/maps/FieldMap.tsx`, `src/components/charts/PowerClimateChart.tsx`, `src/lib/nasa/power.ts`.

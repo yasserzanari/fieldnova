@@ -6,6 +6,7 @@ export type PowerMonthlyRecord = {
   temperatureC?: number
   temperatureMaxC?: number
   temperatureMinC?: number
+  surfaceSoilWetness?: number
   rootZoneWetness?: number
 }
 
@@ -40,7 +41,7 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5): Promise<Pow
   if (cached && cached.expiresAt > Date.now()) return cached.data
 
   const params = new URLSearchParams({
-    parameters: 'PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETROOT',
+    parameters: 'PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETTOP,GWETROOT',
     community: 'AG',
     longitude: String(lon),
     latitude: String(lat),
@@ -67,6 +68,7 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5): Promise<Pow
     temperatureC: valueAt('T2M', date),
     temperatureMaxC: valueAt('T2M_MAX', date),
     temperatureMinC: valueAt('T2M_MIN', date),
+    surfaceSoilWetness: valueAt('GWETTOP', date),
     rootZoneWetness: valueAt('GWETROOT', date),
   })).filter(record => Object.values(record).some(value => typeof value === 'number'))
 
@@ -86,7 +88,7 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5): Promise<Pow
 }
 
 export function latestCompleteRecord(records: PowerMonthlyRecord[]) {
-  return [...records].reverse().find(record => record.temperatureC !== undefined || record.precipitationMmPerDay !== undefined || record.rootZoneWetness !== undefined)
+  return [...records].reverse().find(record => record.temperatureC !== undefined || record.precipitationMmPerDay !== undefined || record.surfaceSoilWetness !== undefined || record.rootZoneWetness !== undefined)
 }
 
 export function formatPowerMonth(isoMonth: string) {
