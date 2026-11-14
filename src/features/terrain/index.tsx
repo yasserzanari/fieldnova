@@ -6,6 +6,7 @@ import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { SoilProfileEditor } from './SoilProfileEditor'
 import './terrain.css'
 
 type SoilLayer = 'surface' | 'root'
@@ -98,7 +99,7 @@ export function TerrainPage() {
           <SoilMetric label="Humidité racinaire modélisée" parameter="GWETROOT" value={latest?.rootZoneWetness} color="root" />
           <p className="terrain-model-detail">Fractions relatives issues du modèle NASA POWER · UTC · {series?.source.join(' + ')}</p>
         </>}
-        <div className="terrain-profile-missing"><span className="terrain-profile-icon"><Layers3 size={16} /></span><span><strong>Texture, pH et matière organique</strong><small>Aucune analyse de sol ou mesure de parcelle n’est reliée à ce point.</small></span><em>Non fourni</em></div>
+        <SoilProfileEditor point={location} />
         <div className="terrain-note"><ShieldCheck size={13} /><span>Les valeurs POWER et SMAP sont deux produits différents ; la carte SMAP ne donne pas la valeur numérique du point cliqué.</span></div>
       </aside>
     </div>
