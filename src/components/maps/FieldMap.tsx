@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Map as MapLibreMap, RasterTileSource, ScaleControl, type GeoJSONSource, type MapMouseEvent } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoPoint } from '../../lib/geo/location'
+import type { ParcelFeature } from '../../lib/geo/parcel-boundary'
 import './field-map.css'
 
 export type MapBaseLayer = 'streets' | 'nasa'
@@ -13,6 +14,7 @@ type Props = {
   showNdvi: boolean
   showSurfaceSoil?: boolean
   showRootSoil?: boolean
+  parcelBoundary?: ParcelFeature | null
   imageryDate: string
   onPointSelect: (point: GeoPoint) => void
   onMapReady?: (map: MapLibreMap) => void
@@ -27,7 +29,7 @@ function gibsTileUrl(layer: string, date: string, format: 'jpg' | 'png', matrixS
   return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/${matrixSet}/{z}/{y}/{x}.${format}`
 }
 
-export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
+export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, parcelBoundary = null, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const onSelectRef = useRef(onPointSelect)
@@ -98,6 +100,10 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
               features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [selectedPoint.longitude, selectedPoint.latitude] } }],
             },
           },
+          parcelBoundary: {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] },
+          },
         },
         layers: [
           { id: 'osm-streets', type: 'raster', source: 'osm', layout: { visibility: 'visible' } },
@@ -105,6 +111,8 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
           { id: 'nasa-ndvi', type: 'raster', source: 'nasaNdvi', layout: { visibility: showNdvi ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.82 } },
           { id: 'smap-surface-soil', type: 'raster', source: 'smapSurface', layout: { visibility: showSurfaceSoil ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.56 } },
           { id: 'smap-root-soil', type: 'raster', source: 'smapRoot', layout: { visibility: showRootSoil ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.56 } },
+          { id: 'parcel-boundary-fill', type: 'fill', source: 'parcelBoundary', paint: { 'fill-color': '#b5df80', 'fill-opacity': 0.2 } },
+          { id: 'parcel-boundary-line', type: 'line', source: 'parcelBoundary', paint: { 'line-color': '#efffc7', 'line-width': 3, 'line-opacity': 0.95 } },
           { id: 'selected-point-halo', type: 'circle', source: 'selectedPoint', paint: { 'circle-radius': 10, 'circle-color': '#fffefa', 'circle-opacity': 0.9 } },
           { id: 'selected-point', type: 'circle', source: 'selectedPoint', paint: { 'circle-radius': 5, 'circle-color': '#286b45', 'circle-stroke-color': '#fffefa', 'circle-stroke-width': 2 } },
         ],
@@ -156,6 +164,17 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
     if (map.isStyleLoaded()) updatePoint()
     else map.once('load', updatePoint)
   }, [selectedPoint.latitude, selectedPoint.longitude])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const updateParcel = () => {
+      const source = map.getSource('parcelBoundary') as GeoJSONSource | undefined
+      source?.setData(parcelBoundary ?? { type: 'FeatureCollection', features: [] })
+    }
+    if (map.isStyleLoaded()) updateParcel()
+    else map.once('load', updateParcel)
+  }, [parcelBoundary])
 
   useEffect(() => {
     const map = mapRef.current

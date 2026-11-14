@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, ArrowUpRight, CloudRain, Download, Droplets, LocateFixed, MapPinned, Minus, Plus, RotateCcw, ShieldCheck, Sprout, ThermometerSun } from 'lucide-react'
+import type { ChangeEvent } from 'react'
+import { Activity, ArrowUpRight, CloudRain, Download, Droplets, LocateFixed, MapPinned, Minus, Plus, RotateCcw, ShieldCheck, Sprout, ThermometerSun, Trash2, Upload } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
@@ -7,6 +8,7 @@ import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { readSoilProfile, type FarmSoilProfile } from '../../lib/farm/soil-profile'
 import { cropCatalog, evaluateRotation, exampleRotationWorkspace, priorityLabels, readRotationWorkspace, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
+import { clearSavedParcelBoundary, parseParcelGeoJSON, readSavedParcelBoundary, saveParcelBoundary, type ParsedParcel } from '../../lib/geo/parcel-boundary'
 import './rotation-explorer.css'
 
 function dayBefore(days: number) {
@@ -39,6 +41,8 @@ export function RotationExplorer() {
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [soilState, setSoilState] = useState(() => ({ pointKey, value: readSoilProfile(location) }))
   const [workspace, setWorkspace] = useState(() => ({ pointKey, value: readRotationWorkspace(location) }))
+  const [parcel, setParcel] = useState<ParsedParcel | null>(() => readSavedParcelBoundary())
+  const [parcelError, setParcelError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
   const [climateLoading, setClimateLoading] = useState(true)
@@ -107,6 +111,25 @@ export function RotationExplorer() {
       moveToPoint({ latitude: Number(position.coords.latitude.toFixed(5)), longitude: Number(position.coords.longitude.toFixed(5)) })
       setLocating(false)
     }, () => setLocating(false), { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 })
+  }
+  const importParcel = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const parsed = parseParcelGeoJSON(await file.text(), file.name.replace(/\.(geo)?json$/i, '') || 'Parcelle importée')
+      saveParcelBoundary(parsed)
+      setParcel(parsed)
+      setParcelError('')
+      map?.fitBounds(parsed.bounds, { padding: { top: 100, right: 320, bottom: 100, left: 320 }, maxZoom: 13, duration: 700 })
+    } catch (error) {
+      setParcelError(error instanceof Error ? error.message : 'Impossible de lire ce GeoJSON.')
+    }
+  }
+  const removeParcel = () => {
+    clearSavedParcelBoundary()
+    setParcel(null)
+    setParcelError('')
   }
   const exportDecisionBrief = () => {
     const leaderIds = new Set(leaders)
@@ -180,7 +203,7 @@ export function RotationExplorer() {
     <header className="rotation-heading"><div><h1>Explorer les rotations</h1><p>Comparez des successions de cultures selon des critères visibles et modifiables.</p></div><div className="rotation-heading-actions"><span className="rotation-example-badge">{currentWorkspace.isExample ? 'Exemple illustratif' : 'Scénario local'}</span><button type="button" className="rotation-export" onClick={exportDecisionBrief}><Download size={13} />Exporter la fiche</button><button type="button" className="rotation-reset" onClick={resetExample}><RotateCcw size={13} />Charger l’exemple</button></div></header>
 
     <div className="rotation-map-stage">
-      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} imageryDate={dayBefore(11)} onPointSelect={moveToPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA et position de l’exploitation pour comparer les rotations" />
+      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} parcelBoundary={parcel?.feature ?? null} imageryDate={dayBefore(11)} onPointSelect={moveToPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA et position de l’exploitation pour comparer les rotations" />
       <div className="rotation-map-topline"><div className="rotation-location-chip"><MapPinned size={15} /><span>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</span><small>Point suivi</small></div><div className="rotation-map-options"><div className="rotation-base-switch" role="group" aria-label="Fond de carte"><button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Satellite</button></div><label><input type="checkbox" checked={showNdvi} onChange={event => setShowNdvi(event.target.checked)} />NDVI</label></div></div>
       <div className="rotation-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 220 })}><Plus size={15} /></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 220 })}><Minus size={15} /></button><button type="button" aria-label="Utiliser ma position" onClick={locateMe} disabled={locating}><LocateFixed size={14} /></button></div>
       <span className="rotation-map-hint">Cliquez pour déplacer le point suivi · les profils et séries suivent la position sélectionnée</span>
@@ -189,6 +212,12 @@ export function RotationExplorer() {
         <header className="rotation-panel-heading"><span className="rotation-panel-icon soil"><Sprout size={15} /></span><span><strong>Sol local</strong><small>Données saisies par vous</small></span></header>
         {soilValues.length ? <ul className="rotation-soil-list">{soilValues.map(value => <li key={value}>{value}</li>)}</ul> : <p className="rotation-context-empty">Aucune caractéristique de sol n’est renseignée pour ce point.</p>}
         <Link to="/app/terrain" className="rotation-context-link">Renseigner le profil du sol <ArrowUpRight size={12} /></Link>
+        <div className="rotation-parcel-card">
+          <div><strong>Limite de parcelle</strong><small>{parcel ? `${parcel.feature.properties?.name ?? 'Parcelle'} · ≈ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} ha` : 'Importez un fichier GeoJSON WGS84'}</small></div>
+          {parcel ? <button type="button" className="rotation-parcel-remove" aria-label="Retirer la limite de parcelle" onClick={removeParcel}><Trash2 size={12} /></button> : <label className="rotation-parcel-import"><Upload size={12} />Importer<input type="file" accept=".geojson,.json,application/geo+json,application/json" aria-label="Importer une limite GeoJSON" onChange={importParcel} /></label>}
+        </div>
+        {parcelError && <p className="rotation-parcel-error" role="alert">{parcelError}</p>}
+        {parcel && <small className="rotation-parcel-note">Contour importé localement · surface géodésique approximative. Aucune statistique NASA zonale calculée.</small>}
         <div className="rotation-context-divider" />
         <header className="rotation-panel-heading"><span className="rotation-panel-icon climate"><Activity size={15} /></span><span><strong>Contexte NASA POWER</strong><small>{climateLoading ? 'Chargement des données…' : latest ? `${formatPowerMonth(latest.date)} · valeur mensuelle` : 'Données non disponibles'}</small></span></header>
         {climateLoading ? <div className="rotation-context-empty" role="status">Récupération de la série climatique…</div> : climateError ? <div className="rotation-context-error" role="alert">{climateError}<button type="button" onClick={() => setRefreshKey(value => value + 1)}>Réessayer</button></div> : <div className="rotation-climate-metrics"><span><CloudRain size={13} /><small>Pluie moyenne</small><strong>{latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j`}</strong></span><span><ThermometerSun size={13} /><small>Température</small><strong>{latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`}</strong></span><span><Droplets size={13} /><small>Humidité racinaire</small><strong>{latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`}</strong></span></div>}
