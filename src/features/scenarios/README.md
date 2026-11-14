@@ -2,7 +2,7 @@
 
 - **Route :** `/app/scenarios`
 - **Explorateur de rotations :** compare une rotation de référence et deux options modifiables sur trois saisons. Le petit catalogue français est un exemple de prototype; les familles botaniques et les calculs de répétition/diversité sont descriptifs, sans score de rendement ni effet de sol inféré.
-- **Persistance locale :** les rotations et la priorité choisie sont sauvegardées dans le navigateur pour le point sélectionné. Le profil de sol utilisateur reste distinct et provient de `src/lib/farm/soil-profile.ts`.
+- **Persistance locale :** les rotations et la priorité choisie sont sauvegardées dans le navigateur pour le point sélectionné. Le profil de sol utilisateur reste distinct; son origine, sa référence et sa date sont décrites dans `src/lib/farm/soil-profile.ts` sans vérification indépendante.
 - **Fiche de comparaison :** le bouton « Exporter la fiche » télécharge un Markdown local avec les trois rotations, le critère, les valeurs POWER disponibles, le profil de sol déclaré, la méthode et les limites. Aucune donnée n’est envoyée par cet export.
 - **Parcelle :** un GeoJSON WGS84 avec géométrie Polygon ou MultiPolygon peut être importé, visualisé et supprimé. Le contour et la superficie géodésique approximative sont stockés localement. L’application ne calcule pas de statistiques NASA à l’intérieur du polygone.
 - **Contexte NASA :** NASA POWER affiche la dernière période mensuelle complète pour le point suivi et la cellule NASA renvoyée par le service. Ces valeurs ne changent pas les métriques de rotation; elles apportent un contexte climatique historique, pas une prévision à la parcelle.

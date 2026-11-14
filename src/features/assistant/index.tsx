@@ -7,7 +7,7 @@ import { MessageActions } from '../../components/ai-chat/message-actions'
 import { LiquidMultimodalInput } from '../../components/ai-chat/liquid-multimodal-input'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
-import { readSoilProfile } from '../../lib/farm/soil-profile'
+import { readSoilProfile, soilSourceLabels } from '../../lib/farm/soil-profile'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { cropCatalog, evaluateRotation, readRotationWorkspace } from '../scenarios/rotation-model'
 import './assistant.css'
@@ -91,8 +91,9 @@ function formatSoilAnswer(point: GeoPoint) {
     profile.drainage && profile.drainage !== 'unknown' ? `drainage ${({ poor: 'lent', moderate: 'modéré', good: 'rapide' } as const)[profile.drainage]}` : '',
   ].filter(Boolean)
   if (!entries.length) return 'Aucune caractéristique de sol n’est renseignée pour ce point. Ces champs restent inconnus tant qu’ils ne sont pas saisis; vous pouvez les compléter dans « Mon terrain ». Les données NASA de la carte ne remplacent pas une analyse de sol.'
-  const updated = profile.updatedAt ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(profile.updatedAt)) : 'date non précisée'
-  return `Pour ce point, le profil local saisi dans FieldNova indique : ${entries.join(' · ')}. Dernière mise à jour : ${updated}. Ce sont des informations déclarées localement, pas des mesures NASA ni un résultat de laboratoire vérifié.`
+  const sample = profile.sampleDate ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${profile.sampleDate}T12:00:00Z`)) : 'date d’échantillon non précisée'
+  const reference = profile.sourceName ? ` Référence fournie : ${profile.sourceName}.` : ''
+  return `Pour ce point, le profil local saisi dans FieldNova indique : ${entries.join(' · ')}. Origine déclarée : ${soilSourceLabels[profile.sourceType ?? 'farmer-reported']}; ${sample}.${reference} Cette origine est fournie par l’utilisateur et n’est pas vérifiée par FieldNova; les valeurs ne sont pas des mesures NASA.`
 }
 
 function formatRotationAnswer(point: GeoPoint) {
