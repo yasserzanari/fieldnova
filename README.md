@@ -30,6 +30,15 @@ Le serveur Vite écoute sur `http://localhost:5173` et recharge l’application 
 
 ## État
 
-Le socle React, le shell partagé, la landing page, la connexion de démonstration et les six vues authentifiées sont réalisés : Vue d’ensemble, Atlas, Mon terrain, Scénarios, Assistant et Données & confiance. Les principales interactions fonctionnent localement dans le prototype.
+Le shell partagé, la landing page, la connexion de démonstration et les six vues authentifiées sont réalisés : Vue d’ensemble, Atlas, Mon terrain, Scénarios, Assistant et Données & confiance.
 
-Les parcelles, couches, réponses de l’assistant, métriques et profils du sol visibles sont illustratifs. Aucun flux NASA, météo, capteur, fournisseur de sol ni modèle LLM n’est connecté. L’interface signale ces limites au lieu de présenter les valeurs de démonstration comme des observations réelles.
+### Données et limites actuelles
+
+- NASA POWER fournit des séries mensuelles de précipitations, températures et humidité modélisée pour le point suivi. Le résultat est associé à une cellule de grille, pas à une mesure de parcelle.
+- NASA GIBS sert les couches cartographiques MODIS et SMAP affichées par la carte interactive MapLibre. Les couches de sol SMAP sont des produits modélisés à résolution régionale.
+- Le profil local de sol (texture, pH, matière organique, profondeur et drainage) est saisi par l’utilisateur et conservé dans son navigateur. Il n’est pas vérifié par analyse de laboratoire ni envoyé à un serveur.
+- L’explorateur de rotations compare trois successions selon des métriques descriptives de familles botaniques, répétitions et présence de légumineuses. Le catalogue et ses rotations préremplies sont des exemples à adapter à la région; ce n’est ni une recommandation agronomique ni une prédiction de rendement.
+- L’onglet Climat historique compare des périodes NASA POWER observées. Il ne prédit pas les conditions futures.
+- L’assistant est un prototype à règles locales; aucun modèle LLM distant ni service de conseil agricole n’est connecté.
+
+Les valeurs d’exemple sont étiquetées dans l’interface et séparées des observations NASA et des entrées locales de l’utilisateur.
