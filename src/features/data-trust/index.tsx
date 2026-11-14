@@ -32,6 +32,10 @@ function statusClass(status: SourceStatus) {
   return status === 'Connecté' ? 'connect' : status === 'Référence' ? 'reference' : 'import'
 }
 
+function formatFetchedAt(value: string) {
+  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(value)) + ' UTC'
+}
+
 export function DataTrustPage() {
   const { location, selectLocation } = useSelectedLocation()
   const [selectedId, setSelectedId] = useState('power')
@@ -93,7 +97,14 @@ export function DataTrustPage() {
             <div className="trust-meta-row"><span><Layers3 size={13} /> Résolution</span><strong>{selected.id === 'power' && series ? `MERRA-2 · 0,5° × 0,625° · centre ${coordinate(series.gridPoint.latitude, 'N', 'S')} · ${coordinate(series.gridPoint.longitude, 'E', 'O')}` : selected.resolution}</strong></div>
           <div className="trust-meta-row"><span><MapPin size={13} /> Couverture</span><strong>{selected.id === 'power' ? 'Point actif; valeur interpolée/agrégée au point de grille POWER' : selected.coverage}</strong></div>
           <div className="trust-meta-row"><span><Waves size={13} /> Période</span><strong>{selected.id === 'power' ? latest ? `Mensuel · dernière période exploitable ${formatPowerMonth(latest.date)}` : loading ? 'Chargement de la série mensuelle…' : 'Aucune période exploitable' : selected.period}</strong></div>
+          {selected.id === 'power' && <>
+            <div className="trust-meta-row"><span><Database size={13} /> Source API</span><strong>{series ? series.source.join(' · ') : loading ? 'En attente de la réponse NASA POWER' : 'Non disponible'}</strong></div>
+            <div className="trust-meta-row"><span><CloudSun size={13} /> Récupérée</span><strong>{series ? `${formatFetchedAt(series.fetchedAt)} · version non fournie par la réponse` : 'Aucune récupération réussie pour ce point'}</strong></div>
+          </>}
+          {selected.id === 'gibs' && <div className="trust-meta-row"><span><Layers3 size={13} /> Produit affiché</span><strong>{layer === 'truecolor' ? `MODIS Terra Corrected Reflectance True Color · ${imageryDate}` : layer === 'ndvi' ? `MODIS Terra NDVI 8-Day · ${imageryDate}` : layer === 'surface' ? 'SMAP L4 · humidité de surface · date produit non récupérée' : 'SMAP L4 · humidité racinaire · date produit non récupérée'}</strong></div>}
           <div className="trust-meta-row"><span><ShieldCheck size={13} /> Limite</span><strong>{selected.id === 'power' ? 'Climatologie mensuelle; pas de prévision ni de mesure parcellaire' : selected.license}</strong></div>
+          {selected.id === 'power' && <a className="trust-source-link trust-citation-link" href="https://power.larc.nasa.gov/docs/referencing/" target="_blank" rel="noreferrer">Guide officiel de citation NASA POWER <ExternalLink size={12} /></a>}
+          {selected.id === 'gibs' && <a className="trust-source-link trust-citation-link" href={layer === 'surface' || layer === 'root' ? 'https://nsidc.org/data/spl4smgp' : 'https://nasa-gibs.github.io/gibs-api-docs/available-visualizations/'} target="_blank" rel="noreferrer">Référence du produit affiché <ExternalLink size={12} /></a>}
           {selected.id === 'power' && error && <div className="trust-data-error" role="alert"><ShieldAlert size={14} />{error}</div>}
           {selected.id === 'power' && series && <div className="trust-live-chart"><PowerClimateChart records={series.records} source="NASA POWER" title="Série mensuelle au point suivi" months={24} /></div>}
           {selected.id === 'gibs' && <div className="trust-quality-card"><span className="trust-quality-icon"><ShieldCheck size={17} /></span><span><small>Lecture de la couche</small><strong>Pixel satellite</strong></span><span className="trust-quality-breakdown"><b>MODIS <em>image datée</em></b><b>SMAP <em>~9 km</em></b><b>Parcelle <em>non fournie</em></b></span></div>}
