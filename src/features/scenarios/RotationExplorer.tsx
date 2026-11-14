@@ -396,6 +396,7 @@ export function RotationExplorer() {
             <span><strong>{signed(detailedMetrics.legumeSeasons - referenceMetrics.legumeSeasons)}</strong><small>années avec légumineuse</small></span>
             <span><strong>{signed(detailedMetrics.knownRootTransitions - referenceMetrics.knownRootTransitions)}</strong><small>transitions racinaires connues</small></span>
           </div>}
+          {detailedPlan.id !== 'reference' && detailedMetrics.complete && referenceMetrics?.complete && <><p className="rotation-evidence-tradeoff">{priorityComparison(detailedMetrics, referenceMetrics, currentWorkspace.priority)}</p><p className="rotation-evidence-tradeoff-note">Les autres écarts sont des comptes descriptifs. FieldNova n’évalue ici ni rendement, ni coût, ni besoin en eau, ni matériel ou calendrier local.</p></>}
           <p className="rotation-evidence-verdict">{detailedUnavailable.length ? `Non retenue : ${detailedUnavailable.map(id => cropCatalog.find(crop => crop.id === id)?.label).join(', ')} est/sont déclaré(s) indisponible(s).` : !detailedMetrics.complete ? 'Séquence incomplète; elle n’entre pas dans le classement.' : detailedPlan.id === 'reference' ? 'Cette rotation sert de référence; elle n’est pas une option candidate générée.' : leaders.includes(detailedPlan.id) ? 'Cette option atteint la meilleure valeur du critère parmi les rotations complètes compatibles.' : 'Cette option est compatible avec les exclusions déclarées, mais son critère est inférieur à celui des options mises en avant.'}</p>
         </section>
         <section className="rotation-evidence-section"><h3>Traits du catalogue, année par année</h3>
@@ -439,6 +440,27 @@ function priorityExplanation(metrics: ReturnType<typeof evaluateRotation>, prior
   if (priority === 'alternation') return `${metrics.repeatedFamilyTransitions} répétition(s) de famille entre années consécutives (moins de répétitions donne une valeur de critère plus élevée).`
   if (priority === 'legume') return `${metrics.legumeSeasons} année(s) avec légumineuse sur cinq.`
   return `${metrics.knownRootTransitions} transition(s) entre architectures racinaires connues; les cultures inconnues ne sont pas comptées.`
+}
+
+function priorityComparison(metrics: ReturnType<typeof evaluateRotation>, reference: ReturnType<typeof evaluateRotation>, priority: RotationPriority) {
+  const difference = priority === 'diversity'
+    ? metrics.distinctFamilies - reference.distinctFamilies
+    : priority === 'alternation'
+      ? reference.repeatedFamilyTransitions - metrics.repeatedFamilyTransitions
+      : priority === 'legume'
+        ? metrics.legumeSeasons - reference.legumeSeasons
+        : metrics.knownRootTransitions - reference.knownRootTransitions
+  if (difference === 0) return `Critère choisi : même valeur que la référence (${priorityLabels[priority]}).`
+  const quantity = Math.abs(difference)
+  const direction = difference > 0 ? 'de plus' : 'de moins'
+  const metric = priority === 'diversity'
+    ? `famille(s) distincte(s) ${direction}`
+    : priority === 'alternation'
+      ? `répétition(s) de famille ${difference > 0 ? 'en moins' : 'en plus'}`
+      : priority === 'legume'
+        ? `année(s) avec légumineuse ${direction}`
+        : `transition(s) racinaire(s) documentée(s) ${direction}`
+  return `Critère choisi (${priorityLabels[priority]}) : ${quantity} ${metric} que la référence; valeur ${difference > 0 ? 'plus élevée' : 'plus faible'} pour ce critère descriptif.`
 }
 
 function signed(value: number) {

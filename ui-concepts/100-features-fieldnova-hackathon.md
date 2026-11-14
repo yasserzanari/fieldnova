@@ -110,7 +110,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 41. **[P0] Trois scénarios comparables** : rotation actuelle, option favorisant la priorité choisie et option alternative.
 42. **[P0] Classement compréhensible** : révéler les critères qui font gagner ou perdre chaque scénario, plutôt qu’un score opaque.
 43. **[P0] Pondération par priorité** : le classement change quand l’agriculteur change ses préférences, avec pondérations visibles.
-44. **[P0] Panneau des compromis** : montrer explicitement les gains possibles et les coûts ou contraintes associés.
+44. **[P0 · PARTIEL] Panneau des compromis** : compare le critère choisi à la référence, rend visibles les autres écarts descriptifs et signale que rendements, coûts, eau, matériel et calendrier local ne sont pas évalués. Une comparaison fiable de ces contraintes nécessite des données locales validées.
 45. **[P1] Simulation de météo historique** : tester un scénario sur des années observées, sans le présenter comme prévision.
 46. **[P1] Scénario de disponibilité en eau** : comparer des hypothèses définies par l’utilisateur et montrer quelles données sont absentes.
 47. **[P1] Sensibilité des résultats** : indiquer si une petite variation d’entrée change le scénario classé premier.
