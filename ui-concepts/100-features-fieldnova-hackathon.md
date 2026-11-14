@@ -37,7 +37,7 @@ Ces fonctions forment le parcours conseillé pour une démonstration courte. Ell
 6. **Rotation actuelle comme scénario témoin** : l’agriculteur peut comparer une alternative à sa pratique actuelle.
 7. **[PARTIELLEMENT LIVRÉ] Générateur de deux rotations candidates** : explorer les combinaisons du catalogue, exclure les cultures déclarées indisponibles et classer selon les traits visibles; le calendrier et les règles agronomiques locales ne sont pas modélisés.
 8. **Comparaison côte à côte** : montrer les compromis selon l’eau, la diversité des familles, la couverture du sol, le calendrier et les priorités choisies.
-9. **Justification de chaque résultat** : règle appliquée, données d’entrée, source, unité, période et incertitude visible.
+9. **[PARTIELLEMENT LIVRÉ] Justification de chaque résultat** : fiche par rotation avec critère, écarts à la référence, traits et sources, données NASA/sol chargées, contraintes appliquées, limites et éléments manquants à vérifier. Les métriques actuelles sont descriptives; elles ne mesurent pas les bénéfices agronomiques.
 10. **Stress-test sur des années historiques** : comparer comment les options se comportent durant des périodes observées plus sèches ou plus chaudes, sans prétendre prédire l’avenir.
 11. **Assistant qui répond à partir des éléments affichés** : il peut retrouver les sources et expliquer les compromis, mais ne fabrique pas une recommandation agronomique.
 12. **Résumé de décision exportable** : scénario choisi, raisons, données consultées, inconnues à vérifier et prochaine étape proposée.

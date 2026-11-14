@@ -10,7 +10,7 @@ import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMo
 import { readSoilProfile, soilSourceLabels } from '../../lib/farm/soil-profile'
 import { readRotationConstraints } from '../scenarios/rotation-constraints'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
-import { cropCatalog, evaluateRotation, priorityLabels, readRotationWorkspace, rotationSources, type CropId } from '../scenarios/rotation-model'
+import { cropCatalog, evaluateRotation, priorityLabels, readRotationWorkspace, rotationPriorityValue, rotationSources, type CropId } from '../scenarios/rotation-model'
 import './assistant.css'
 
 type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
@@ -116,6 +116,8 @@ function formatSoilAnswer(point: GeoPoint) {
 function formatRotationAnswer(point: GeoPoint) {
   const workspace = readRotationWorkspace(point)
   const constraints = readRotationConstraints(point)
+  const reference = workspace.plans.find(plan => plan.id === 'reference')
+  const referenceMetrics = reference ? evaluateRotation(reference) : undefined
   const plans = workspace.plans.map(plan => {
     const metrics = evaluateRotation(plan)
     if (!metrics.complete) return `${plan.title} : succession incomplète.`
@@ -127,7 +129,13 @@ function formatRotationAnswer(point: GeoPoint) {
     }).join(' → ')
     const unavailable = plan.id === 'reference' ? [] : [...new Set(plan.crops.filter((id): id is CropId => Boolean(id && constraints.unavailableCropIds.includes(id))))]
     const constraintStatus = unavailable.length ? ` Option exclue du classement car le profil déclare ${unavailable.map(id => cropCatalog.find(crop => crop.id === id)?.label ?? id).join(', ')} indisponible(s).` : ''
-    return `${plan.title} (${crops}) : ${metrics.distinctFamilies} familles botaniques distinctes, ${metrics.repeatedFamilyTransitions} répétition(s) de famille, ${metrics.legumeSeasons} année(s) avec légumineuse et ${metrics.knownRootTransitions} transition(s) entre architectures racinaires connues.${constraintStatus}`
+    const comparison = plan.id !== 'reference' && metrics.complete && referenceMetrics?.complete
+      ? ` Écarts bruts par rapport à la référence : ${metrics.distinctFamilies - referenceMetrics.distinctFamilies} famille(s), ${metrics.repeatedFamilyTransitions - referenceMetrics.repeatedFamilyTransitions} répétition(s), ${metrics.legumeSeasons - referenceMetrics.legumeSeasons} année(s) avec légumineuse, ${metrics.knownRootTransitions - referenceMetrics.knownRootTransitions} transition(s) racinaire(s) documentée(s).`
+      : ''
+    const rankingValue = metrics.complete ? rotationPriorityValue(metrics, workspace.priority) : undefined
+    const referenceValue = referenceMetrics?.complete ? rotationPriorityValue(referenceMetrics, workspace.priority) : undefined
+    const priorityEvidence = plan.id !== 'reference' ? ` Valeur du critère « ${priorityLabels[workspace.priority]} » : ${!metrics.complete ? 'non calculée, séquence incomplète' : workspace.priority === 'alternation' ? metrics.repeatedFamilyTransitions + ' répétitions (moins = meilleure valeur pour ce critère)' : rankingValue}; référence : ${referenceValue === undefined ? 'indisponible ou incomplète' : workspace.priority === 'alternation' ? referenceMetrics?.repeatedFamilyTransitions : referenceValue}.` : ''
+    return `${plan.title} (${crops}) : ${metrics.distinctFamilies} familles botaniques distinctes, ${metrics.repeatedFamilyTransitions} répétition(s) de famille, ${metrics.legumeSeasons} année(s) avec légumineuse et ${metrics.knownRootTransitions} transition(s) entre architectures racinaires connues.${comparison}${priorityEvidence}${constraintStatus}`
   })
   const unavailableLabels = constraints.unavailableCropIds.map(id => cropCatalog.find(crop => crop.id === id)?.label ?? id)
   return `${workspace.isExample ? 'Les scénarios affichés sont des exemples sur cinq années.' : 'Voici les scénarios enregistrés pour ce point.'} Critère sélectionné : ${priorityLabels[workspace.priority]}. ${unavailableLabels.length ? `Cultures déclarées indisponibles pour les options : ${unavailableLabels.join(', ')}. ` : 'Aucune culture déclarée indisponible. '}${plans.join(' ')} Les architectures racinaires absentes de la référence sont laissées inconnues. Ces indicateurs décrivent la séquence; ils ne prédisent ni rendement ni amélioration du sol. La référence racinaire est régionale et doit être confirmée localement. Vous pouvez modifier les cultures et contraintes dans l’onglet Scénarios.`
