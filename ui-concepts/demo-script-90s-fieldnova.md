@@ -7,18 +7,19 @@ FieldNova aide une exploitation à examiner des rotations avec le contexte clima
 ## Préparation avant l’enregistrement
 
 1. Lancer le projet sur le réseau local avec `npm run dev -- --port 5180`.
-2. Vérifier que Codex CLI est installé et connecté sur la machine qui lance Vite avec `codex login status`.
-3. Ouvrir `/app/scenarios` et attendre la fin du chargement NASA POWER. Vérifier que la période mensuelle et les références du même mois précédent sont visibles.
-4. Vérifier que les rotations sont marquées **Exemple illustratif** si aucune rotation locale n’a été saisie.
-5. Ne pas ajouter de valeurs de sol inventées. Un profil inconnu est une bonne démonstration de la façon dont FieldNova garde une inconnue visible.
-6. Si NASA POWER ou Codex CLI est indisponible, conserver l’état d’erreur à l’écran et expliquer que FieldNova garde une réponse locale et ne remplace pas les observations absentes par des nombres fictifs.
-7. Fermer les onglets inutiles et enregistrer en 1625 × 1231 ou dans un format 16:9 qui laisse les panneaux lisibles.
+2. Depuis la landing, cliquer « Essayer la démo fictive ». Le bandeau permanent **MODE DÉMO** doit distinguer le profil fictif des observations NASA POWER réelles. L’option « Quitter » permet de restaurer les données locales d’avant la démo.
+3. Vérifier que Codex CLI est installé et connecté sur la machine qui lance Vite avec `codex login status`; vérifier aussi `/api/codex/status` dans le navigateur.
+4. Ouvrir `/app/scenarios` et attendre la fin du chargement NASA POWER. Vérifier que la période mensuelle et les références du même mois précédent sont visibles.
+5. Vérifier que les rotations sont marquées **Exemple illustratif** et que le sol est inconnu dans ce cas fictif.
+6. Ne pas ajouter de valeurs de sol inventées. Le profil inconnu montre comment FieldNova garde une inconnue visible.
+7. Si NASA POWER ou Codex CLI est indisponible, conserver l’état d’erreur à l’écran et expliquer que FieldNova garde une réponse locale et ne remplace pas les observations absentes par des nombres fictifs.
+8. Fermer les onglets inutiles et enregistrer en 1625 × 1231 ou dans un format 16:9 qui laisse les panneaux lisibles.
 
 ## Script avec actions et narration
 
 | Temps | Action à l’écran | Narration |
 |---|---|---|
-| 0–10 s | Montrer la carte et les trois rotations. | « Un agriculteur doit réfléchir à la succession de ses cultures alors que les conditions climatiques varient. FieldNova rassemble ses options et les données disponibles au même endroit. » |
+| 0–10 s | Depuis l’accueil, lancer « Essayer la démo fictive »; montrer le bandeau MODE DÉMO puis la carte et les trois rotations. | « Un agriculteur doit réfléchir à la succession de ses cultures alors que les conditions climatiques varient. Voici une ferme fictive pour la démonstration; les données NASA restent réelles et identifiées. » |
 | 10–24 s | Pointer la carte, les coordonnées, la période NASA POWER et la cellule de grille. | « Ici, la carte est interactive. Les valeurs NASA POWER correspondent à une cellule de grille et à un mois complet; elles ne sont pas une mesure de la parcelle. » |
 | 24–37 s | Montrer pluie, température et humidité racinaire, puis les moyennes et plages des mêmes mois des années précédentes. | « L’agriculteur voit les conditions récentes à côté d’un repère calculé sur les mêmes mois observés auparavant. Le nombre d’années utilisées est indiqué. » |
 | 37–51 s | Modifier une culture dans une option de cinq ans, puis changer la priorité vers « Alternance des racines connues ». | « Il peut modifier une rotation et choisir le critère qui compte pour lui. FieldNova montre les familles, les légumineuses et les racines seulement lorsqu’elles sont documentées; le classement reste un compte explicable, pas un rendement prédit. » |

@@ -82,6 +82,16 @@ export function RotationExplorer() {
   }, [pointKey])
 
   useEffect(() => {
+    const reloadLocalExampleData = () => {
+      setSoilState({ pointKey, value: readSoilProfile(location) })
+      setWorkspace({ pointKey, value: readRotationWorkspace(location) })
+      setConstraintState({ pointKey, value: readRotationConstraints(location) })
+    }
+    window.addEventListener('fieldnova:demo-mode-change', reloadLocalExampleData)
+    return () => window.removeEventListener('fieldnova:demo-mode-change', reloadLocalExampleData)
+  }, [pointKey, location])
+
+  useEffect(() => {
     if (workspace.pointKey !== pointKey || workspace.value.isExample) return
     try {
       writeRotationWorkspace(location, workspace.value)

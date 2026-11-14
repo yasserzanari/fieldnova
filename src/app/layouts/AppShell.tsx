@@ -1,22 +1,76 @@
-import { Bell, ChevronDown, ChevronLeft, CircleHelp, CloudRain, Leaf, MapPin, Menu, ThermometerSun, UserRound } from 'lucide-react'
-import { NavLink, Outlet } from 'react-router-dom'
-import { Suspense, useMemo, useState } from 'react'
+import { Bell, ChevronDown, ChevronLeft, CircleHelp, CloudRain, FlaskConical, Leaf, MapPin, Menu, ThermometerSun, UserRound } from 'lucide-react'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { featureRoutes } from '../navigation'
 import { useSelectedLocation } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
+import { exitDemoWorkspace, readDemoWorkspace, type DemoWorkspace } from '../../lib/demo/demo-workspace'
 
 function coordinate(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(2).replace('.', ',')}° ${value < 0 ? negative : positive}`
 }
 
 export function AppShell() {
+  const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [demoWorkspace, setDemoWorkspace] = useState<DemoWorkspace | null>(() => readDemoWorkspace())
+  const [demoError, setDemoError] = useState('')
+  const [quitPromptOpen, setQuitPromptOpen] = useState(false)
+  const keepDemoButton = useRef<HTMLButtonElement>(null)
+  const quitDemoButton = useRef<HTMLButtonElement>(null)
   const { location } = useSelectedLocation()
   const { series, loading, error } = usePowerMonthly(location)
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
   const unavailable = Boolean(error)
+
+  useEffect(() => {
+    const refreshDemo = () => setDemoWorkspace(readDemoWorkspace())
+    window.addEventListener('fieldnova:demo-mode-change', refreshDemo)
+    window.addEventListener('storage', refreshDemo)
+    return () => {
+      window.removeEventListener('fieldnova:demo-mode-change', refreshDemo)
+      window.removeEventListener('storage', refreshDemo)
+    }
+  }, [])
+
+  const quitDemo = () => {
+    try {
+      exitDemoWorkspace()
+      setDemoWorkspace(null)
+      setDemoError('')
+      setQuitPromptOpen(false)
+      navigate('/app/overview', { replace: true })
+    } catch {
+      setDemoError('La restauration a échoué. Vos données de démonstration restent disponibles; réessayez.')
+    }
+  }
+
+  useEffect(() => {
+    if (!quitPromptOpen) return
+    keepDemoButton.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') dismissQuitPrompt() }
+    const trapFocus = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      const buttons = document.querySelectorAll<HTMLButtonElement>('.demo-exit-dialog button')
+      const first = buttons.item(0)
+      const last = buttons.item(buttons.length - 1)
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', trapFocus)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keydown', trapFocus)
+    }
+  }, [quitPromptOpen])
+
+  const dismissQuitPrompt = () => {
+    setQuitPromptOpen(false)
+    requestAnimationFrame(() => quitDemoButton.current?.focus())
+  }
 
   return (
     <div className="app-frame">
@@ -62,6 +116,11 @@ export function AppShell() {
             </span>
             <span className="context-source">NASA POWER · mensuel</span>
           </div>
+          {demoWorkspace && <div className="demo-mode-pill" aria-label="Mode démo : ferme fictive">
+            <FlaskConical size={14} /><span role="status"><strong>MODE DÉMO</strong><small>Profil fictif · NASA POWER réelle</small></span>
+            <button ref={quitDemoButton} type="button" onClick={() => setQuitPromptOpen(true)} title="Restaurer les données antérieures à la démo">Quitter</button>
+            {demoError && <span className="demo-mode-error" role="alert">{demoError}</span>}
+          </div>}
           <div className="topbar-actions">
             <button className="icon-button" aria-label="Notifications"><Bell size={18} /></button>
             <button className="icon-button" aria-label="Aide"><CircleHelp size={18} /></button>
@@ -70,6 +129,14 @@ export function AppShell() {
         </header>
         <main className="app-main"><Suspense fallback={<div className="route-loading" role="status">Ouverture de la vue…</div>}><Outlet /></Suspense></main>
       </div>
+      {quitPromptOpen && <div className="demo-exit-backdrop" onClick={event => { if (event.target === event.currentTarget) dismissQuitPrompt() }}>
+        <section className="demo-exit-dialog" role="dialog" aria-modal="true" aria-labelledby="demo-exit-title" aria-describedby="demo-exit-description">
+          <FlaskConical size={22} aria-hidden="true" />
+          <h2 id="demo-exit-title">Quitter l’exemple fictif ?</h2>
+          <p id="demo-exit-description">Les modifications faites dans la ferme d’exemple seront effacées. Les données présentes avant son lancement seront restaurées.</p>
+          <div><button type="button" className="demo-exit-cancel" ref={keepDemoButton} onClick={dismissQuitPrompt}>Continuer la démo</button><button type="button" className="demo-exit-confirm" onClick={quitDemo}>Quitter et restaurer</button></div>
+        </section>
+      </div>}
     </div>
   )
 }

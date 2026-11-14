@@ -8,6 +8,7 @@ export type FarmProfile = {
   waterAccess: FarmWaterAccess
   waterConstraint: FarmWaterConstraint
   waterNotes?: string
+  isExample?: boolean
   updatedAt: string
 }
 
@@ -40,6 +41,7 @@ export function readFarmProfile(point: GeoPoint): FarmProfile | null {
       waterAccess: parsed.waterAccess,
       waterConstraint: parsed.waterConstraint,
       waterNotes: typeof parsed.waterNotes === 'string' ? parsed.waterNotes.trim().slice(0, 240) || undefined : undefined,
+      isExample: parsed.isExample === true,
       updatedAt: typeof parsed.updatedAt === 'string' && Number.isFinite(Date.parse(parsed.updatedAt)) ? parsed.updatedAt : '',
     }
   } catch {
@@ -59,6 +61,7 @@ export function writeFarmProfile(point: GeoPoint, profile: Omit<FarmProfile, 'up
     waterAccess: profile.waterAccess,
     waterConstraint: profile.waterConstraint,
     waterNotes: profile.waterNotes?.trim() || undefined,
+    isExample: profile.isExample === true,
     updatedAt: new Date().toISOString(),
   }
   localStorage.setItem(storageKey(point), JSON.stringify(stored))

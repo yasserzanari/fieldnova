@@ -1,0 +1,7 @@
+.demo-entry-page { display:grid; min-height:100svh; place-items:center; padding:24px; background:radial-gradient(ellipse at 25% 15%,#e6edcf 0,transparent 42%),#f5f4ed; }
+.demo-entry-card { width:min(100%,520px); padding:38px; border:1px solid #dfdfd3; border-radius:22px; background:#fffefa; box-shadow:0 20px 70px rgb(32 51 29 / 10%); }
+.demo-entry-mark { display:grid; width:48px; height:48px; place-items:center; border-radius:15px; background:#163d25; color:#e4f0cc; font-size:24px; font-weight:760; }
+.demo-entry-eyebrow { margin:22px 0 8px; color:#52734b; font-size:12px; font-weight:720; letter-spacing:.08em; text-transform:uppercase; }
+.demo-entry-card h1 { margin:0; color:#16251b; font-size:25px; letter-spacing:-.04em; }
+.demo-entry-card > p:last-of-type { margin:12px 0 0; color:#66685b; font-size:14px; line-height:1.7; }
+.demo-entry-card button { margin-top:20px; padding:10px 15px; border:0; border-radius:10px; background:#173d25; color:white; font:inherit; font-size:13px; font-weight:680; cursor:pointer; }
