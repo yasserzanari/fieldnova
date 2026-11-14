@@ -46,6 +46,7 @@ export function parseParcelGeoJSON(text: string, fallbackName = 'Parcelle import
   const coordinates = polygons as MultiPolygonCoordinates
   const areaSquareMeters = polygons.reduce((sum, polygon) => {
     if (!polygon.length || polygon.some(ring => !isValidRing(ring))) throw new Error('Chaque anneau GeoJSON doit contenir au moins 4 points et être fermé.')
+    if (polygon.some(ring => hasSelfIntersection(ring))) throw new Error('La limite de parcelle se croise elle-même. Corrigez le contour avant de l’enregistrer.')
     const outerArea = ringArea(polygon[0])
     const holeArea = polygon.slice(1).reduce((area, ring) => area + ringArea(ring), 0)
     return sum + Math.max(0, outerArea - holeArea)
@@ -126,6 +127,28 @@ function isValidRing(ring: Position[]) {
   const [firstLongitude, firstLatitude] = ring[0]
   const [lastLongitude, lastLatitude] = ring[ring.length - 1]
   return firstLongitude === lastLongitude && firstLatitude === lastLatitude
+}
+
+function hasSelfIntersection(ring: Position[]) {
+  const segmentCount = ring.length - 1
+  for (let first = 0; first < segmentCount; first += 1) {
+    for (let second = first + 1; second < segmentCount; second += 1) {
+      if (second === first + 1 || first === 0 && second === segmentCount - 1) continue
+      if (segmentsIntersect(ring[first], ring[first + 1], ring[second], ring[second + 1])) return true
+    }
+  }
+  return false
+}
+
+function segmentsIntersect(a: Position, b: Position, c: Position, d: Position) {
+  const orientation = (first: Position, second: Position, third: Position) => (second[0] - first[0]) * (third[1] - first[1]) - (second[1] - first[1]) * (third[0] - first[0])
+  const onSegment = (first: Position, point: Position, second: Position) => point[0] >= Math.min(first[0], second[0]) && point[0] <= Math.max(first[0], second[0]) && point[1] >= Math.min(first[1], second[1]) && point[1] <= Math.max(first[1], second[1])
+  const abC = orientation(a, b, c)
+  const abD = orientation(a, b, d)
+  const cdA = orientation(c, d, a)
+  const cdB = orientation(c, d, b)
+  if (abC === 0 && onSegment(a, c, b) || abD === 0 && onSegment(a, d, b) || cdA === 0 && onSegment(c, a, d) || cdB === 0 && onSegment(c, b, d)) return true
+  return (abC > 0) !== (abD > 0) && (cdA > 0) !== (cdB > 0)
 }
 
 function ringArea(ring: Position[]) {

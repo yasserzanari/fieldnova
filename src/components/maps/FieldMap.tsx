@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Map as MapLibreMap, RasterTileSource, ScaleControl, type GeoJSONSource, type MapMouseEvent } from 'maplibre-gl'
+import type { FeatureCollection } from 'geojson'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoPoint } from '../../lib/geo/location'
 import type { PowerGridCell } from '../../lib/nasa/power'
@@ -16,6 +17,8 @@ type Props = {
   showSurfaceSoil?: boolean
   showRootSoil?: boolean
   powerGridCell?: PowerGridCell | null
+  draftParcelPoints?: GeoPoint[]
+  drawingParcel?: boolean
   imageryDate: string
   onPointSelect: (point: GeoPoint) => void
   onMapReady?: (map: MapLibreMap) => void
@@ -30,12 +33,13 @@ function gibsTileUrl(layer: string, date: string, format: 'jpg' | 'png', matrixS
   return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/${matrixSet}/{z}/{y}/{x}.${format}`
 }
 
-export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, powerGridCell, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
+export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, powerGridCell, draftParcelPoints = [], drawingParcel = false, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
   const parcel = useParcelBoundary()
   const parcelBoundary = parcel?.feature ?? null
   const parcelLabel = parcel ? ` Limite affichée : ${parcel.feature.properties?.name ?? 'parcelle importée'}, environ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} hectares.` : ''
+  const draftParcelLabel = drawingParcel ? ` Tracé de parcelle en cours : ${draftParcelPoints.length} sommet(s); les sommets ne sont pas encore enregistrés.` : ''
   const gridCellLabel = powerGridCell ? ` Maille météo NASA POWER indiquée par un contour vert discontinu, environ ${Math.round(powerGridCell.properties.widthKm)} par ${Math.round(powerGridCell.properties.heightKm)} km.` : ''
-  const mapLabel = `${ariaLabel}.${parcelLabel}${gridCellLabel}`
+  const mapLabel = `${ariaLabel}.${parcelLabel}${draftParcelLabel}${gridCellLabel}`
   const legendItems = [
     ...(baseLayer === 'nasa' ? [{ id: 'truecolor', label: `MODIS Terra · composition couleur · ${imageryDate}`, detail: 'Image composite; pas une mesure unique.' }] : []),
     ...(showNdvi ? [{ id: 'ndvi', label: `NDVI MODIS Terra · composite 8 jours · ${imageryDate}`, detail: 'Indice sans unité · palette et gamme NASA GIBS.', legendUrl: 'https://gibs.earthdata.nasa.gov/legends/MODIS_NDVI_H.svg' }] : []),
@@ -124,6 +128,10 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
             type: 'geojson',
             data: { type: 'FeatureCollection', features: [] },
           },
+          parcelDraft: {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] },
+          },
         },
         layers: [
           { id: 'osm-streets', type: 'raster', source: 'osm', layout: { visibility: 'visible' } },
@@ -135,14 +143,18 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
           { id: 'power-grid-cell-line', type: 'line', source: 'powerGridCell', paint: { 'line-color': '#dff4ad', 'line-width': 2, 'line-opacity': 0.95, 'line-dasharray': [2, 2] } },
           { id: 'parcel-boundary-fill', type: 'fill', source: 'parcelBoundary', paint: { 'fill-color': '#b5df80', 'fill-opacity': 0.2 } },
           { id: 'parcel-boundary-line', type: 'line', source: 'parcelBoundary', paint: { 'line-color': '#efffc7', 'line-width': 3, 'line-opacity': 0.95 } },
+          { id: 'parcel-draft-fill', type: 'fill', source: 'parcelDraft', filter: ['==', ['geometry-type'], 'Polygon'], paint: { 'fill-color': '#b5df80', 'fill-opacity': 0.18 } },
+          { id: 'parcel-draft-line-halo', type: 'line', source: 'parcelDraft', filter: ['in', ['geometry-type'], ['literal', ['LineString', 'Polygon']]], paint: { 'line-color': '#fffefa', 'line-width': 5, 'line-opacity': 0.92 } },
+          { id: 'parcel-draft-line', type: 'line', source: 'parcelDraft', filter: ['in', ['geometry-type'], ['literal', ['LineString', 'Polygon']]], paint: { 'line-color': '#416b3b', 'line-width': 2.5, 'line-dasharray': [2, 1] } },
+          { id: 'parcel-draft-points', type: 'circle', source: 'parcelDraft', filter: ['==', ['geometry-type'], 'Point'], paint: { 'circle-radius': 5, 'circle-color': '#416b3b', 'circle-stroke-color': '#fffefa', 'circle-stroke-width': 2 } },
           { id: 'selected-point-halo', type: 'circle', source: 'selectedPoint', paint: { 'circle-radius': 10, 'circle-color': '#fffefa', 'circle-opacity': 0.9 } },
           { id: 'selected-point', type: 'circle', source: 'selectedPoint', paint: { 'circle-radius': 5, 'circle-color': '#286b45', 'circle-stroke-color': '#fffefa', 'circle-stroke-width': 2 } },
         ],
       },
     })
     mapRef.current = map
+    onReadyRef.current?.(map)
     map.addControl(new ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-right')
-    map.on('load', () => onReadyRef.current?.(map))
     map.on('click', (event: MapMouseEvent) => onSelectRef.current({ latitude: Number(event.lngLat.lat.toFixed(5)), longitude: Number(event.lngLat.lng.toFixed(5)) }))
     map.on('error', event => {
       if (event.error) console.warn('FieldNova map tile error:', event.error.message)
@@ -208,6 +220,44 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
     if (map.isStyleLoaded()) updateParcel()
     else map.once('load', updateParcel)
   }, [parcelBoundary])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const updateDraft = () => {
+      const source = map.getSource('parcelDraft') as GeoJSONSource | undefined
+      const positions = draftParcelPoints.map(point => [point.longitude, point.latitude] as [number, number])
+      const features: FeatureCollection['features'] = []
+      if (positions.length >= 3) {
+        const ring = [...positions, positions[0]]
+        features.push({ type: 'Feature', properties: { kind: 'outline' }, geometry: { type: 'Polygon', coordinates: [ring] } })
+      } else if (positions.length === 2) {
+        features.push({ type: 'Feature', properties: { kind: 'outline' }, geometry: { type: 'LineString', coordinates: positions } })
+      }
+      for (const coordinates of positions) features.push({ type: 'Feature', properties: { kind: 'vertex' }, geometry: { type: 'Point', coordinates } })
+      source?.setData({ type: 'FeatureCollection', features })
+    }
+    if (map.isStyleLoaded()) updateDraft()
+    else map.once('load', updateDraft)
+  }, [draftParcelPoints])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    map.getCanvas().style.cursor = drawingParcel ? 'crosshair' : ''
+    if (drawingParcel) map.doubleClickZoom.disable()
+    else map.doubleClickZoom.enable()
+    return () => {
+      map.getCanvas().style.cursor = ''
+      map.doubleClickZoom.enable()
+    }
+  }, [drawingParcel])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!drawingParcel || !map) return
+    map.flyTo({ center: [selectedPoint.longitude, selectedPoint.latitude], zoom: 14, duration: 450 })
+  }, [drawingParcel, selectedPoint.latitude, selectedPoint.longitude])
 
   useEffect(() => {
     const map = mapRef.current

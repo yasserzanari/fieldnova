@@ -67,6 +67,8 @@ export function RotationExplorer() {
   const [saveError, setSaveError] = useState('')
   const [constraintError, setConstraintError] = useState('')
   const [generationMessage, setGenerationMessage] = useState('')
+  const [drawingParcel, setDrawingParcel] = useState(false)
+  const [draftParcelPoints, setDraftParcelPoints] = useState<GeoPoint[]>([])
   const [detailPlanId, setDetailPlanId] = useState<RotationId | null>(null)
   const detailsDialogRef = useRef<HTMLDialogElement>(null)
   const { series: currentSeries, loading: climateLoading, error: climateError, retry: retryClimate } = usePowerMonthly(location)
@@ -115,6 +117,15 @@ export function RotationExplorer() {
     const dialog = detailsDialogRef.current
     if (detailPlanId && dialog && !dialog.open) dialog.showModal()
   }, [detailPlanId])
+
+  useEffect(() => {
+    if (!drawingParcel) return
+    const cancelOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') cancelParcelDrawing()
+    }
+    window.addEventListener('keydown', cancelOnEscape)
+    return () => window.removeEventListener('keydown', cancelOnEscape)
+  }, [drawingParcel])
 
   const currentWorkspace = workspace.pointKey === pointKey ? workspace.value : readRotationWorkspace(location)
   const constraints = constraintState.pointKey === pointKey ? constraintState.value : emptyRotationConstraints()
@@ -174,8 +185,41 @@ export function RotationExplorer() {
     }
   }
   const moveToPoint = (point: GeoPoint) => {
+    if (drawingParcel) {
+      setDraftParcelPoints(current => [...current, point])
+      return
+    }
     selectLocation(point)
     map?.flyTo({ center: [point.longitude, point.latitude], zoom: Math.max(7, map.getZoom()), duration: 800 })
+  }
+  const startParcelDrawing = () => {
+    setParcelError('')
+    setDraftParcelPoints([])
+    setDrawingParcel(true)
+  }
+  const undoParcelVertex = () => setDraftParcelPoints(current => current.slice(0, -1))
+  const cancelParcelDrawing = () => {
+    setDrawingParcel(false)
+    setDraftParcelPoints([])
+    setParcelError('')
+  }
+  const finishParcelDrawing = () => {
+    if (draftParcelPoints.length < 3) {
+      setParcelError('Ajoutez au moins trois sommets distincts pour former une limite.')
+      return
+    }
+    const positions = draftParcelPoints.map(point => [point.longitude, point.latitude])
+    const ring = [...positions, positions[0]]
+    try {
+      const parsed = parseParcelGeoJSON(JSON.stringify({ type: 'Feature', properties: { name: 'Parcelle dessinée' }, geometry: { type: 'Polygon', coordinates: [ring] } }), 'Parcelle dessinée')
+      saveParcelBoundary(parsed)
+      map?.fitBounds(parsed.bounds, { padding: { top: 100, right: 320, bottom: 100, left: 320 }, maxZoom: 13, duration: 700 })
+      setDrawingParcel(false)
+      setDraftParcelPoints([])
+      setParcelError('')
+    } catch (error) {
+      setParcelError(error instanceof Error ? error.message : 'Impossible d’enregistrer cette limite.')
+    }
   }
   const locateMe = () => {
     if (!navigator.geolocation) return
@@ -291,21 +335,28 @@ export function RotationExplorer() {
     <header className="rotation-heading"><div><h1>Explorer les rotations</h1><p>Comparez des successions de cultures selon des critères visibles et modifiables.</p></div><div className="rotation-heading-actions"><span className="rotation-example-badge">{currentWorkspace.isExample ? 'Exemple illustratif' : 'Scénario local'}</span><button type="button" className="rotation-generate" onClick={generateOptions}><Sparkles size={13} />Générer 2 options</button><button type="button" className="rotation-export" onClick={exportDecisionBrief}><Download size={13} />Exporter la fiche</button><button type="button" className="rotation-reset" onClick={resetExample}><RotateCcw size={13} />Charger l’exemple</button></div></header>
 
     <div className="rotation-map-stage">
-      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} powerGridCell={currentSeries?.gridCell} imageryDate={dayBefore(11)} onPointSelect={moveToPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA et position de l’exploitation pour comparer les rotations" />
+      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} powerGridCell={currentSeries?.gridCell} draftParcelPoints={draftParcelPoints} drawingParcel={drawingParcel} imageryDate={dayBefore(11)} onPointSelect={moveToPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA et position de l’exploitation pour comparer les rotations" />
       <div className="rotation-map-topline"><div className="rotation-location-chip"><MapPinned size={15} /><span>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</span><small>Point suivi</small></div><div className="rotation-map-options"><div className="rotation-base-switch" role="group" aria-label="Fond de carte"><button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Satellite</button></div><label><input type="checkbox" checked={showNdvi} onChange={event => setShowNdvi(event.target.checked)} />NDVI</label></div></div>
-      <div className="rotation-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 220 })}><Plus size={15} /></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 220 })}><Minus size={15} /></button><button type="button" aria-label="Utiliser ma position" onClick={locateMe} disabled={locating}><LocateFixed size={14} /></button></div>
-      <span className="rotation-map-hint">Cliquez pour déplacer le point suivi · les profils et séries suivent la position sélectionnée</span>
+      <div className="rotation-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 220 })}><Plus size={15} /></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 220 })}><Minus size={15} /></button><button type="button" aria-label="Utiliser ma position" onClick={locateMe} disabled={locating || drawingParcel}><LocateFixed size={14} /></button></div>
+      <span className="rotation-map-hint">{drawingParcel ? 'Mode dessin actif · chaque clic ajoute un sommet au contour temporaire' : 'Cliquez pour déplacer le point suivi · les profils et séries suivent la position sélectionnée'}</span>
 
       <aside className="rotation-context-panel rotation-context-left" aria-label="Contexte du sol local et du climat NASA">
         <header className="rotation-panel-heading"><span className="rotation-panel-icon soil"><Sprout size={15} /></span><span><strong>Sol local</strong><small>{soilHasGeneralValues ? `Origine déclarée : ${soilSourceLabels[soil.sourceType ?? 'farmer-reported']}` : soil.horizons?.length ? 'Origine propre à chaque horizon' : 'Aucune donnée renseignée'}</small></span></header>
         {soilValues.length ? <ul className="rotation-soil-list">{soilValues.map(value => <li key={value}>{value}</li>)}</ul> : <p className="rotation-context-empty">Aucune caractéristique de sol n’est renseignée pour ce point.</p>}
         <Link to="/app/terrain" className="rotation-context-link">Renseigner le profil du sol <ArrowUpRight size={12} /></Link>
         <div className="rotation-parcel-card">
-          <div><strong>Limite de parcelle</strong><small>{parcel ? `${parcel.feature.properties?.name ?? 'Parcelle'} · ≈ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} ha` : 'Importez un fichier GeoJSON WGS84'}</small></div>
-          {parcel ? <button type="button" className="rotation-parcel-remove" aria-label="Retirer la limite de parcelle" onClick={removeParcel}><Trash2 size={12} /></button> : <label className="rotation-parcel-import"><Upload size={12} />Importer<input type="file" accept=".geojson,.json,application/geo+json,application/json" aria-label="Importer une limite GeoJSON" onChange={importParcel} /></label>}
+          <div><strong>Limite de parcelle</strong><small>{parcel ? `${parcel.feature.properties?.name ?? 'Parcelle'} · ≈ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} ha` : 'Importez ou dessinez une limite WGS84'}</small></div>
+          <div className="rotation-parcel-actions">
+            {drawingParcel ? <><button type="button" className="rotation-parcel-cancel" onClick={cancelParcelDrawing}>Annuler</button><button type="button" className="rotation-parcel-undo" onClick={undoParcelVertex} disabled={!draftParcelPoints.length}>Retour</button><button type="button" className="rotation-parcel-finish" onClick={finishParcelDrawing} disabled={draftParcelPoints.length < 3}>Terminer · {draftParcelPoints.length}</button></> : <>
+              <label className="rotation-parcel-import"><Upload size={12} />Importer<input type="file" accept=".geojson,.json,application/geo+json,application/json" aria-label="Importer une limite GeoJSON" onChange={importParcel} /></label>
+              <button type="button" className="rotation-parcel-draw" onClick={startParcelDrawing}>Dessiner</button>
+              {parcel && <button type="button" className="rotation-parcel-remove" aria-label="Retirer la limite de parcelle" onClick={removeParcel}><Trash2 size={12} /></button>}
+            </>}
+          </div>
         </div>
+        {drawingParcel && <p className="rotation-parcel-drawing-help" role="status">Carte rapprochée au point suivi. Cliquez pour placer les sommets ({draftParcelPoints.length}); « Retour » retire le dernier. Terminez pour enregistrer ou annulez pour conserver la limite actuelle.</p>}
         {parcelError && <p className="rotation-parcel-error" role="alert">{parcelError}</p>}
-        {parcel && <small className="rotation-parcel-note">Contour importé localement · surface géodésique approximative. Aucune statistique NASA zonale calculée.</small>}
+        {parcel && <small className="rotation-parcel-note">Contour dessiné/importé localement · surface géodésique approximative. Aucune statistique NASA zonale calculée.</small>}
         <div className="rotation-context-divider" />
         <header className="rotation-panel-heading"><span className="rotation-panel-icon climate"><Activity size={15} /></span><span><strong>Contexte NASA POWER</strong><small>{climateLoading ? 'Chargement des données…' : latest ? `${formatPowerMonth(latest.date)} · valeur mensuelle` : 'Données non disponibles'}</small></span></header>
         {climateLoading ? <div className="rotation-context-empty" role="status">Récupération de la série climatique…</div> : climateError ? <div className="rotation-context-error" role="alert">{climateError}<button type="button" onClick={retryClimate}>Réessayer</button></div> : <><div className="rotation-climate-metrics"><span><CloudRain size={13} /><div><small>Pluie moyenne</small><small className="rotation-climate-reference">{climateReferences.precipitation}</small></div><strong>{latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j`}</strong></span><span><ThermometerSun size={13} /><div><small>Température</small><small className="rotation-climate-reference">{climateReferences.temperature}</small></div><strong>{latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`}</strong></span><span><Droplets size={13} /><div><small>Humidité racinaire</small><small className="rotation-climate-reference">{climateReferences.roots}</small></div><strong>{latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0).replace('.', ',')} %`}</strong></span></div><small className="rotation-climate-footnote">Repère historique du même mois · pas une prévision</small></>}
