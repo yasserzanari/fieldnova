@@ -1,6 +1,6 @@
 import { Bell, ChevronDown, CircleHelp, Leaf, Menu, UserRound } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { featureRoutes } from '../navigation'
 
 export function AppShell() {
@@ -41,6 +41,7 @@ export function AppShell() {
           <div className="topbar-context">
             <span className="context-control"><Leaf size={18} /> Maïs · Saison 2025 <ChevronDown size={15} /></span>
             <span className="context-weather">☀️ <strong>18 °C</strong><span>Précipitations 7 j : 12 mm</span></span>
+            <span className="context-demo">Données de démonstration</span>
           </div>
           <div className="topbar-actions">
             <button className="icon-button" aria-label="Notifications"><Bell size={18} /></button>
@@ -48,7 +49,7 @@ export function AppShell() {
             <button className="profile-button" aria-label="Profil de l’utilisateur"><UserRound size={18} /></button>
           </div>
         </header>
-        <main className="app-main"><Outlet /></main>
+        <main className="app-main"><Suspense fallback={<div className="route-loading" role="status">Ouverture de la vue…</div>}><Outlet /></Suspense></main>
       </div>
     </div>
   )

@@ -1,12 +1,13 @@
 import { BarChart3, Bot, Database, Globe2, House, Layers3, Leaf } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import type { ComponentType } from 'react'
-import { OverviewPage } from '../features/overview'
-import { AtlasPage } from '../features/atlas'
-import { TerrainPage } from '../features/terrain'
-import { ScenariosPage } from '../features/scenarios'
-import { AssistantPage } from '../features/assistant'
-import { DataTrustPage } from '../features/data-trust'
+import { lazy, type ComponentType } from 'react'
+
+const OverviewPage = lazy(() => import('../features/overview').then(module => ({ default: module.OverviewPage })))
+const AtlasPage = lazy(() => import('../features/atlas').then(module => ({ default: module.AtlasPage })))
+const TerrainPage = lazy(() => import('../features/terrain').then(module => ({ default: module.TerrainPage })))
+const ScenariosPage = lazy(() => import('../features/scenarios').then(module => ({ default: module.ScenariosPage })))
+const AssistantPage = lazy(() => import('../features/assistant').then(module => ({ default: module.AssistantPage })))
+const DataTrustPage = lazy(() => import('../features/data-trust').then(module => ({ default: module.DataTrustPage })))
 
 export type FeatureRoute = {
   path: string
