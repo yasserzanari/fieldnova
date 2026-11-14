@@ -25,8 +25,8 @@ const scenes = [
   },
   {
     id: 'scenarios',
-    title: 'Comparer plusieurs chemins avant d’agir.',
-    copy: 'Les scénarios de rotation mettent les compromis en regard : fertilité, couverture, rendement et résilience. Les hypothèses et les observations restent différenciées.',
+    title: 'Comparer des rotations selon un critère visible.',
+    copy: 'Les scénarios affichent les familles, répétitions, légumineuses et racines documentées sur cinq ans. Climat et sol restent des repères séparés; coûts, calendrier local et rendement ne sont pas simulés.',
     modules: ['Scénarios'],
     image: scenariosConcept,
     alt: 'Concept FieldNova comparant trois scénarios de rotation sur une parcelle',
@@ -34,7 +34,7 @@ const scenes = [
   {
     id: 'assistant',
     title: 'Poser une question et voir sur quoi repose la réponse.',
-    copy: 'L’assistant se comporte comme un chat contextualisé : il consulte les outils adaptés, relie ses réponses à la parcelle et laisse la carte visible. Données & confiance détaille ensuite les sources et leurs limites.',
+    copy: 'L’assistant consulte les outils FieldNova pour le point suivi, cite les sources utilisées et laisse la carte visible. Les données NASA gardent leur maille et ne décrivent pas automatiquement une parcelle.',
     modules: ['Assistant', 'Données & confiance'],
     image: assistantConcept,
     alt: 'Concept FieldNova montrant un chat agricole à gauche et une carte de parcelles à droite',
