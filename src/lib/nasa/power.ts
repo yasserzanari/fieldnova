@@ -1,4 +1,14 @@
 import type { GeoPoint } from '../geo/location'
+import type { Feature, MultiPolygon, Polygon } from 'geojson'
+
+export type PowerGridCellProperties = {
+  center: GeoPoint
+  latitudeResolutionDegrees: number
+  longitudeResolutionDegrees: number
+  widthKm: number
+  heightKm: number
+}
+export type PowerGridCell = Feature<Polygon | MultiPolygon, PowerGridCellProperties>
 
 export type PowerMonthlyRecord = {
   date: string
@@ -13,6 +23,7 @@ export type PowerMonthlyRecord = {
 export type PowerMonthlySeries = {
   point: GeoPoint
   gridPoint: GeoPoint
+  gridCell: PowerGridCell
   source: string[]
   timeStandard: string
   fetchedAt: string
@@ -29,7 +40,40 @@ type PowerResponse = {
 }
 
 const CACHE_TTL = 15 * 60 * 1000
+const MERRA2_LATITUDE_STEP = 0.5
+const MERRA2_LONGITUDE_STEP = 0.625
 const cache = new Map<string, { expiresAt: number; data: PowerMonthlySeries }>()
+
+export function merra2GridCellAt(point: GeoPoint): PowerGridCell {
+  const latitudeIndex = Math.min(360, Math.max(0, Math.round((point.latitude + 90) / MERRA2_LATITUDE_STEP)))
+  const latitude = -90 + latitudeIndex * MERRA2_LATITUDE_STEP
+  const normalizedLongitude = ((point.longitude + 180) % 360 + 360) % 360 - 180
+  const longitudeIndex = Math.round((normalizedLongitude + 180) / MERRA2_LONGITUDE_STEP) % 576
+  const longitude = -180 + longitudeIndex * MERRA2_LONGITUDE_STEP
+  const south = Math.max(-90, latitude - MERRA2_LATITUDE_STEP / 2)
+  const north = Math.min(90, latitude + MERRA2_LATITUDE_STEP / 2)
+  const west = longitude - MERRA2_LONGITUDE_STEP / 2
+  const east = longitude + MERRA2_LONGITUDE_STEP / 2
+  const latitudeKm = (north - south) * 111.32
+  const longitudeKm = MERRA2_LONGITUDE_STEP * 111.32 * Math.cos(latitude * Math.PI / 180)
+  const ring = (left: number, right: number) => [[left, south], [right, south], [right, north], [left, north], [left, south]] as [number, number][]
+  const geometry: Polygon | MultiPolygon = west < -180
+    ? { type: 'MultiPolygon', coordinates: [[ring(west + 360, 180)], [ring(-180, east)]] }
+    : east > 180
+      ? { type: 'MultiPolygon', coordinates: [[ring(west, 180)], [ring(-180, east - 360)]] }
+      : { type: 'Polygon', coordinates: [ring(west, east)] }
+  return {
+    type: 'Feature',
+    properties: {
+      center: { latitude, longitude },
+      latitudeResolutionDegrees: MERRA2_LATITUDE_STEP,
+      longitudeResolutionDegrees: MERRA2_LONGITUDE_STEP,
+      widthKm: Math.max(0, longitudeKm),
+      heightKm: latitudeKm,
+    },
+    geometry,
+  }
+}
 
 export async function fetchPowerMonthly(point: GeoPoint, years = 5): Promise<PowerMonthlySeries> {
   const lat = Number(point.latitude.toFixed(3))
@@ -76,10 +120,11 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5): Promise<Pow
   })).filter(record => Object.values(record).some(value => typeof value === 'number'))
 
   if (!records.length) throw new Error('NASA POWER n’a pas encore de mois achevé exploitable pour ce point.')
-  const coordinates = body.geometry?.coordinates
+  const gridCell = merra2GridCellAt(point)
   const series: PowerMonthlySeries = {
     point,
-    gridPoint: coordinates?.length && coordinates.length >= 2 ? { longitude: coordinates[0], latitude: coordinates[1] } : point,
+    gridPoint: gridCell.properties.center,
+    gridCell,
     source: body.header?.sources ?? ['NASA POWER'],
     timeStandard: body.header?.time_standard ?? 'UTC',
     fetchedAt: new Date().toISOString(),

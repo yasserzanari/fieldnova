@@ -95,7 +95,7 @@ export function OverviewPage() {
       </header>
 
       <div className="overview-map-stage">
-        <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} imageryDate={imageryDate} onPointSelect={updatePoint} onMapReady={setMap} ariaLabel="Carte interactive OpenStreetMap et couches NASA GIBS" />
+        <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={updatePoint} onMapReady={setMap} ariaLabel="Carte interactive OpenStreetMap et couches NASA GIBS" />
         <div className="overview-map-topline">
           <div className="map-location"><MapPinned size={15} /><span>{formatCoord(location.latitude, location.latitude < 0 ? 'S' : 'N')} · {formatCoord(location.longitude, location.longitude < 0 ? 'O' : 'E')}</span><small>Point suivi</small></div>
           <div className="overview-map-options">
@@ -116,7 +116,7 @@ export function OverviewPage() {
         <span className="overview-map-click-hint">Cliquez sur la carte pour interroger NASA POWER à cet endroit</span>
 
         <aside className="overview-panel overview-parcels-panel" aria-label="Point suivi et coordonnées">
-          <header className="overview-panel-heading"><div><h2>Point d’analyse</h2><p>{dataPoint ? `Cellule NASA · ${dataPoint.latitude.toFixed(3)}, ${dataPoint.longitude.toFixed(3)}` : 'Chargement de la cellule NASA…'}</p></div><span className="panel-icon"><MapPinned size={17} /></span></header>
+          <header className="overview-panel-heading"><div><h2>Point d’analyse</h2><p>{dataPoint ? `Centre maille NASA POWER · ${dataPoint.latitude.toFixed(3)}, ${dataPoint.longitude.toFixed(3)} · 0,5° × 0,625°` : 'Chargement de la cellule NASA…'}</p></div><span className="panel-icon"><MapPinned size={17} /></span></header>
           <form className="overview-coordinate-form" onSubmit={applyCoordinates}>
             <label><span>Latitude</span><input inputMode="decimal" value={latitude} onChange={event => setLatitude(event.target.value)} aria-label="Latitude" /></label>
             <label><span>Longitude</span><input inputMode="decimal" value={longitude} onChange={event => setLongitude(event.target.value)} aria-label="Longitude" /></label>

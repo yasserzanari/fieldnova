@@ -97,7 +97,7 @@ export function AtlasPage() {
     </header>
 
     <div className="atlas-map-stage">
-      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive OpenStreetMap et couches satellite NASA GIBS" />
+      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive OpenStreetMap et couches satellite NASA GIBS" />
       <div className="atlas-map-toolbar">
         <div className="atlas-base-switch" role="group" aria-label="Fond de carte"><button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Image NASA</button></div>
         <label className="atlas-ndvi-toggle"><input type="checkbox" checked={showNdvi} onChange={event => setShowNdvi(event.target.checked)} /><Activity size={14} /> NDVI</label>
@@ -118,7 +118,7 @@ export function AtlasPage() {
 
       <aside className="atlas-float-panel atlas-selection-panel" aria-label="Séries climatiques du point sélectionné">
         <header className="atlas-selection-heading"><div><span className="atlas-polygon-icon" /><div><h2>Point suivi</h2><p>{formatCoord(location.latitude, 'N', 'S')} · {formatCoord(location.longitude, 'E', 'O')}</p></div></div><button type="button" aria-label="Centrer sur ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></header>
-        <p className="atlas-grid-point">{gridPoint ? `Cellule NASA POWER · ${gridPoint.latitude.toFixed(3)}, ${gridPoint.longitude.toFixed(3)}` : 'Cellule de grille NASA en attente'}</p>
+        <p className="atlas-grid-point">{gridPoint ? `Centre maille NASA POWER · ${gridPoint.latitude.toFixed(3)}, ${gridPoint.longitude.toFixed(3)} · 0,5° × 0,625°` : 'Cellule de grille NASA en attente'}</p>
         {loading ? <div className="atlas-data-state" role="status">Chargement de NASA POWER…</div> : error ? <div className="atlas-data-error" role="alert"><span>{error}</span><button type="button" onClick={() => setRefreshKey(value => value + 1)}>Réessayer</button></div> : <>
           <div className="atlas-live-metrics">
             <AtlasMetric icon={<CloudRain size={14} />} label="Pluie moyenne" value={latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(2).replace('.', ',')} mm/j`} source="PRECTOTCORR" />

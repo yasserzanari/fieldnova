@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Map as MapLibreMap, RasterTileSource, ScaleControl, type GeoJSONSource, type MapMouseEvent } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoPoint } from '../../lib/geo/location'
+import type { PowerGridCell } from '../../lib/nasa/power'
 import { useParcelBoundary } from '../../lib/geo/parcel-boundary'
 import './field-map.css'
 
@@ -14,6 +15,7 @@ type Props = {
   showNdvi: boolean
   showSurfaceSoil?: boolean
   showRootSoil?: boolean
+  powerGridCell?: PowerGridCell | null
   imageryDate: string
   onPointSelect: (point: GeoPoint) => void
   onMapReady?: (map: MapLibreMap) => void
@@ -28,10 +30,12 @@ function gibsTileUrl(layer: string, date: string, format: 'jpg' | 'png', matrixS
   return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/${matrixSet}/{z}/{y}/{x}.${format}`
 }
 
-export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
+export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, powerGridCell, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
   const parcel = useParcelBoundary()
   const parcelBoundary = parcel?.feature ?? null
-  const mapLabel = parcel ? `${ariaLabel}. Limite affichée : ${parcel.feature.properties?.name ?? 'parcelle importée'}, environ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} hectares.` : ariaLabel
+  const parcelLabel = parcel ? ` Limite affichée : ${parcel.feature.properties?.name ?? 'parcelle importée'}, environ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} hectares.` : ''
+  const gridCellLabel = powerGridCell ? ` Maille météo NASA POWER indiquée par un contour vert discontinu, environ ${Math.round(powerGridCell.properties.widthKm)} par ${Math.round(powerGridCell.properties.heightKm)} km.` : ''
+  const mapLabel = `${ariaLabel}.${parcelLabel}${gridCellLabel}`
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const onSelectRef = useRef(onPointSelect)
@@ -102,6 +106,10 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
               features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [selectedPoint.longitude, selectedPoint.latitude] } }],
             },
           },
+          powerGridCell: {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: powerGridCell ? [powerGridCell] : [] },
+          },
           parcelBoundary: {
             type: 'geojson',
             data: { type: 'FeatureCollection', features: [] },
@@ -113,6 +121,8 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
           { id: 'nasa-ndvi', type: 'raster', source: 'nasaNdvi', layout: { visibility: showNdvi ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.82 } },
           { id: 'smap-surface-soil', type: 'raster', source: 'smapSurface', layout: { visibility: showSurfaceSoil ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.56 } },
           { id: 'smap-root-soil', type: 'raster', source: 'smapRoot', layout: { visibility: showRootSoil ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.56 } },
+          { id: 'power-grid-cell-fill', type: 'fill', source: 'powerGridCell', paint: { 'fill-color': '#c8ec92', 'fill-opacity': 0.11 } },
+          { id: 'power-grid-cell-line', type: 'line', source: 'powerGridCell', paint: { 'line-color': '#dff4ad', 'line-width': 2, 'line-opacity': 0.95, 'line-dasharray': [2, 2] } },
           { id: 'parcel-boundary-fill', type: 'fill', source: 'parcelBoundary', paint: { 'fill-color': '#b5df80', 'fill-opacity': 0.2 } },
           { id: 'parcel-boundary-line', type: 'line', source: 'parcelBoundary', paint: { 'line-color': '#efffc7', 'line-width': 3, 'line-opacity': 0.95 } },
           { id: 'selected-point-halo', type: 'circle', source: 'selectedPoint', paint: { 'circle-radius': 10, 'circle-color': '#fffefa', 'circle-opacity': 0.9 } },
@@ -170,6 +180,17 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
   useEffect(() => {
     const map = mapRef.current
     if (!map) return
+    const updateGridCell = () => {
+      const source = map.getSource('powerGridCell') as GeoJSONSource | undefined
+      source?.setData({ type: 'FeatureCollection', features: powerGridCell ? [powerGridCell] : [] })
+    }
+    if (map.isStyleLoaded()) updateGridCell()
+    else map.once('load', updateGridCell)
+  }, [powerGridCell])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
     const updateParcel = () => {
       const source = map.getSource('parcelBoundary') as GeoJSONSource | undefined
       source?.setData(parcelBoundary ?? { type: 'FeatureCollection', features: [] })
@@ -191,5 +212,11 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
     else map.once('load', updateDate)
   }, [imageryDate])
 
-  return <div ref={containerRef} className={`field-map ${className}`} role="application" aria-label={mapLabel} />
+  return <div className={`field-map-shell ${className}`}>
+    <div ref={containerRef} className="field-map" role="application" aria-label={mapLabel} />
+    {powerGridCell && <div className="field-map-power-legend" aria-label={`Maille météorologique NASA POWER, environ ${Math.round(powerGridCell.properties.widthKm)} par ${Math.round(powerGridCell.properties.heightKm)} kilomètres`}>
+      <span className="field-map-power-swatch" aria-hidden="true" />
+      <span><strong>Maille météo · NASA POWER</strong><small>≈ {Math.round(powerGridCell.properties.widthKm)} × {Math.round(powerGridCell.properties.heightKm)} km · point séparé</small></span>
+    </div>}
+  </div>
 }

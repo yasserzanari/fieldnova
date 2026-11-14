@@ -71,7 +71,7 @@
 .trust-detail-footer { display:flex; min-height:33px; flex:none; align-items:center; justify-content:space-between; gap:5px; margin-top:7px; padding-top:6px; border-top:1px solid #eeece5; }.trust-detail-footer > span { display:inline-flex; align-items:center; gap:5px; color:#777365; font-size:7px; }.trust-detail-footer button { display:inline-flex; align-items:center; gap:4px; padding:5px 7px; border:1px solid #dce6d3; border-radius:7px; background:#f2f6ed; color:#4b7043; font-size:7px; font-weight:680; cursor:pointer; }
 .trust-status-banner { border-color:#dce8d2; background:#f0f5eb; color:#527046; }
 .trust-map-stage { cursor:default; touch-action:auto; background:#dfe5d5; }
-.trust-map-stage > .field-map { z-index:0; border-radius:inherit; }
+.trust-map-stage > .field-map-shell { z-index:0; border-radius:inherit; }
 .trust-map-controls, .trust-map-context, .trust-layer-menu, .trust-map-legend { z-index:5; }
 .trust-map-context .trust-status-pill { margin-left:auto; }
 .trust-map-layer-choices { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; }

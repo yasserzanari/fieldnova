@@ -1,4 +1,8 @@
+.field-map-shell { position:absolute; inset:0; width:100%; height:100%; overflow:hidden; background:#dfe5d5; }
 .field-map { position:absolute; inset:0; width:100%; height:100%; overflow:hidden; background:#dfe5d5; }
+.field-map-power-legend { position:absolute; z-index:2; bottom:12px; left:12px; display:flex; align-items:center; gap:8px; max-width:min(280px,calc(100% - 24px)); padding:7px 10px; border:1px solid rgb(226 235 206 / 92%); border-radius:9px; background:rgb(255 254 249 / 94%); box-shadow:0 2px 12px rgb(25 38 24 / 15%); pointer-events:none; }
+.field-map-power-legend > span:last-child { display:grid; gap:2px; }.field-map-power-legend strong { color:#3b5135; font-size:9px; font-weight:720; }.field-map-power-legend small { color:#777465; font-size:8px; }
+.field-map-power-swatch { width:20px; height:14px; flex:none; border:2px dashed #5e803f; border-radius:3px; background:rgb(200 236 146 / 25%); }
 .field-map .maplibregl-map { width:100%; height:100%; font:inherit; }
 .field-map .maplibregl-canvas { outline:none; }
 .field-map .maplibregl-ctrl-bottom-right { right:8px; bottom:8px; }
