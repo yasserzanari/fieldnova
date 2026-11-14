@@ -1,7 +1,10 @@
 # Données & confiance
 
-This route is the provenance workspace for FieldNova: search and filter a six-entry catalog, inspect a source record, toggle illustrative coverage and parcel outlines, and review the planned processing lineage.
+This route describes the actual integrations used by FieldNova and the data that is still missing. NASA POWER monthly climate and soil-wetness estimates are fetched for the shared selected coordinate; NASA GIBS MODIS and SMAP products are available on the shared interactive map. The POWER detail includes a live chart, grid point, latest usable month, variables, and limitations.
 
-All catalog entries are references or import prerequisites. None is connected. Spatial and temporal coverage, product selection, license review, quality, and freshness remain unknown until a provider is integrated and the actual payload is validated. The center map is an unreferenced visual aid, not a coverage result. The chart is an empty state and contains no measurements.
+Sentinel-2 and SoilGrids remain catalog references; local station records and farm parcel data require configuration or import. Those sources do not appear as connected or feed displayed metrics. The map has no farm boundary until a parcel geometry is provided.
 
-The lineage view shows the integration gates FieldNova must pass before using a source in a map, metric, scenario, or assistant answer. Do not promote a source to connected or validated without a real connection and recorded checks.
+Source references:
+
+- [NASA POWER monthly API](https://power.larc.nasa.gov/docs/services/api/temporal/monthly/)
+- [NASA GIBS access documentation](https://nasa-gibs.github.io/gibs-api-docs/access-basics/)
