@@ -7,7 +7,7 @@
 - **Parcelle :** un GeoJSON WGS84 avec géométrie Polygon ou MultiPolygon peut être importé, visualisé et supprimé. Le contour et la superficie géodésique approximative sont stockés localement. L’application ne calcule pas de statistiques NASA à l’intérieur du polygone.
 - **Contexte NASA :** NASA POWER affiche la dernière période mensuelle complète pour le point suivi et la cellule NASA renvoyée par le service. Ces valeurs ne changent pas les métriques de rotation; elles apportent un contexte climatique historique, pas une prévision à la parcelle.
 - **Repère saisonnier :** pluie, température et humidité racinaire du dernier mois sont accompagnées de la moyenne et de la plage des valeurs observées pour le même mois des années précédentes. Le nombre d’années comparées est affiché; ce repère décrit la variabilité passée sans prédire la saison suivante.
-- **Carte :** carte MapLibre partagée avec le fond OpenStreetMap et les couches NASA GIBS; changer le point met à jour le contexte NASA et l’espace de rotations lié aux coordonnées.
+- **Carte :** carte MapLibre partagée avec le fond OpenStreetMap et les couches NASA GIBS; le point suivi et le contour GeoJSON importé sont synchronisés entre les onglets Atlas, Mon terrain, Scénarios et Assistant.
 - **Limites du catalogue :** la bibliothèque de cultures est illustrative, adaptée à une démonstration France métropolitaine et non validée pour d’autres régions. Aucun conseil agronomique, rendement, besoin en eau, effet sur le carbone ou fixation d’azote n’est calculé.
 ### Climat historique
 

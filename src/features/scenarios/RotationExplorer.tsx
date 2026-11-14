@@ -8,7 +8,7 @@ import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { readSoilProfile, soilSourceLabels, type FarmSoilProfile } from '../../lib/farm/soil-profile'
 import { cropCatalog, evaluateRotation, exampleRotationWorkspace, priorityLabels, readRotationWorkspace, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
-import { clearSavedParcelBoundary, parseParcelGeoJSON, readSavedParcelBoundary, saveParcelBoundary, type ParsedParcel } from '../../lib/geo/parcel-boundary'
+import { clearSavedParcelBoundary, parseParcelGeoJSON, saveParcelBoundary, useParcelBoundary } from '../../lib/geo/parcel-boundary'
 import './rotation-explorer.css'
 
 function dayBefore(days: number) {
@@ -54,7 +54,7 @@ export function RotationExplorer() {
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [soilState, setSoilState] = useState(() => ({ pointKey, value: readSoilProfile(location) }))
   const [workspace, setWorkspace] = useState(() => ({ pointKey, value: readRotationWorkspace(location) }))
-  const [parcel, setParcel] = useState<ParsedParcel | null>(() => readSavedParcelBoundary())
+  const parcel = useParcelBoundary()
   const [parcelError, setParcelError] = useState('')
   const [saveError, setSaveError] = useState('')
   const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
@@ -137,7 +137,6 @@ export function RotationExplorer() {
     try {
       const parsed = parseParcelGeoJSON(await file.text(), file.name.replace(/\.(geo)?json$/i, '') || 'Parcelle importée')
       saveParcelBoundary(parsed)
-      setParcel(parsed)
       setParcelError('')
       map?.fitBounds(parsed.bounds, { padding: { top: 100, right: 320, bottom: 100, left: 320 }, maxZoom: 13, duration: 700 })
     } catch (error) {
@@ -146,7 +145,6 @@ export function RotationExplorer() {
   }
   const removeParcel = () => {
     clearSavedParcelBoundary()
-    setParcel(null)
     setParcelError('')
   }
   const exportDecisionBrief = () => {
@@ -224,7 +222,7 @@ export function RotationExplorer() {
     <header className="rotation-heading"><div><h1>Explorer les rotations</h1><p>Comparez des successions de cultures selon des critères visibles et modifiables.</p></div><div className="rotation-heading-actions"><span className="rotation-example-badge">{currentWorkspace.isExample ? 'Exemple illustratif' : 'Scénario local'}</span><button type="button" className="rotation-export" onClick={exportDecisionBrief}><Download size={13} />Exporter la fiche</button><button type="button" className="rotation-reset" onClick={resetExample}><RotateCcw size={13} />Charger l’exemple</button></div></header>
 
     <div className="rotation-map-stage">
-      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} parcelBoundary={parcel?.feature ?? null} imageryDate={dayBefore(11)} onPointSelect={moveToPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA et position de l’exploitation pour comparer les rotations" />
+      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} imageryDate={dayBefore(11)} onPointSelect={moveToPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA et position de l’exploitation pour comparer les rotations" />
       <div className="rotation-map-topline"><div className="rotation-location-chip"><MapPinned size={15} /><span>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</span><small>Point suivi</small></div><div className="rotation-map-options"><div className="rotation-base-switch" role="group" aria-label="Fond de carte"><button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Satellite</button></div><label><input type="checkbox" checked={showNdvi} onChange={event => setShowNdvi(event.target.checked)} />NDVI</label></div></div>
       <div className="rotation-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 220 })}><Plus size={15} /></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 220 })}><Minus size={15} /></button><button type="button" aria-label="Utiliser ma position" onClick={locateMe} disabled={locating}><LocateFixed size={14} /></button></div>
       <span className="rotation-map-hint">Cliquez pour déplacer le point suivi · les profils et séries suivent la position sélectionnée</span>

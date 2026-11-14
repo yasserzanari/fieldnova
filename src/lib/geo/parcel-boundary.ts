@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import type { Feature, MultiPolygon, Polygon } from 'geojson'
 
 type Position = number[]
@@ -10,6 +11,7 @@ export type ParcelBounds = [[number, number], [number, number]]
 export type ParsedParcel = { feature: ParcelFeature; areaHectares: number; bounds: ParcelBounds }
 
 const STORAGE_KEY = 'fieldnova:parcel-boundary:v1'
+const PARCEL_EVENT = 'fieldnova:parcel-boundary-change'
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 const EARTH_RADIUS_METERS = 6_371_008.8
 
@@ -74,12 +76,28 @@ export function readSavedParcelBoundary(): ParsedParcel | null {
   }
 }
 
+export function useParcelBoundary() {
+  const [parcel, setParcel] = useState<ParsedParcel | null>(readSavedParcelBoundary)
+  useEffect(() => {
+    const update = () => setParcel(readSavedParcelBoundary())
+    window.addEventListener(PARCEL_EVENT, update)
+    window.addEventListener('storage', update)
+    return () => {
+      window.removeEventListener(PARCEL_EVENT, update)
+      window.removeEventListener('storage', update)
+    }
+  }, [])
+  return parcel
+}
+
 export function saveParcelBoundary(parcel: ParsedParcel) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ feature: parcel.feature }))
+  window.dispatchEvent(new CustomEvent(PARCEL_EVENT))
 }
 
 export function clearSavedParcelBoundary() {
   localStorage.removeItem(STORAGE_KEY)
+  window.dispatchEvent(new CustomEvent(PARCEL_EVENT))
 }
 
 function readPolygonGeometries(input: unknown): Array<Polygon | MultiPolygon> {

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Map as MapLibreMap, RasterTileSource, ScaleControl, type GeoJSONSource, type MapMouseEvent } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoPoint } from '../../lib/geo/location'
-import type { ParcelFeature } from '../../lib/geo/parcel-boundary'
+import { useParcelBoundary } from '../../lib/geo/parcel-boundary'
 import './field-map.css'
 
 export type MapBaseLayer = 'streets' | 'nasa'
@@ -14,7 +14,6 @@ type Props = {
   showNdvi: boolean
   showSurfaceSoil?: boolean
   showRootSoil?: boolean
-  parcelBoundary?: ParcelFeature | null
   imageryDate: string
   onPointSelect: (point: GeoPoint) => void
   onMapReady?: (map: MapLibreMap) => void
@@ -29,7 +28,10 @@ function gibsTileUrl(layer: string, date: string, format: 'jpg' | 'png', matrixS
   return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/${matrixSet}/{z}/{y}/{x}.${format}`
 }
 
-export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, parcelBoundary = null, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
+export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
+  const parcel = useParcelBoundary()
+  const parcelBoundary = parcel?.feature ?? null
+  const mapLabel = parcel ? `${ariaLabel}. Limite affichée : ${parcel.feature.properties?.name ?? 'parcelle importée'}, environ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} hectares.` : ariaLabel
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const onSelectRef = useRef(onPointSelect)
@@ -189,5 +191,5 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
     else map.once('load', updateDate)
   }, [imageryDate])
 
-  return <div ref={containerRef} className={`field-map ${className}`} role="application" aria-label={ariaLabel} />
+  return <div ref={containerRef} className={`field-map ${className}`} role="application" aria-label={mapLabel} />
 }
