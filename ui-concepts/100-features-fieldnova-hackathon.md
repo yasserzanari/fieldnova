@@ -160,7 +160,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 ### I. Impact, adaptation et communauté — 81 à 90
 
 81. **[P0 · PARTIEL] Histoire d’une ferme pilote** : le script utilise une ferme explicitement fictive et un problème de comparaison générique; il manque un lieu et des priorités validés avec une exploitation réelle.
-82. **[P0] Indicateur d’impact mesurable** : compter les décisions explorées ou les données réunies, sans convertir cela en rendement gagné.
+82. **[P0 · PARTIEL] Indicateur mesurable de couverture** : la vue d’ensemble compte les domaines de données utilisables (NASA, ferme, sol, rotations) et exclut les profils fictifs. Cela mesure la couverture de la session, pas les décisions explorées ni un impact agricole; l’historique d’usage et une validation terrain restent à établir.
 83. **[P1] Mesure des besoins des agriculteurs** : conduire quelques entretiens et faire apparaître ce qui a changé dans le produit.
 84. **[P1] Scénarios adaptés aux petites exploitations** : prendre en compte coût, main-d’œuvre et matériel, pas seulement la météo.
 85. **[P1] Scénarios de stress hydrique et thermique historiques** : mettre les événements passés en contexte local.
