@@ -156,7 +156,7 @@ export function generateRotationOptions(reference: RotationPlan, priority: Rotat
     || right.metrics.legumeSeasons - left.metrics.legumeSeasons
     || right.metrics.knownRootTransitions - left.metrics.knownRootTransitions
     || left.metrics.repeatedFamilyTransitions - right.metrics.repeatedFamilyTransitions
-    || left.key.localeCompare(right.key))
+    || compareCatalogOrder(left.crops, right.crops))
   const first = byPriority[0]
   const secondary = candidates
     .filter(candidate => candidate.key !== first.key && candidate.score >= first.score - 1)
@@ -164,7 +164,7 @@ export function generateRotationOptions(reference: RotationPlan, priority: Rotat
       || right.metrics.legumeSeasons - left.metrics.legumeSeasons
       || right.score - left.score
       || left.metrics.repeatedFamilyTransitions - right.metrics.repeatedFamilyTransitions
-      || left.key.localeCompare(right.key))[0]
+      || compareCatalogOrder(left.crops, right.crops))[0]
   const second = secondary ?? byPriority[1]
   if (!second) return null
 
@@ -176,6 +176,14 @@ export function generateRotationOptions(reference: RotationPlan, priority: Rotat
 
 function rotationStorageKey(point: GeoPoint) {
   return `${storagePrefix}${point.latitude.toFixed(4)},${point.longitude.toFixed(4)}`
+}
+
+function compareCatalogOrder(left: CropId[], right: CropId[]) {
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    const difference = cropCatalog.findIndex(crop => crop.id === left[index]) - cropCatalog.findIndex(crop => crop.id === right[index])
+    if (difference) return difference
+  }
+  return left.length - right.length
 }
 
 function isCropId(value: unknown): value is CropId {

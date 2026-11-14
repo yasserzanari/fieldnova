@@ -367,6 +367,7 @@ export function RotationExplorer() {
         <header className="rotation-panel-heading"><span className="rotation-panel-icon goal"><ShieldCheck size={15} /></span><span><strong>Votre priorité</strong><small>Modifie les options mises en avant</small></span></header>
         <label className="rotation-priority-label" htmlFor="rotation-priority">Comparer selon</label>
         <select id="rotation-priority" className="rotation-priority-select" value={currentWorkspace.priority} onChange={event => updatePriority(event.target.value as RotationPriority)}><option value="diversity">Diversité des familles</option><option value="alternation">Alternance des familles</option><option value="legume">Présence de légumineuses</option><option value="root">Alternance des racines connues</option></select>
+        <details className="rotation-method-details"><summary>Méthode de comparaison</summary><div><p><strong>Indicateur principal :</strong> {methodPriorityDescription[currentWorkspace.priority]}</p><p>Les pastilles « Critère choisi » marquent toutes les rotations complètes compatibles qui atteignent la meilleure valeur; une égalité reste une égalité. Lors de la génération, FieldNova ne retient que des séquences de cinq années et écarte les cultures déclarées indisponibles. Pour ordonner les candidates à égalité sur le critère principal, elle privilégie davantage de familles distinctes, davantage d’années avec légumineuse, davantage de transitions racinaires documentées, puis moins de répétitions de famille. Si tout reste égal, l’ordre du catalogue départage les séquences.</p><p><strong>Option A</strong> est la première candidate ainsi ordonnée. Pour <strong>Option B</strong>, FieldNova cherche une autre séquence à un point ou moins de l’indicateur principal d’Option A; elle privilégie alors diversité, légumineuses, critère principal et moins de répétitions. À défaut, elle prend la séquence suivante du classement.</p><p>Il n’y a ni score combiné ni pondération cachée. Climat NASA et sol local restent du contexte et n’entrent pas dans ce classement.</p></div></details>
         <details className="rotation-exclusions"><summary>Cultures indisponibles · {constraints.unavailableCropIds.length}</summary><p>Ces choix excluent une culture des options générées et de leur classement. La référence actuelle reste visible.</p><div>{cropCatalog.map(crop => <label key={crop.id}><input type="checkbox" checked={constraints.unavailableCropIds.includes(crop.id)} onChange={() => toggleUnavailableCrop(crop.id)} /><span>{crop.label}</span></label>)}</div></details>
         <div className="rotation-best-match" aria-live="polite"><small>Options complètes compatibles · critère « {priorityLabels[currentWorkspace.priority]} »</small>{leaders.length ? <strong>{leaders.map(id => currentWorkspace.plans.find(plan => plan.id === id)?.title).join(' · ')}</strong> : <strong>Aucune option complète compatible</strong>}</div>
         {generationMessage && <p className="rotation-generation-message" role="status">{generationMessage}</p>}
@@ -442,4 +443,11 @@ function priorityExplanation(metrics: ReturnType<typeof evaluateRotation>, prior
 
 function signed(value: number) {
   return value > 0 ? `+${value}` : String(value)
+}
+
+const methodPriorityDescription: Record<RotationPriority, string> = {
+  diversity: 'nombre de familles botaniques distinctes (à maximiser, de 1 à 5).',
+  alternation: 'nombre de répétitions de famille entre deux années consécutives (à minimiser, de 0 à 4).',
+  legume: 'nombre d’années avec au moins une légumineuse (à maximiser, de 0 à 5).',
+  root: 'nombre de transitions entre architectures racinaires connues d’années consécutives (à maximiser, de 0 à 4; valeurs inconnues ignorées).',
 }
