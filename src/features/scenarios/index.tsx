@@ -6,6 +6,7 @@ import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { fetchPowerMonthly, formatPowerMonth, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { RotationExplorer } from './RotationExplorer'
 import './scenarios.css'
 
 type CaseId = 'reference' | 'dry' | 'heat'
@@ -76,6 +77,18 @@ function formatCoord(value: number, positive: string, negative: string) {
 }
 
 export function ScenariosPage() {
+  const [mode, setMode] = useState<'rotations' | 'climate'>('rotations')
+  return <div className="scenario-hub">
+    <div className="scenario-hub-toolbar" role="group" aria-label="Modes des scénarios">
+      <span>Comparer</span>
+      <button type="button" aria-pressed={mode === 'rotations'} className={mode === 'rotations' ? 'is-active' : ''} onClick={() => setMode('rotations')}>Rotations culturales</button>
+      <button type="button" aria-pressed={mode === 'climate'} className={mode === 'climate' ? 'is-active' : ''} onClick={() => setMode('climate')}>Climat historique</button>
+    </div>
+    <div className="scenario-hub-content">{mode === 'rotations' ? <RotationExplorer /> : <ClimateScenariosPage />}</div>
+  </div>
+}
+
+function ClimateScenariosPage() {
   const { location, selectLocation } = useSelectedLocation()
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
   const [showNdvi, setShowNdvi] = useState(false)
