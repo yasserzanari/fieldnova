@@ -2,7 +2,7 @@ import { CloudRain, Droplets } from 'lucide-react'
 import { formatPowerMonth, type PowerMonthlyRecord } from '../../lib/nasa/power'
 import './power-climate-chart.css'
 
-type Props = { records: PowerMonthlyRecord[]; source: string; mode?: 'climate' | 'soil'; title?: string; months?: number }
+type Props = { records: PowerMonthlyRecord[]; source: string; mode?: 'climate' | 'soil'; title?: string; months?: number; compact?: boolean }
 type PlotPoint = { x: number; y: number; value: number; month: string; date: string }
 
 const LEFT = 48
@@ -18,7 +18,7 @@ function finite(values: Array<number | undefined>) {
   return values.filter((value): value is number => value !== undefined && Number.isFinite(value))
 }
 
-export function PowerClimateChart({ records, source, mode = 'climate', title, months = 12 }: Props) {
+export function PowerClimateChart({ records, source, mode = 'climate', title, months = 12, compact = false }: Props) {
   const visible = records.slice(-months).map(record => ({ ...record, month: formatPowerMonth(record.date) }))
   const isSoil = mode === 'soil'
   const allValues = finite(visible.map(row => isSoil ? row.rootZoneWetness : row.precipitationMmPerDay))
@@ -45,10 +45,10 @@ export function PowerClimateChart({ records, source, mode = 'climate', title, mo
   }])
   const labelIndexes = visible.map((_, index) => index).filter(index => index === 0 || index === visible.length - 1 || index % Math.max(1, Math.ceil(visible.length / 6)) === 0)
 
-  return <section className={`power-chart-panel ${isSoil ? 'is-soil-chart' : ''}`} aria-label={title ?? (isSoil ? 'Humidité racinaire mensuelle' : 'Précipitations et température mensuelles')}>
+  return <section className={`power-chart-panel ${isSoil ? 'is-soil-chart' : ''} ${compact ? 'is-compact' : ''}`} aria-label={title ?? (isSoil ? 'Humidité racinaire mensuelle' : 'Précipitations et température mensuelles')}>
     <header className="power-chart-heading"><div><span className={`power-chart-icon ${isSoil ? 'soil-icon' : 'climate-icon'}`}>{isSoil ? <Droplets size={16} /> : <CloudRain size={16} />}</span><div><h2>{title ?? (isSoil ? 'Humidité racinaire · NASA POWER' : 'Climat mensuel · NASA POWER')}</h2><p>{isSoil ? 'GWETTOP · surface   ·   GWETROOT · zone racinaire' : 'PRECTOTCORR · mm/j moyen mensuel   ·   T2M · °C'}</p></div></div><span className="power-chart-source">NASA · {source}</span></header>
     <div className="power-chart-summary">{latest ? `Dernière valeur exploitable · ${latest.month}` : 'Aucune valeur NASA valide sur la période affichée'}{!isSoil && latest?.precipitationMmPerDay !== undefined ? ` · ${latest.precipitationMmPerDay.toFixed(2).replace('.', ',')} mm/j` : ''}{!isSoil && latest?.temperatureC !== undefined ? ` · ${latest.temperatureC.toFixed(1).replace('.', ',')} °C` : ''}{isSoil && latest?.surfaceSoilWetness !== undefined ? ` · surface ${(latest.surfaceSoilWetness * 100).toFixed(0)} %` : ''}{isSoil && latest?.rootZoneWetness !== undefined ? ` · racines ${(latest.rootZoneWetness * 100).toFixed(0)} %` : ''}</div>
-    {hasData ? <svg className="power-climate-chart" viewBox="0 0 720 110" role="img" aria-label={isSoil ? 'Humidité racinaire modélisée par mois, donnée NASA POWER' : 'Précipitations moyennes quotidiennes par mois et température moyenne, données NASA POWER'}>
+    {hasData ? <svg className="power-climate-chart" viewBox="0 0 720 110" preserveAspectRatio={compact ? 'none' : undefined} role="img" aria-label={isSoil ? 'Humidité racinaire modélisée par mois, donnée NASA POWER' : 'Précipitations moyennes quotidiennes par mois et température moyenne, données NASA POWER'}>
       <title>{isSoil ? 'Humidité racinaire NASA POWER' : 'Climat mensuel NASA POWER'}</title>
       {[0, .5, 1].map((fraction, index) => {
         const y = BOTTOM - fraction * (BOTTOM - TOP)
