@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Activity, CloudRain, Droplets, Layers2, LocateFixed, MapPinned, Minus, Plus, Search, ShieldCheck, Satellite, ThermometerSun } from 'lucide-react'
+import { Activity, CloudRain, Droplets, Layers2, LocateFixed, MapPinned, Minus, Plus, Search, ShieldCheck, Satellite, Sun, ThermometerSun } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
@@ -120,7 +120,14 @@ export function AtlasPage() {
         <header className="atlas-selection-heading"><div><span className="atlas-polygon-icon" /><div><h2>Point suivi</h2><p>{formatCoord(location.latitude, 'N', 'S')} · {formatCoord(location.longitude, 'E', 'O')}</p></div></div><button type="button" aria-label="Centrer sur ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></header>
         <p className="atlas-grid-point">{gridPoint ? `Cellule NASA POWER · ${gridPoint.latitude.toFixed(3)}, ${gridPoint.longitude.toFixed(3)}` : 'Cellule de grille NASA en attente'}</p>
         {loading ? <div className="atlas-data-state" role="status">Chargement de NASA POWER…</div> : error ? <div className="atlas-data-error" role="alert"><span>{error}</span><button type="button" onClick={() => setRefreshKey(value => value + 1)}>Réessayer</button></div> : <>
-          <div className="atlas-live-metrics"><AtlasMetric icon={<CloudRain size={15} />} label="Pluie moyenne" value={latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(2).replace('.', ',')} mm/j`} source="PRECTOTCORR" /><AtlasMetric icon={<ThermometerSun size={15} />} label="Température moyenne" value={latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`} source="T2M" /><AtlasMetric icon={<Droplets size={15} />} label="Humidité racinaire modélisée" value={latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`} source="GWETROOT" /></div>
+          <div className="atlas-live-metrics">
+            <AtlasMetric icon={<CloudRain size={14} />} label="Pluie moyenne" value={latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(2).replace('.', ',')} mm/j`} source="PRECTOTCORR" />
+            <AtlasMetric icon={<ThermometerSun size={14} />} label="Température moyenne" value={latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`} source="T2M" />
+            <AtlasMetric icon={<Sun size={14} />} label="Température maximale" value={latest?.temperatureMaxC === undefined ? '—' : `${latest.temperatureMaxC.toFixed(1).replace('.', ',')} °C`} source="T2M_MAX" />
+            <AtlasMetric icon={<ThermometerSun size={14} />} label="Température minimale" value={latest?.temperatureMinC === undefined ? '—' : `${latest.temperatureMinC.toFixed(1).replace('.', ',')} °C`} source="T2M_MIN" />
+            <AtlasMetric icon={<Droplets size={14} />} label="Humidité de surface modélisée" value={latest?.surfaceSoilWetness === undefined ? '—' : `${(latest.surfaceSoilWetness * 100).toFixed(0)} %`} source="GWETTOP" />
+            <AtlasMetric icon={<Droplets size={14} />} label="Humidité racinaire modélisée" value={latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`} source="GWETROOT" />
+          </div>
           <p className="atlas-live-source">Dernière période exploitable · {latestDate} · NASA POWER · {series?.source.join(' + ')}</p>
         </>}
         <div className="atlas-panel-note"><ShieldCheck size={13} /><span>Valeurs mensuelles sur cellule de grille, pas des observations de la ferme.</span></div>
