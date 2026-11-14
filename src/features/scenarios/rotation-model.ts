@@ -2,14 +2,16 @@ import type { GeoPoint } from '../../lib/geo/location'
 
 export type CropId = 'wheat' | 'maize' | 'oats' | 'pea' | 'faba' | 'rapeseed' | 'sunflower' | 'beet'
 export type RotationId = 'reference' | 'option-a' | 'option-b'
-export type RotationPriority = 'diversity' | 'alternation' | 'legume'
+export type RotationPriority = 'diversity' | 'alternation' | 'legume' | 'root'
 
 export type CropDefinition = {
   id: CropId
   label: string
+  shortLabel: string
   family: string
   familyLabel: string
   isLegume: boolean
+  rootArchitecture: 'fibrous' | 'taproot' | 'unknown'
 }
 
 export type RotationPlan = {
@@ -24,21 +26,33 @@ export type RotationWorkspace = {
   isExample: boolean
 }
 
+export const rotationSources = {
+  rootArchitecture: {
+    label: 'DRAAF Hauts-de-France · systèmes racinaires et successions',
+    url: 'https://draaf.hauts-de-france.agriculture.gouv.fr/grandes-cultures-les-systemes-cerealiers-au-coeur-des-assolements-des-hauts-de-a4927.html',
+  },
+  legumes: {
+    label: 'INRAE · diversité végétale et rotations',
+    url: 'https://www.inrae.fr/actualites/augmenter-diversite-vegetale-espaces-agricoles-proteger-cultures',
+  },
+} as const
+
 export const cropCatalog: CropDefinition[] = [
-  { id: 'wheat', label: 'Blé tendre', family: 'poaceae', familyLabel: 'Poacées', isLegume: false },
-  { id: 'maize', label: 'Maïs', family: 'poaceae', familyLabel: 'Poacées', isLegume: false },
-  { id: 'oats', label: 'Avoine', family: 'poaceae', familyLabel: 'Poacées', isLegume: false },
-  { id: 'pea', label: 'Pois protéagineux', family: 'fabaceae', familyLabel: 'Fabacées', isLegume: true },
-  { id: 'faba', label: 'Féverole', family: 'fabaceae', familyLabel: 'Fabacées', isLegume: true },
-  { id: 'rapeseed', label: 'Colza', family: 'brassicaceae', familyLabel: 'Brassicacées', isLegume: false },
-  { id: 'sunflower', label: 'Tournesol', family: 'asteraceae', familyLabel: 'Astéracées', isLegume: false },
-  { id: 'beet', label: 'Betterave sucrière', family: 'amaranthaceae', familyLabel: 'Amaranthacées', isLegume: false },
+  { id: 'wheat', label: 'Blé tendre', shortLabel: 'Blé', family: 'poaceae', familyLabel: 'Poacées', isLegume: false, rootArchitecture: 'fibrous' },
+  { id: 'maize', label: 'Maïs', shortLabel: 'Maïs', family: 'poaceae', familyLabel: 'Poacées', isLegume: false, rootArchitecture: 'unknown' },
+  { id: 'oats', label: 'Avoine', shortLabel: 'Avoine', family: 'poaceae', familyLabel: 'Poacées', isLegume: false, rootArchitecture: 'fibrous' },
+  { id: 'pea', label: 'Pois protéagineux', shortLabel: 'Pois', family: 'fabaceae', familyLabel: 'Fabacées', isLegume: true, rootArchitecture: 'taproot' },
+  { id: 'faba', label: 'Féverole', shortLabel: 'Féverole', family: 'fabaceae', familyLabel: 'Fabacées', isLegume: true, rootArchitecture: 'taproot' },
+  { id: 'rapeseed', label: 'Colza', shortLabel: 'Colza', family: 'brassicaceae', familyLabel: 'Brassicacées', isLegume: false, rootArchitecture: 'taproot' },
+  { id: 'sunflower', label: 'Tournesol', shortLabel: 'Tournesol', family: 'asteraceae', familyLabel: 'Astéracées', isLegume: false, rootArchitecture: 'unknown' },
+  { id: 'beet', label: 'Betterave sucrière', shortLabel: 'Betterave', family: 'amaranthaceae', familyLabel: 'Amaranthacées', isLegume: false, rootArchitecture: 'unknown' },
 ]
 
 export const priorityLabels: Record<RotationPriority, string> = {
   diversity: 'Diversité des familles',
   alternation: 'Alternance des familles',
   legume: 'Présence de légumineuses',
+  root: 'Alternance des racines connues',
 }
 
 const cropIds = new Set(cropCatalog.map(crop => crop.id))
@@ -49,9 +63,9 @@ export function exampleRotationWorkspace(): RotationWorkspace {
     priority: 'diversity',
     isExample: true,
     plans: [
-      { id: 'reference', title: 'Référence actuelle', crops: ['wheat', 'maize', 'wheat'] },
-      { id: 'option-a', title: 'Option A', crops: ['wheat', 'pea', 'maize'] },
-      { id: 'option-b', title: 'Option B', crops: ['rapeseed', 'wheat', 'sunflower'] },
+      { id: 'reference', title: 'Référence actuelle', crops: ['wheat', 'maize', 'wheat', 'maize', 'wheat'] },
+      { id: 'option-a', title: 'Option A', crops: ['wheat', 'pea', 'maize', 'rapeseed', 'wheat'] },
+      { id: 'option-b', title: 'Option B', crops: ['rapeseed', 'wheat', 'sunflower', 'oats', 'faba'] },
     ],
   }
 }
@@ -67,10 +81,10 @@ export function readRotationWorkspace(point: GeoPoint): RotationWorkspace {
       return {
         id,
         title: id === 'reference' ? 'Référence actuelle' : id === 'option-a' ? 'Option A' : 'Option B',
-        crops: Array.from({ length: 3 }, (_, index) => isCropId(stored?.crops?.[index]) ? stored.crops[index] : ''),
+        crops: Array.from({ length: 5 }, (_, index) => isCropId(stored?.crops?.[index]) ? stored.crops[index] : ''),
       }
     })
-    const priority = parsed.priority === 'alternation' || parsed.priority === 'legume' ? parsed.priority : 'diversity'
+    const priority = parsed.priority === 'alternation' || parsed.priority === 'legume' || parsed.priority === 'root' ? parsed.priority : 'diversity'
     return { plans, priority, isExample: false }
   } catch {
     return exampleRotationWorkspace()
@@ -88,11 +102,16 @@ export function evaluateRotation(plan: RotationPlan) {
   const distinctFamilies = new Set(crops.map(crop => crop.family)).size
   const repeatedFamilyTransitions = crops.slice(1).reduce((count, crop, index) => count + Number(crop.family === crops[index].family), 0)
   const legumeSeasons = crops.filter(crop => crop.isLegume).length
+  const knownRootTransitions = crops.slice(1).reduce((count, crop, index) => {
+    const previous = crops[index]
+    return count + Number(previous.rootArchitecture !== 'unknown' && crop.rootArchitecture !== 'unknown' && previous.rootArchitecture !== crop.rootArchitecture)
+  }, 0)
   return {
     complete: crops.length === plan.crops.length,
     distinctFamilies,
     repeatedFamilyTransitions,
     legumeSeasons,
+    knownRootTransitions,
   }
 }
 
@@ -103,7 +122,9 @@ export function topRotations(plans: RotationPlan[], priority: RotationPriority) 
     ? item.metrics.distinctFamilies
     : priority === 'alternation'
       ? -item.metrics.repeatedFamilyTransitions
-      : item.metrics.legumeSeasons
+      : priority === 'legume'
+        ? item.metrics.legumeSeasons
+        : item.metrics.knownRootTransitions
   const best = Math.max(...complete.map(value))
   return complete.filter(item => value(item) === best).map(item => item.plan.id)
 }
