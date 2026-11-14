@@ -42,6 +42,12 @@ export function OverviewPage() {
     setCoordError('')
   }, [location.latitude, location.longitude])
 
+  useEffect(() => {
+    const reloadFarmProfile = () => setFarmProfile(readFarmProfile(location))
+    window.addEventListener('fieldnova:demo-mode-change', reloadFarmProfile)
+    return () => window.removeEventListener('fieldnova:demo-mode-change', reloadFarmProfile)
+  }, [location.latitude, location.longitude])
+
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
   const updatePoint = (point: GeoPoint) => {
     selectLocation(point)
@@ -82,7 +88,7 @@ export function OverviewPage() {
       <header className="overview-heading">
         <div><h1>Vue d’ensemble</h1><p>Choisissez un point sur la carte pour charger le climat NASA à cet emplacement.</p></div>
         <button className="overview-farm-profile-button" type="button" onClick={() => setFarmSetupOpen(true)} aria-label={farmProfile ? `Modifier le profil de ${farmProfile.name}` : 'Configurer le profil de ma ferme'}>
-          <span className="overview-farm-profile-icon"><Sprout size={16} /></span><span><strong>{farmProfile?.name ?? 'Configurer ma ferme'}</strong><small>{farmProfile ? 'Profil enregistré localement' : 'Ajouter mes priorités et contraintes'}</small></span><ChevronRight size={16} />
+          <span className="overview-farm-profile-icon"><Sprout size={16} /></span><span><strong>{farmProfile?.name ?? 'Configurer ma ferme'}</strong><small>{farmProfile?.isExample ? 'Profil fictif · exemple agricole' : farmProfile ? 'Profil enregistré localement' : 'Ajouter mes priorités et contraintes'}</small></span><ChevronRight size={16} />
         </button>
       </header>
 

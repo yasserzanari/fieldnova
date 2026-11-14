@@ -22,9 +22,9 @@ export function PublicLanding() {
           title="Le climat change."
           titleLine2="Décider avec le terrain."
           description="FieldNova rassemble observations, parcelles et rotations pour vous aider à comprendre les risques et choisir la suite avec méthode."
-          primaryButtonText="Découvrir les modules"
-          primaryButtonHref="#fonctionnalites"
-          secondaryButtonText="Ouvrir FieldNova"
+          primaryButtonText="Essayer la démo fictive"
+          primaryButtonHref="/demo"
+          secondaryButtonText="Se connecter"
           secondaryButtonHref="/login"
           partnersTitle=""
           partners={[]}

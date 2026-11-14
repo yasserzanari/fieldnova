@@ -133,8 +133,8 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 ### G. Expérience utilisateur et travail au champ — 61 à 70
 
-61. **[P0] Parcours de démo sans compte ni configuration** : démarrer avec une ferme fictive clairement identifiée comme exemple.
-62. **[P0] Indicateur « exemple » persistant** : empêcher de confondre un cas de démonstration avec une ferme réelle.
+61. **[LIVRÉ] Parcours de démo sans compte ni configuration** : le bouton de la landing démarre une ferme fictive préremplie; le profil, les rotations et les contraintes d’exemple sont séparés des réponses NASA consultées en direct.
+62. **[LIVRÉ] Indicateur « exemple » persistant** : le bandeau global reste visible dans toutes les vues et permet de quitter le cas fictif; le profil sauvegardé avant le lancement est restauré.
 63. **[P1] Mode mobile utilisable au champ** : boutons larges, panneaux courts et carte accessible sur petit écran.
 64. **[P1] Connexion lente tolérante** : garder les informations déjà récupérées et signaler clairement les données indisponibles.
 65. **[P1] Unités préférées** : choisir unités métriques et formats locaux, tout en conservant l’unité d’origine en provenance.
@@ -173,7 +173,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 ### J. Démonstration, documentation et préparation au jugement — 91 à 100
 
 91. **[P0] Démo chronométrée de 90 secondes** : un problème, un clic de carte, trois rotations, une décision éclairée.
-92. **[P0] Scénario de démonstration reproductible** : jeu d’essai identifié, données NASA réellement chargées et état de l’interface réinitialisable.
+92. **[LIVRÉ] Scénario de démonstration reproductible** : route `/demo`, profil et rotations marqués fictifs, point connu, observations NASA POWER rechargées, état antérieur sauvegardé puis restaurable.
 93. **[P0] Écran d’accueil expliquant le problème** : qui est l’utilisateur, ce qu’il décide et comment FieldNova l’aide.
 94. **[P0] Vidéo avec données lisibles** : montrer sources et limites à l’écran, pas seulement des animations de carte.
 95. **[P0] Phrase de distinction** : expliquer en une phrase ce que la plateforme relie et ce que l’agriculteur peut comparer.

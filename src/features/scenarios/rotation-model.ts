@@ -85,7 +85,7 @@ export function readRotationWorkspace(point: GeoPoint): RotationWorkspace {
       }
     })
     const priority = parsed.priority === 'alternation' || parsed.priority === 'legume' || parsed.priority === 'root' ? parsed.priority : 'diversity'
-    return { plans, priority, isExample: false }
+    return { plans, priority, isExample: parsed.isExample === true }
   } catch {
     return exampleRotationWorkspace()
   }

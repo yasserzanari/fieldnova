@@ -32,15 +32,16 @@ function initialDraft(point: GeoPoint): Draft {
   const workspace = readRotationWorkspace(point)
   const reference = workspace.plans.find(plan => plan.id === 'reference')
   const constraints = readRotationConstraints(point)
+  const exampleFarm = farm?.isExample === true
   return {
     name: farm?.name ?? '',
     locationConfirmed: Boolean(farm),
-    crops: workspace.isExample ? ['', '', '', '', ''] : Array.from({ length: 5 }, (_, index) => reference?.crops[index] ?? ''),
+    crops: workspace.isExample && !exampleFarm ? ['', '', '', '', ''] : Array.from({ length: 5 }, (_, index) => reference?.crops[index] ?? ''),
     waterAccess: farm?.waterAccess ?? 'unknown',
     waterConstraint: farm?.waterConstraint ?? 'unknown',
     waterNotes: farm?.waterNotes ?? '',
     unavailableCropIds: constraints.unavailableCropIds,
-    priority: workspace.isExample ? '' : workspace.priority,
+    priority: workspace.isExample && !exampleFarm ? '' : workspace.priority,
   }
 }
 
@@ -109,6 +110,7 @@ export function FarmSetupWizard({ open, point, onClose, onSaved }: { open: boole
         waterAccess: draft.waterAccess,
         waterConstraint: draft.waterConstraint,
         waterNotes: draft.waterNotes,
+        isExample: readFarmProfile(point)?.isExample === true,
       })
       writeRotationWorkspace(point, { plans, priority: draft.priority as RotationPriority, isExample: false })
       writeRotationConstraints(point, { unavailableCropIds: draft.unavailableCropIds })
@@ -151,7 +153,7 @@ export function FarmSetupWizard({ open, point, onClose, onSaved }: { open: boole
         </div>}
 
         {step === 1 && <div className="farm-setup-fields">
-          <p className="farm-setup-help">Saisissez uniquement les cultures que vous avez réellement observées. Les cinq années sont facultatives; les champs vides resteront inconnus.</p>
+          <p className="farm-setup-help">{readFarmProfile(point)?.isExample ? 'Ces valeurs appartiennent au cas fictif de démonstration. Modifiez-les pour explorer le parcours; elles ne décrivent pas une ferme réelle.' : 'Saisissez uniquement les cultures que vous avez réellement observées. Les cinq années sont facultatives; les champs vides resteront inconnus.'}</p>
           <div className="farm-setup-crop-grid">{draft.crops.map((crop, index) => <label key={index}>Année {index + 1}<select value={crop} onChange={event => update('crops', draft.crops.map((value, cropIndex) => cropIndex === index ? event.target.value as CropId | '' : value))}><option value="">Non renseignée</option>{cropCatalog.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>)}</div>
           <p className="farm-setup-data-note">{selectedCrops}/5 années renseignées. Les rotations d’exemple ne sont jamais reprises comme votre historique.</p>
         </div>}
