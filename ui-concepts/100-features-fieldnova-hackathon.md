@@ -81,9 +81,9 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 ### C. Sol et santé des sols — 21 à 30
 
-21. **[P0] Profil de sol avec inconnues explicites** : texture, profondeur utile, drainage, matière organique et pH ne sont jamais remplis par défaut.
+21. **[P0 · LIVRÉ] Profil de sol avec inconnues explicites** : texture, profondeur utile, drainage, matière organique et pH ne sont jamais remplis par défaut.
 22. **[Livrée — CSV] Import d’une analyse de sol** : lire localement un CSV UTF-8 avec intervalles en centimètres, aperçu révocable, validation des plages et métadonnées de laboratoire/date conservées au niveau des horizons. L’origine des caractéristiques générales déjà saisies n’est pas remplacée. Le profil n’est modifié qu’après application de l’aperçu et enregistrement explicite. Les PDF et images ne sont pas encore analysés.
-23. **[P0] Étiquette de fiabilité par champ** : « mesuré », « déclaré », « produit satellite/modèle », « estimé » ou « inconnu ».
+23. **[P0 · PARTIEL] Étiquette de fiabilité par champ** : les inconnues, les profils locaux et l’origine déclarée des horizons sont visibles; la fiabilité n’est pas encore qualifiée séparément pour chaque champ ni vérifiée indépendamment.
 24. **[Livrée] Vue des horizons du sol** : saisir jusqu’à cinq couches de 0 à 400 cm, leurs textures/pH/matière organique connus, et distinguer les intervalles manquants ainsi que la profondeur sous la dernière couche comme non documentés. Provenance déclarée partagée avec le profil local.
 25. **[P1] Indicateurs de santé du sol définis** : expliquer chaque indicateur, sa méthode et les données requises avant de le calculer.
 26. **[P1] Historique des analyses** : comparer deux prélèvements comparables et avertir si les profondeurs ou méthodes diffèrent.
@@ -94,10 +94,10 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 ### D. Cultures et rotations — 31 à 40
 
-31. **[P0] Catalogue local de cultures** : inclure seulement les cultures pertinentes à la région pilote et documenter chaque source.
-32. **[P0] Carte d’une rotation sur plusieurs saisons** : lire l’enchaînement année par année sans ambiguïté.
-33. **[P0] Rotation actuelle comme référence** : rendre les alternatives comparables à une pratique saisie par l’utilisateur.
-34. **[P0] Vérification des successions incompatibles** : afficher la règle agronomique, sa source et le degré de confiance.
+31. **[P0 · PARTIEL] Catalogue local de cultures** : un catalogue illustratif est documenté, mais il n’est pas restreint ni validé pour une région pilote.
+32. **[P0 · LIVRÉ] Carte d’une rotation sur plusieurs saisons** : trois séquences éditables montrent distinctement les cultures de chaque année.
+33. **[P0 · LIVRÉ] Rotation actuelle comme référence** : la séquence de référence est modifiable et sert de base aux écarts affichés.
+34. **[P0 · À VALIDER LOCALEMENT] Vérification des successions incompatibles** : aucune règle d’incompatibilité n’est appliquée sans source agronomique et validation adaptées à la région pilote.
 35. **[P1] Familles botaniques** : visualiser leur diversité et limiter certaines répétitions selon des règles documentées.
 36. **[P1] Cultures de couverture** : ajouter une option dédiée, avec ses coûts opérationnels et ses limites locales.
 37. **[P1] Intercultures et mélanges** : représenter deux cultures simultanées et éviter de les traiter comme une rotation simple.
@@ -107,9 +107,9 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 ### E. Scénarios et comparaison — 41 à 50
 
-41. **[P0] Trois scénarios comparables** : rotation actuelle, option favorisant la priorité choisie et option alternative.
-42. **[P0] Classement compréhensible** : révéler les critères qui font gagner ou perdre chaque scénario, plutôt qu’un score opaque.
-43. **[P0] Pondération par priorité** : le classement change quand l’agriculteur change ses préférences, avec pondérations visibles.
+41. **[P0 · LIVRÉ] Trois scénarios comparables** : rotation de référence, option principale et option alternative générées.
+42. **[P0 · LIVRÉ] Classement compréhensible** : les métriques, règles de départage et raisons de sélection sont consultables; aucun score opaque n’est utilisé.
+43. **[P0 · PARTIEL] Priorité de comparaison** : le classement réagit à un critère unique sélectionné; la pondération de plusieurs préférences n’est pas encore prise en charge.
 44. **[P0 · PARTIEL] Panneau des compromis** : compare le critère choisi à la référence, rend visibles les autres écarts descriptifs et signale que rendements, coûts, eau, matériel et calendrier local ne sont pas évalués. Une comparaison fiable de ces contraintes nécessite des données locales validées.
 45. **[P1] Simulation de météo historique** : tester un scénario sur des années observées, sans le présenter comme prévision.
 46. **[P1] Scénario de disponibilité en eau** : comparer des hypothèses définies par l’utilisateur et montrer quelles données sont absentes.
@@ -122,7 +122,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 51. **[P0 · LIVRÉ] Réponse liée au point sélectionné** : chaque réponse conserve et affiche la coordonnée utilisée, même lorsque l’utilisateur déplace ensuite le point suivi sur la carte; les sources indiquent séparément la maille ou résolution de leur produit.
 52. **[P0 · LIVRÉ] Réponse avec sources consultables** : chaque réponse fondée sur un outil affiche les sources associées à ses données — NASA POWER/GIBS, profil local FieldNova ou références agronomiques — avec distinction explicite entre déclaration locale et source externe.
-53. **[P0] Trace d’outils réelle** : montrer les requêtes exécutées et leur statut, et non une animation prétendant avoir interrogé un outil.
+53. **[P0 · LIVRÉ] Trace d’outils réelle** : le chat affiche les lectures locales, requêtes NASA POWER, actions de couche et statuts réellement exécutés.
 54. **[P0 · LIVRÉ] Questions de suivi suggérées** : proposer pluie, température et humidité seulement lorsque la variable correspondante existe dans la dernière période NASA exploitable; adapter aussi la question NDVI à la couche affichée et conserver les actions vers les profils locaux et rotations.
 55. **[P1] Réponses séparant fait, calcul et hypothèse** : utiliser des étiquettes visuelles différentes.
 56. **[P1] Réponse courte pour le terrain** : produire une synthèse en langage simple, avec un lien vers les détails.
@@ -159,7 +159,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 ### I. Impact, adaptation et communauté — 81 à 90
 
-81. **[P0] Histoire d’une ferme pilote** : définir le lieu, le problème, les priorités et les décisions que la démo veut éclairer.
+81. **[P0 · PARTIEL] Histoire d’une ferme pilote** : le script utilise une ferme explicitement fictive et un problème de comparaison générique; il manque un lieu et des priorités validés avec une exploitation réelle.
 82. **[P0] Indicateur d’impact mesurable** : compter les décisions explorées ou les données réunies, sans convertir cela en rendement gagné.
 83. **[P1] Mesure des besoins des agriculteurs** : conduire quelques entretiens et faire apparaître ce qui a changé dans le produit.
 84. **[P1] Scénarios adaptés aux petites exploitations** : prendre en compte coût, main-d’œuvre et matériel, pas seulement la météo.
@@ -172,7 +172,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 ### J. Démonstration, documentation et préparation au jugement — 91 à 100
 
-91. **[P0] Démo chronométrée de 90 secondes** : un problème, un clic de carte, trois rotations, une décision éclairée.
+91. **[P0 · LIVRÉ] Démo chronométrée de 90 secondes** : un script fournit les actions, la narration, les plans vidéo et le repli en cas d’indisponibilité.
 92. **[LIVRÉ] Scénario de démonstration reproductible** : route `/demo`, profil et rotations marqués fictifs, point connu, observations NASA POWER rechargées, état antérieur sauvegardé puis restaurable.
 93. **[P0 · LIVRÉ] Écran d’accueil expliquant le problème** : l’accueil décrit le lien entre séries NASA, contexte local et rotations; les vues expliquent les critères réellement comparés et leurs limites.
 94. **[P0] Vidéo avec données lisibles** : montrer sources et limites à l’écran, pas seulement des animations de carte.
