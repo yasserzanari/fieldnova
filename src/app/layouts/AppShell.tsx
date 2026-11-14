@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, CircleHelp, CloudRain, Leaf, MapPin, Menu, ThermometerSun, UserRound } from 'lucide-react'
+import { Bell, ChevronDown, ChevronLeft, CircleHelp, CloudRain, Leaf, MapPin, Menu, ThermometerSun, UserRound } from 'lucide-react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { Suspense, useEffect, useState } from 'react'
 import { featureRoutes } from '../navigation'
@@ -11,6 +11,7 @@ function coordinate(value: number, positive: string, negative: string) {
 
 export function AppShell() {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const { location } = useSelectedLocation()
   const [latest, setLatest] = useState<PowerMonthlyRecord | undefined>()
   const [loading, setLoading] = useState(true)
@@ -33,11 +34,14 @@ export function AppShell() {
 
   return (
     <div className="app-frame">
-      <aside className={`app-sidebar ${menuOpen ? 'is-open' : ''}`}>
+      <aside className={`app-sidebar ${menuOpen ? 'is-open' : ''} ${sidebarCollapsed ? 'is-collapsed' : ''}`}>
+        <div className="sidebar-brand-row">
         <NavLink className="brand-lockup" to="/app/overview" aria-label="FieldNova, vue d’ensemble">
           <span className="brand-symbol"><Leaf size={21} strokeWidth={2.3} /></span>
           <span>FieldNova</span>
         </NavLink>
+        <button className="sidebar-toggle" type="button" aria-label={sidebarCollapsed ? 'Épingler la navigation ouverte' : 'Réduire la navigation'} aria-pressed={!sidebarCollapsed} title={sidebarCollapsed ? 'Épingler la navigation ouverte' : 'Réduire la navigation'} onClick={() => setSidebarCollapsed(value => !value)}><ChevronLeft size={17} aria-hidden="true" /></button>
+        </div>
         <nav className="primary-nav" aria-label="Navigation principale">
           {featureRoutes.map(({ path, label, icon: Icon }) => (
             <NavLink
