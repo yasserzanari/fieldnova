@@ -56,7 +56,10 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5): Promise<Pow
 
   const values = body.properties?.parameter
   if (!values) throw new Error('NASA POWER n’a renvoyé aucune série exploitable pour ce point.')
-  const keys = Object.keys(values.PRECTOTCORR ?? values.T2M ?? {}).sort()
+  const currentMonth = new Date().toISOString().slice(0, 7).replace('-', '')
+  // The monthly endpoint may already return the in-progress month. Keep only closed
+  // calendar months so every consumer can call its latest record "complete" safely.
+  const keys = Object.keys(values.PRECTOTCORR ?? values.T2M ?? {}).filter(date => date < currentMonth).sort()
   const fill = body.header?.fill_value ?? -999
   const valueAt = (parameter: string, date: string) => {
     const value = values[parameter]?.[date]
@@ -72,7 +75,7 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5): Promise<Pow
     rootZoneWetness: valueAt('GWETROOT', date),
   })).filter(record => Object.values(record).some(value => typeof value === 'number'))
 
-  if (!records.length) throw new Error('Les dernières périodes NASA POWER sont encore manquantes à ce point.')
+  if (!records.length) throw new Error('NASA POWER n’a pas encore de mois achevé exploitable pour ce point.')
   const coordinates = body.geometry?.coordinates
   const series: PowerMonthlySeries = {
     point,

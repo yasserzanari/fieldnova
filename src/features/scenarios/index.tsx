@@ -58,8 +58,8 @@ function deriveCases(records: PowerMonthlyRecord[]): ClimateCase[] {
 
   const monthNumber = (record: PowerMonthlyRecord) => Number(record.date.slice(0, 4)) * 12 + Number(record.date.slice(5, 7))
   const windows = Array.from({ length: Math.max(0, records.length - 2) }, (_, index) => records.slice(index, index + 3)).filter(window => window.length === 3 && monthNumber(window[1]) - monthNumber(window[0]) === 1 && monthNumber(window[2]) - monthNumber(window[1]) === 1)
-  const driestWindow = windows.filter(window => average(window.map(record => record.precipitationMmPerDay)) !== undefined).sort((left, right) => (average(left.map(row => row.precipitationMmPerDay)) ?? Infinity) - (average(right.map(row => row.precipitationMmPerDay)) ?? Infinity))[0]
-  const hottestWindow = windows.filter(window => average(window.map(record => record.temperatureC)) !== undefined).sort((left, right) => (average(right.map(row => row.temperatureC)) ?? -Infinity) - (average(left.map(row => row.temperatureC)) ?? -Infinity))[0]
+  const driestWindow = windows.filter(window => window.every(record => record.precipitationMmPerDay !== undefined)).sort((left, right) => (average(left.map(row => row.precipitationMmPerDay)) ?? Infinity) - (average(right.map(row => row.precipitationMmPerDay)) ?? Infinity))[0]
+  const hottestWindow = windows.filter(window => window.every(record => record.temperatureC !== undefined)).sort((left, right) => (average(right.map(row => row.temperatureC)) ?? -Infinity) - (average(left.map(row => row.temperatureC)) ?? -Infinity))[0]
   const dry = driestWindow && summarizeCase('dry', driestWindow)
   const heat = hottestWindow && summarizeCase('heat', hottestWindow)
   if (dry) result.push(dry)
