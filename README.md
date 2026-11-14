@@ -30,4 +30,6 @@ Le serveur Vite écoute sur `http://localhost:5173` et recharge l’application 
 
 ## État
 
-Le socle React, les routes des six onglets et le shell partagé sont installés. Les écrans seront livrés un module à la fois ; les routes non encore construites affichent leur maquette de référence.
+Le socle React, le shell partagé et la landing page sont installés. Les routes authentifiées sont en cours de réalisation, une par une ; tant qu’un onglet n’est pas livré, il affiche son concept visuel de référence.
+
+Les nombres visibles dans les visuels de présentation sont illustratifs. Ils ne proviennent pas encore de données de parcelle en direct.

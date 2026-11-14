@@ -1,10 +1,12 @@
-* { box-sizing: border-box; }
-html, body, #root { width: 100%; min-width: 320px; min-height: 100%; margin: 0; }
-body { color: var(--color-soil-900); background: var(--color-cream-100); }
-button, input { font: inherit; }
-button, a { -webkit-tap-highlight-color: transparent; }
-a { color: inherit; }
-button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid #78a85e; outline-offset: 3px; }
+@layer base {
+  * { box-sizing: border-box; }
+  html, body, #root { width: 100%; min-width: 320px; min-height: 100%; margin: 0; }
+  body { color: var(--color-soil-900); background: var(--color-cream-100); }
+  button, input { font: inherit; }
+  button, a { -webkit-tap-highlight-color: transparent; }
+  a { color: inherit; }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid #78a85e; outline-offset: 3px; }
+}
 .app-frame { display: flex; width: 100%; height: 100dvh; min-height: 560px; overflow: hidden; background: var(--color-cream-100); }
 .app-sidebar { z-index: 20; display: flex; width: 244px; flex: 0 0 244px; flex-direction: column; padding: 22px 14px 15px; border-right: 1px solid var(--color-border); background: var(--color-shell); }
 .brand-lockup { display: inline-flex; align-items: center; gap: 10px; margin: 0 10px 34px; color: var(--color-forest-950); font-size: 25px; font-weight: 730; letter-spacing: -.05em; text-decoration: none; }
