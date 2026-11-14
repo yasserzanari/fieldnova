@@ -14,6 +14,7 @@ import './assistant.css'
 
 type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
 type Message = { id: number; role: 'user' | 'assistant'; text: string; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[] }
+type CodexStatus = 'checking' | 'ready' | 'unavailable'
 
 const sources: AISource[] = [
   { id: 'power', title: 'NASA POWER · données mensuelles', url: 'https://power.larc.nasa.gov/docs/services/api/temporal/monthly/', snippet: 'Série au point de grille NASA POWER : température, précipitations et humidité du sol modélisée.' },
@@ -118,6 +119,7 @@ export function AssistantPage() {
   const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
   const [loadingData, setLoadingData] = useState(true)
   const [dataError, setDataError] = useState('')
+  const [codexStatus, setCodexStatus] = useState<CodexStatus>('checking')
   const [messages, setMessages] = useState<Message[]>([
     { id: 1, role: 'assistant', text: 'Bonjour. Je peux consulter les données climatiques mensuelles NASA POWER et afficher les couches MODIS ou SMAP sur la carte. Cliquez sur la carte pour changer le point suivi, puis demandez-moi la pluie, la température, le NDVI ou l’humidité du sol.' },
   ])
@@ -143,6 +145,14 @@ export function AssistantPage() {
   }, [location])
 
   useEffect(() => {
+    let active = true
+    fetch('/api/codex/status').then(response => response.json()).then(result => {
+      if (active) setCodexStatus(result.available ? 'ready' : 'unavailable')
+    }).catch(() => { if (active) setCodexStatus('unavailable') })
+    return () => { active = false }
+  }, [])
+
+  useEffect(() => {
     const thread = threadRef.current
     if (thread) thread.scrollTop = thread.scrollHeight
   }, [messages])
@@ -159,6 +169,7 @@ export function AssistantPage() {
     const trace: TraceNode[] = []
     let currentSeries = series
     let answer: string
+    let evidence = ''
     let traceHeading = 'Aucun outil exécuté'
     let usedSources: AISource[] = []
     if (files.length) {
@@ -169,14 +180,17 @@ export function AssistantPage() {
       trace.push(traceNode(`soil-${id}`, 'read', 'Profil de sol local · navigateur', 'Profil local consulté', knownFields ? `${knownFields} champ(s) renseigné(s) pour le point suivi` : 'Aucun champ de sol renseigné', 'completed'))
       traceHeading = 'Profil de sol local consulté'
       answer = formatSoilAnswer(location)
+      evidence = answer
     } else if (route.intent === 'rotation') {
       const workspace = readRotationWorkspace(location)
       const completePlans = workspace.plans.filter(plan => evaluateRotation(plan).complete).length
       trace.push(traceNode(`rotation-${id}`, 'read', 'Scénarios de rotation · navigateur', 'Rotations consultées', `${completePlans}/3 scénario(s) complet(s) · priorité ${workspace.priority}`, 'completed'))
       traceHeading = 'Scénarios de rotation consultés'
       answer = formatRotationAnswer(location)
+      evidence = answer
     } else if (route.intent === 'unknown') {
       answer = 'Je peux agir sur les données NASA POWER mensuelles, les couches NASA de la carte, le profil de sol saisi localement et les rotations enregistrées. Posez une question sur la pluie, la température, l’humidité, le NDVI, le sol ou une rotation; aucune donnée n’a été consultée pour cette question.'
+      evidence = 'Capacités disponibles : NASA POWER mensuel, couches MODIS/SMAP de la carte, profil de sol local saisi par l’utilisateur, scénarios de rotation locaux. Aucun outil n’a été exécuté pour cette question.'
     } else {
       let failed = false
       const seriesAlreadyLoaded = Boolean(currentSeries && currentSeries.point.latitude === location.latitude && currentSeries.point.longitude === location.longitude)
@@ -198,7 +212,32 @@ export function AssistantPage() {
       }
       traceHeading = route.asksLayer ? 'NASA POWER consulté · carte mise à jour' : 'NASA POWER consulté'
       answer = makeClimateAnswer(question, currentSeries, requestedLayer)
+      evidence = answer
       usedSources = [sources[0], ...(route.asksLayer ? [sources[1]] : [])]
+    }
+    if (!files.length && codexStatus === 'ready') {
+      try {
+        const response = await fetch('/api/codex/reply', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question,
+            history: messages.filter(message => message.text).slice(-6).map(message => ({ role: message.role, text: message.text })),
+            evidence,
+          }),
+        })
+        const result = await response.json()
+        if (!response.ok || typeof result.answer !== 'string') throw new Error(result.error ?? 'Codex CLI indisponible.')
+        answer = result.answer
+        trace.push({ id: `codex-${id}`, type: 'step', primary: 'Réponse formulée par Codex CLI', secondary: 'Contexte FieldNova fourni · session éphémère', status: 'completed' })
+        traceHeading = traceHeading === 'Aucun outil exécuté' ? 'Codex CLI · aucune donnée terrain consultée' : 'Outils FieldNova · réponse Codex CLI'
+      } catch {
+        trace.push({ id: `codex-${id}`, type: 'step', primary: 'Codex CLI indisponible · réponse locale utilisée', secondary: 'Aucune donnée supplémentaire n’a été consultée', status: 'failed' })
+        traceHeading = 'Réponse locale FieldNova'
+      }
+    } else if (!files.length && codexStatus === 'unavailable') {
+      trace.push({ id: `codex-${id}`, type: 'step', primary: 'Codex CLI non connecté · réponse locale utilisée', secondary: 'Connectez Codex CLI sur le serveur de démonstration', status: 'failed' })
+      traceHeading = 'Réponse locale FieldNova'
     }
     setMessages(current => current.map(message => message.id === id ? { ...message, text: answer, trace, traceHeading, running: false, sources: usedSources.length ? usedSources : undefined } : message))
   }
@@ -218,7 +257,7 @@ export function AssistantPage() {
           <div className="assistant-chat-heading"><h1>Assistant FieldNova</h1><p>Point actif · {coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</p></div>
           <button className="assistant-quiet-icon" type="button" title="Informations sur cet assistant" aria-label="À propos de cet assistant" onClick={() => setShowDetails(value => !value)}><CircleHelp size={17} /></button>
         </header>
-        <div className="assistant-demo-notice"><span><ShieldCheck size={14} /></span><p><strong>Outils de données actifs · sans LLM externe</strong><small>Réponses fondées sur NASA POWER et les couches NASA affichées. Les pièces jointes ne sont pas analysées.</small></p></div>
+        <div className={`assistant-demo-notice ${codexStatus === 'unavailable' ? 'is-warning' : ''}`}><span><ShieldCheck size={14} /></span><p><strong>{codexStatus === 'checking' ? 'Connexion à Codex CLI…' : codexStatus === 'ready' ? 'Codex CLI connecté · outils FieldNova actifs' : 'Codex CLI indisponible · mode données locales'}</strong><small>{codexStatus === 'ready' ? 'Codex rédige les réponses à partir des résultats NASA et des données du terrain consultées par FieldNova. Les pièces jointes ne sont pas analysées.' : 'La carte et les outils de données restent disponibles; les réponses locales signalent leurs limites. Les pièces jointes ne sont pas analysées.'}</small></p></div>
         <div className="assistant-chat-context"><span className="assistant-context-pill"><MapPin size={12} /> Coordonnée sélectionnée</span><span>{loadingData ? 'NASA POWER…' : dataError ? 'Données indisponibles' : latest ? `Données · ${formatPowerMonth(latest.date)}` : 'Aucune observation récente'}</span></div>
         <div className="assistant-thread" ref={threadRef} aria-live="polite">
           {showDetails && <div className="assistant-welcome"><span><Sparkles size={14} /></span><p>Posez une question : l’assistant interroge la série mensuelle NASA POWER et met à jour les couches réellement visibles sur la carte. Les données régionales ne remplacent pas des mesures de parcelle.</p><button type="button" aria-label="Masquer les informations" onClick={() => setShowDetails(false)}><X size={13} /></button></div>}
@@ -244,7 +283,7 @@ export function AssistantPage() {
         </div>
         <div className="assistant-composer-wrap">
           <LiquidMultimodalInput className="assistant-composer" defaultModel="fast" placeholder="Demandez à propos des données NASA…" maxHeight={110} onSubmit={handleSend} />
-          <div className="assistant-composer-foot"><span><span className="assistant-online-dot" /> NASA POWER {loadingData ? '· chargement' : dataError ? '· indisponible' : '· connecté'}</span><span>Entrée pour envoyer · Maj + Entrée pour une nouvelle ligne</span></div>
+          <div className="assistant-composer-foot"><span><span className="assistant-online-dot" /> Codex CLI {codexStatus === 'checking' ? '· vérification' : codexStatus === 'ready' ? '· connecté' : '· local'} · NASA POWER {loadingData ? '· chargement' : dataError ? '· indisponible' : '· connecté'}</span><span>Entrée pour envoyer · Maj + Entrée pour une nouvelle ligne</span></div>
         </div>
       </aside>
 

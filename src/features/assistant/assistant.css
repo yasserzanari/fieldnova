@@ -9,6 +9,9 @@
 .assistant-quiet-icon:hover { background:#f0efe8; color:var(--color-forest-800); }
 .assistant-demo-notice { display:flex; flex:none; align-items:center; gap:8px; margin:9px 11px 5px; padding:8px 9px; border:1px solid #e7e4d7; border-radius:9px; background:#f8f7f1; }
 .assistant-demo-notice > span { display:grid; width:25px; height:25px; flex:none; place-items:center; border-radius:7px; background:#ebf1e4; color:#55774a; }
+.assistant-demo-notice.is-warning { border-color:#ead9c6; background:#fbf4e9; }
+.assistant-demo-notice.is-warning > span { background:#f4e6d2; color:#956d3d; }
+.assistant-demo-notice.is-warning strong { color:#80603a; }
 .assistant-demo-notice p { display:grid; min-width:0; gap:2px; margin:0; }
 .assistant-demo-notice strong { color:#4c4a3d; font-size:9px; font-weight:700; }
 .assistant-demo-notice small { color:#777465; font-size:8px; line-height:1.35; }
