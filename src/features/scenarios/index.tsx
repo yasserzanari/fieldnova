@@ -1,119 +1,177 @@
-import { useRef, useState, type CSSProperties, type PointerEvent } from 'react'
-import { Check, ChevronRight, Cloud, Droplets, Layers3, Leaf, LocateFixed, Minus, Plus, Shield, Sprout, Wind } from 'lucide-react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { Activity, CloudRain, Droplets, ExternalLink, LocateFixed, MapPinned, RefreshCw, ShieldCheck, ThermometerSun } from 'lucide-react'
+import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
+import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
+import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
+import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
+import { fetchPowerMonthly, formatPowerMonth, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import './scenarios.css'
 
-type ScenarioId = 'S1' | 'S2' | 'S3'
-type Priority = 'soil' | 'economy' | 'emissions' | 'resilience'
+type CaseId = 'reference' | 'dry' | 'heat'
+type Priority = 'water' | 'rain' | 'heat'
+type ClimateCase = { id: CaseId; title: string; description: string; period: string; count: number; rain?: number; temperature?: number; wetness?: number }
 
-const scenarios: Array<{ id: ScenarioId; name: string; detail: string; tone: string; cropPlan: string[]; crops: string[] }> = [
-  { id: 'S1', name: 'Référence', detail: 'Rotation actuelle conservée', tone: 'reference', cropPlan: ['Maïs grain', 'Blé d’hiver', 'Colza', 'Maïs grain'], crops: ['🌽', '🌾', '🌼', '🌽'] },
-  { id: 'S2', name: 'Sol & Résilience', detail: 'Couverts · légumineuses', tone: 'soil', cropPlan: ['Blé tendre', 'Couvert végétal', 'Pois', 'Maïs grain'], crops: ['🌾', '🌱', '🫛', '🌽'] },
-  { id: 'S3', name: 'Performance & Climat', detail: 'Diversification · couvert long', tone: 'climate', cropPlan: ['Tournesol', 'Couvert long', 'Blé tendre', 'Féverole'], crops: ['🌻', '🌱', '🌾', '🪻'] },
-]
-
-const priorities: Array<{ id: Priority; label: string; icon: typeof Leaf }> = [
-  { id: 'soil', label: 'Fertilité des sols', icon: Leaf },
-  { id: 'economy', label: 'Performance économique', icon: Sprout },
-  { id: 'emissions', label: 'Réduction des émissions (GES)', icon: Cloud },
-  { id: 'resilience', label: 'Résilience aux aléas', icon: Shield },
-]
-
-const scores: Record<ScenarioId, { organic: string; yield: string; emissions: string; coverage: string; resilience: number }> = {
-  S1: { organic: '—', yield: '—', emissions: '—', coverage: '78 %', resilience: 1 },
-  S2: { organic: '+0,4 pt', yield: '+2 %', emissions: '−12 %', coverage: '92 %', resilience: 2 },
-  S3: { organic: '+0,5 pt', yield: '+4 %', emissions: '−18 %', coverage: '95 %', resilience: 3 },
+const caseCopy: Record<CaseId, { title: string; description: string; icon: typeof Activity }> = {
+  reference: { title: 'Référence récente', description: '12 dernières valeurs mensuelles valides', icon: Activity },
+  dry: { title: 'Période la plus sèche', description: 'Fenêtre de 3 mois avec le moins de pluie', icon: CloudRain },
+  heat: { title: 'Période la plus chaude', description: 'Fenêtre de 3 mois avec la température la plus élevée', icon: ThermometerSun },
 }
 
-const priorityChoice: Record<Priority, ScenarioId> = { soil: 'S2', economy: 'S3', emissions: 'S3', resilience: 'S2' }
+const priorityCopy: Record<Priority, { title: string; icon: typeof Activity }> = {
+  water: { title: 'Humidité racinaire', icon: Droplets },
+  rain: { title: 'Précipitations', icon: CloudRain },
+  heat: { title: 'Température', icon: ThermometerSun },
+}
+
+function daysAgo(days: number) {
+  const date = new Date()
+  date.setUTCDate(date.getUTCDate() - days)
+  return date.toISOString().slice(0, 10)
+}
+
+function average(values: Array<number | undefined>) {
+  const present = values.filter((value): value is number => value !== undefined && Number.isFinite(value))
+  return present.length ? present.reduce((sum, value) => sum + value, 0) / present.length : undefined
+}
+
+function summarizeCase(id: CaseId, records: PowerMonthlyRecord[]): ClimateCase | undefined {
+  if (!records.length) return undefined
+  const labels = records.map(record => formatPowerMonth(record.date))
+  const first = labels[0]
+  const last = labels[labels.length - 1]
+  return {
+    id,
+    ...caseCopy[id],
+    period: first === last ? first : `${first} – ${last}`,
+    count: records.length,
+    rain: average(records.map(record => record.precipitationMmPerDay)),
+    temperature: average(records.map(record => record.temperatureC)),
+    wetness: average(records.map(record => record.rootZoneWetness)),
+  }
+}
+
+function deriveCases(records: PowerMonthlyRecord[]): ClimateCase[] {
+  const result: ClimateCase[] = []
+  const reference = summarizeCase('reference', records.slice(-12))
+  if (reference) result.push(reference)
+
+  const monthNumber = (record: PowerMonthlyRecord) => Number(record.date.slice(0, 4)) * 12 + Number(record.date.slice(5, 7))
+  const windows = Array.from({ length: Math.max(0, records.length - 2) }, (_, index) => records.slice(index, index + 3)).filter(window => window.length === 3 && monthNumber(window[1]) - monthNumber(window[0]) === 1 && monthNumber(window[2]) - monthNumber(window[1]) === 1)
+  const driestWindow = windows.filter(window => average(window.map(record => record.precipitationMmPerDay)) !== undefined).sort((left, right) => (average(left.map(row => row.precipitationMmPerDay)) ?? Infinity) - (average(right.map(row => row.precipitationMmPerDay)) ?? Infinity))[0]
+  const hottestWindow = windows.filter(window => average(window.map(record => record.temperatureC)) !== undefined).sort((left, right) => (average(right.map(row => row.temperatureC)) ?? -Infinity) - (average(left.map(row => row.temperatureC)) ?? -Infinity))[0]
+  const dry = driestWindow && summarizeCase('dry', driestWindow)
+  const heat = hottestWindow && summarizeCase('heat', hottestWindow)
+  if (dry) result.push(dry)
+  if (heat) result.push(heat)
+  return result
+}
+
+function formatMetric(value: number | undefined, unit: string, decimals = 1) {
+  return value === undefined ? '—' : `${value.toFixed(decimals).replace('.', ',')} ${unit}`
+}
+
+function formatCoord(value: number, positive: string, negative: string) {
+  return `${Math.abs(value).toFixed(3).replace('.', ',')}° ${value < 0 ? negative : positive}`
+}
 
 export function ScenariosPage() {
-  const [activeScenarios, setActiveScenarios] = useState<ScenarioId[]>(['S1', 'S2', 'S3'])
-  const [priority, setPriority] = useState<Priority>('soil')
-  const [refreshed, setRefreshed] = useState(false)
-  const [zoom, setZoom] = useState(1)
-  const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [dragging, setDragging] = useState(false)
-  const stageRef = useRef<HTMLDivElement>(null)
-  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 })
+  const { location, selectLocation } = useSelectedLocation()
+  const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
+  const [showNdvi, setShowNdvi] = useState(false)
+  const [imageryDate, setImageryDate] = useState(daysAgo(11))
+  const [map, setMap] = useState<MapLibreMap | null>(null)
+  const [series, setSeries] = useState<PowerMonthlySeries | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [activeCases, setActiveCases] = useState<CaseId[]>(['reference', 'dry', 'heat'])
+  const [priority, setPriority] = useState<Priority>('water')
+  const [range, setRange] = useState(12)
+  const [locating, setLocating] = useState(false)
 
-  const toggleScenario = (id: ScenarioId) => {
-    setRefreshed(false)
-    setActiveScenarios(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id])
+  useEffect(() => {
+    let current = true
+    setLoading(true)
+    setError('')
+    fetchPowerMonthly(location, 5).then(result => {
+      if (current) setSeries(result)
+    }).catch(reason => {
+      if (current) setError(reason instanceof Error ? reason.message : 'Impossible de charger NASA POWER.')
+    }).finally(() => {
+      if (current) setLoading(false)
+    })
+    return () => { current = false }
+  }, [location.latitude, location.longitude, refreshKey])
+
+  const cases = useMemo(() => deriveCases(series?.records ?? []), [series])
+  const displayedCases = cases.filter(item => activeCases.includes(item.id))
+  const recommended = [...displayedCases].sort((left, right) => {
+    const metric = priority === 'water' ? 'wetness' : priority === 'rain' ? 'rain' : 'temperature'
+    const first = left[metric]
+    const second = right[metric]
+    if (first === undefined) return 1
+    if (second === undefined) return -1
+    return priority === 'heat' ? second - first : first - second
+  })[0]
+
+  const toggleCase = (id: CaseId) => setActiveCases(current => current.includes(id) ? current.filter(value => value !== id) : [...current, id])
+  const selectPoint = (point: GeoPoint) => selectLocation(point)
+  const locateMe = () => {
+    if (!navigator.geolocation) return
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(position => {
+      const point = { latitude: Number(position.coords.latitude.toFixed(5)), longitude: Number(position.coords.longitude.toFixed(5)) }
+      selectLocation(point)
+      map?.flyTo({ center: [point.longitude, point.latitude], zoom: 9, duration: 850 })
+      setLocating(false)
+    }, () => setLocating(false), { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 })
   }
-  const preferred = priorityChoice[priority]
-  const recommendation = activeScenarios.includes(preferred) ? preferred : activeScenarios[0]
-  const recommendedScenario = scenarios.find(scenario => scenario.id === recommendation)
-  const priorityName = priorities.find(item => item.id === priority)?.label.toLocaleLowerCase('fr') ?? 'votre priorité'
 
-  const beginPan = (event: PointerEvent<HTMLDivElement>) => {
-    if ((event.target as HTMLElement).closest('button, input, a, svg, .scenario-panel')) return
-    event.currentTarget.setPointerCapture(event.pointerId)
-    dragStart.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y }
-    setDragging(true)
-  }
-  const movePan = (event: PointerEvent<HTMLDivElement>) => {
-    if (!dragging || !stageRef.current) return
-    const rect = stageRef.current.getBoundingClientRect()
-    const limitX = Math.max(0, (rect.width * 1.06 * zoom - rect.width) / 2)
-    const limitY = Math.max(0, (rect.height * 1.06 * zoom - rect.height) / 2)
-    setPan({ x: Math.max(-limitX, Math.min(limitX, dragStart.current.panX + event.clientX - dragStart.current.x)), y: Math.max(-limitY, Math.min(limitY, dragStart.current.panY + event.clientY - dragStart.current.y)) })
-  }
+  return <section className="scenarios-page" aria-label="Comparaison historique des conditions NASA">
+    <header className="scenarios-heading"><div><h1>Scénarios climatiques</h1><p>Comparez des périodes réellement observées par NASA POWER au point sélectionné.</p></div><span className="scenario-data-badge"><i />Historique NASA · sans prévision</span></header>
 
-  return (
-    <section className="scenarios-page" aria-label="Comparaison de scénarios agricoles">
-      <header className="scenarios-heading"><div><h1>Scénarios de rotation</h1><p>Comparer les choix de culture et leurs effets estimés sur la parcelle.</p></div><span className="scenario-demo-tag">Comparaison illustrative</span></header>
-
-      <div ref={stageRef} className={`scenario-map-stage ${dragging ? 'is-dragging' : ''}`} onPointerDown={beginPan} onPointerMove={movePan} onPointerUp={() => setDragging(false)} onPointerCancel={() => setDragging(false)}>
-        <div className="scenario-map-world" style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}>
-          <img src="/images/landing-fields.png" alt="Carte agricole illustrative des parcelles" draggable={false} />
-          <svg className="scenario-map-parcels" viewBox="0 0 1000 700" aria-label="Parcelles agricoles" role="img"><polygon className="scenario-neighbor" points="598,143 767,172 813,302 609,366 608,228" /><polygon className="scenario-neighbor" points="175,388 320,378 448,432 404,568 220,531 149,454" /><polygon className="scenario-selected-field" points="307,264 482,194 615,230 604,384 449,433 324,378" /></svg>
-          <div className="scenario-field-tag"><span><LocateFixed size={14} /></span><strong>P-03 · La Grande Pièce</strong><small>7,4 ha · Maïs 2025</small></div>
-          {priority === 'soil' && <div className="scenario-soil-tag"><span><Layers3 size={16} /></span><span><strong>Sol & couverture · P-03</strong><small>Argilo-limoneux · profil exemple</small><small>Matière organique illustrative : 2,3 %</small></span></div>}
-          <div className="scenario-map-heat" aria-hidden="true" />
-        </div>
-        <div className="scenario-map-location"><LocateFixed size={14} /> Ferme des Chênes <span>·</span> P-03</div>
-        <div className="scenario-map-controls"><button type="button" aria-label="Zoomer" onClick={() => setZoom(value => Math.min(1.65, +(value + .15).toFixed(2)))}><Plus size={16} /></button><button type="button" aria-label="Dézoomer" onClick={() => setZoom(value => Math.max(.95, +(value - .15).toFixed(2)))}><Minus size={16} /></button><button type="button" aria-label="Recentrer la carte" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}><LocateFixed size={15} /></button></div>
-        <div className="scenario-map-scale"><span />250 m</div>
-
-        <aside className="scenario-panel scenario-config-panel" aria-label="Configurer les scénarios">
-          <header className="scenario-panel-heading"><div><span className="scenario-icon"><Sprout size={17} /></span><span><h2>Configurer la comparaison</h2><small>Sélectionnez les pistes à étudier</small></span></div><span className="scenario-count">{activeScenarios.length}/3</span></header>
-          <div className="scenario-select-list">{scenarios.map(scenario => <label key={scenario.id} className={`scenario-choice ${scenario.tone} ${activeScenarios.includes(scenario.id) ? 'is-selected' : ''}`}><input type="checkbox" checked={activeScenarios.includes(scenario.id)} onChange={() => toggleScenario(scenario.id)} /><span className="scenario-choice-icon">{scenario.id === 'S1' ? '🌿' : scenario.id === 'S2' ? '🌱' : '🌾'}</span><span><strong>{scenario.id} · {scenario.name}</strong><small>{scenario.detail}</small></span></label>)}</div>
-          <div className="scenario-priority-heading"><strong>Priorité de l’exploitation</strong><span>Le meilleur compromis suit ce choix.</span></div>
-          <div className="scenario-priority-list" role="radiogroup" aria-label="Priorité de l’exploitation">{priorities.map(item => { const Icon = item.icon; return <label key={item.id} className={`scenario-priority ${priority === item.id ? 'is-active' : ''}`}><input type="radio" name="scenario-priority" checked={priority === item.id} onChange={() => { setPriority(item.id); setRefreshed(false) }} /><Icon size={15} /><span>{item.label}</span>{priority === item.id && <Check size={13} />}</label> })}</div>
-          <button className="scenario-refresh" type="button" disabled={!activeScenarios.length} onClick={() => setRefreshed(true)}><Sprout size={15} /> Actualiser la comparaison</button>
-          {refreshed && <p className="scenario-refresh-message" role="status">Comparaison recalculée selon « {priorityName} ».</p>}
-        </aside>
-
-        <aside className="scenario-panel scenario-results-panel" aria-label="Résultats comparés">
-          <header className="scenario-panel-heading results-heading"><div><span className="scenario-icon results-icon"><Wind size={17} /></span><span><h2>Comparaison des scénarios</h2><small>Effets estimés · P-03 · 2025–2028</small></span></div></header>
-          {activeScenarios.length ? <div className="scenario-results-table" style={{ '--scenario-count': activeScenarios.length } as CSSProperties} role="table" aria-label="Écarts estimés des rotations">
-            <div className="scenario-table-row table-header" role="row"><span role="columnheader">Indicateur · Δ vs S1</span>{activeScenarios.map(id => <span key={id} className={`scenario-cell-${id.toLowerCase()}`} role="columnheader">{id}<small>{id === 'S1' ? 'Réf.' : id === 'S2' ? 'Sol & Rés.' : 'Perf. & Clim.'}</small></span>)}</div>
-            <MetricRow icon={<Leaf size={15} />} label="Matière organique" metric="organic" activeScenarios={activeScenarios} />
-            <MetricRow icon={<Sprout size={15} />} label="Rendement total" metric="yield" activeScenarios={activeScenarios} />
-            <MetricRow icon={<Cloud size={15} />} label="Émissions GES" metric="emissions" activeScenarios={activeScenarios} />
-            <MetricRow icon={<Droplets size={15} />} label="Couverture du sol" metric="coverage" activeScenarios={activeScenarios} />
-            <div className="scenario-table-row resilience-row" role="row"><span role="rowheader"><Shield size={15} />Résilience aux aléas</span>{activeScenarios.map(id => <span key={id} className={`scenario-cell-${id.toLowerCase()}`} role="cell">{Array.from({ length: 3 }, (_, index) => <i key={index} className={index < scores[id].resilience ? `resilience-on resilience-${id.toLowerCase()}` : ''} />)}</span>)}</div>
-          </div> : <div className="scenario-empty-state"><Sprout size={22} /><strong>Choisissez un scénario</strong><span>Activez au moins une rotation à comparer.</span></div>}
-
-          {recommendedScenario && <div className={`scenario-recommendation recommendation-${recommendedScenario.id.toLowerCase()}`}><span className="recommendation-mark"><Leaf size={18} /></span><div><small>Meilleur compromis · priorité {priorityName}</small><strong>{recommendedScenario.id} · {recommendedScenario.name}</strong><p>{recommendation === 'S2' ? 'Favorise la fertilité et la couverture du sol, avec un rendement maintenu dans cette simulation.' : 'Améliore le rendement et réduit les émissions dans cette simulation de rotation.'}</p></div></div>}
-          <div className="scenario-proof-card"><span className="proof-icon"><Check size={15} /></span><div><strong>Hypothèses visibles</strong><p>Valeurs d’exemple, à valider avec des mesures de ferme avant toute décision.</p></div><Link to="/app/data-trust" aria-label="Comprendre les sources et hypothèses"><ChevronRight size={15} /></Link></div>
-        </aside>
-
-        <div className="scenario-map-legend"><span><i className="scenario-outline" />Parcelle sélectionnée</span><span><i className="scenario-heat-legend" />Indice illustratif de couverture</span></div>
+    <div className="scenario-map-stage">
+      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive satellite NASA et point de sélection des scénarios" />
+      <div className="scenario-map-topline">
+        <div className="scenario-point-chip"><MapPinned size={15} /><span>{formatCoord(location.latitude, 'N', 'S')} · {formatCoord(location.longitude, 'E', 'O')}</span><small>Point de comparaison</small></div>
+        <div className="scenario-map-options"><div className="scenario-base-switch" role="group" aria-label="Fond de carte"><button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Image NASA</button></div><label><input type="checkbox" checked={showNdvi} onChange={event => setShowNdvi(event.target.checked)} /><Activity size={13} />NDVI 8 j</label><label className="scenario-image-date">Date image<input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label></div>
       </div>
+      <div className="scenario-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 250 })}><span>+</span></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 250 })}><span>−</span></button><button type="button" aria-label="Utiliser ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></div>
+      <span className="scenario-map-hint">Cliquez sur la carte pour choisir le point d’analyse</span>
 
-      <section className="scenario-rotation-panel" aria-label="Rotations simulées de la parcelle P-03">
-        <header><div><Leaf size={16} /><span><strong>Rotations de la parcelle P-03</strong><small>Hypothèses de culture · 4 saisons</small></span></div><div className="scenario-proof-legend"><span><i className="proof-hypothesis" />Hypothèse de démo</span><span><i className="proof-missing" />Observation réelle non raccordée</span></div><Link to="/app/data-trust">Sources & hypothèses <ChevronRight size={13} /></Link></header>
-        <div className="scenario-timeline"><div className="scenario-timeline-label"><span />Scénario / Rotation</div>{[2025, 2026, 2027, 2028].map(year => <div className="scenario-year" key={year}>{year}<small>Print. · Été · Aut.</small></div>)}
-          {scenarios.filter(scenario => activeScenarios.includes(scenario.id)).map(scenario => <div className={`scenario-plan-row plan-${scenario.id.toLowerCase()}`} key={scenario.id}><div className="scenario-plan-name"><span>{scenario.id}</span><strong>{scenario.name}</strong><small>{scenario.detail}</small></div>{scenario.cropPlan.map((crop, index) => <div className={`scenario-crop crop-${scenario.id.toLowerCase()}`} key={`${scenario.id}-${index}`}><span>{scenario.crops[index]}</span><strong>{crop}</strong></div>)}</div>)}
-          {!activeScenarios.length && <div className="scenario-timeline-empty">Activez une piste pour afficher les rotations proposées.</div>}
-        </div>
-      </section>
+      <aside className="scenario-panel scenario-config-panel" aria-label="Périodes historiques à comparer">
+        <header className="scenario-panel-heading"><div><span className="scenario-icon"><Activity size={16} /></span><span><h2>Périodes historiques</h2><small>Statistiques calculées sur NASA POWER</small></span></div><span className="scenario-count">{activeCases.length}/{cases.length}</span></header>
+        {loading ? <div className="scenario-data-state" role="status">Chargement des séries NASA…</div> : error ? <div className="scenario-data-error" role="alert">{error}<button type="button" onClick={() => setRefreshKey(value => value + 1)}><RefreshCw size={12} />Réessayer</button></div> : <>
+          <div className="scenario-select-list">{cases.map(item => { const Icon = caseCopy[item.id].icon; return <label key={item.id} className={`scenario-choice ${item.id} ${activeCases.includes(item.id) ? 'is-selected' : ''}`}><input type="checkbox" checked={activeCases.includes(item.id)} onChange={() => toggleCase(item.id)} /><span className="scenario-choice-icon"><Icon size={15} /></span><span><strong>{item.title}</strong><small>{item.period} · {item.count} valeurs</small></span></label> })}</div>
+          <div className="scenario-priority-heading"><strong>Classer les périodes par</strong><span>Critère de surveillance historique</span></div>
+          <div className="scenario-priority-list" role="radiogroup" aria-label="Critère de surveillance">{(Object.keys(priorityCopy) as Priority[]).map(id => { const Icon = priorityCopy[id].icon; return <label key={id} className={`scenario-priority ${priority === id ? 'is-active' : ''}`}><input type="radio" name="scenario-priority" checked={priority === id} onChange={() => setPriority(id)} /><Icon size={14} /><span>{priorityCopy[id].title}</span></label> })}</div>
+        </>}
+        <div className="scenario-source-note"><ShieldCheck size={13} /><span>Fenêtres historiques observées ; aucun rendement ou impact futur n’est extrapolé.</span></div>
+        <Link to="/app/atlas" className="scenario-atlas-link">Explorer les couches NASA <ExternalLink size={13} /></Link>
+      </aside>
+
+      <aside className="scenario-panel scenario-results-panel" aria-label="Comparaison des observations NASA">
+        <header className="scenario-panel-heading results-heading"><div><span className="scenario-icon results-icon"><Droplets size={16} /></span><span><h2>Mesures par période</h2><small>NASA POWER · cellule de grille sélectionnée</small></span></div></header>
+        {loading ? <div className="scenario-data-state" role="status">Récupération de NASA POWER…</div> : error ? <div className="scenario-data-error" role="alert">Données indisponibles pour ce point.</div> : displayedCases.length ? <>
+          <div className="scenario-results-table" style={{ '--scenario-count': Math.max(1, displayedCases.length) } as CSSProperties} role="table" aria-label="Moyennes NASA POWER des périodes historiques"><div className="scenario-table-row table-header" role="row"><span role="columnheader">Indicateur moyen</span>{displayedCases.map(item => <span key={item.id} className={`scenario-cell-${item.id}`} role="columnheader">{caseCopy[item.id].title}</span>)}</div>
+            <MetricRow icon={<CloudRain size={14} />} label="Pluie · mm/j" metric="rain" records={displayedCases} />
+            <MetricRow icon={<ThermometerSun size={14} />} label="Température · °C" metric="temperature" records={displayedCases} />
+            <MetricRow icon={<Droplets size={14} />} label="Humidité racinaire · %" metric="wetness" records={displayedCases} />
+          </div>
+          {recommended && <div className="scenario-recommendation"><span className="recommendation-mark"><ShieldCheck size={17} /></span><div><small>Période à examiner · critère {priorityCopy[priority].title.toLocaleLowerCase('fr')}</small><strong>{caseCopy[recommended.id].title} · {recommended.period}</strong><p>Cette fenêtre historique présente la valeur la plus défavorable parmi les périodes sélectionnées, selon le critère choisi.</p></div></div>}
+        </> : <div className="scenario-empty-state"><Activity size={22} /><strong>Sélectionnez une période</strong><span>Activez au moins une période historique.</span></div>}
+        <p className="scenario-results-source">NASA POWER · {series?.source.join(' + ') ?? 'source en attente'} · paramètres mensuels. Les données de grille ne sont pas des mesures de parcelle.</p>
+      </aside>
+    </div>
+
+    <section className="scenario-chart-section" aria-label="Historique climatique NASA POWER">
+      <div className="scenario-chart-toolbar"><div><span className="scenario-chart-icon"><Activity size={16} /></span><span><strong>Historique climatique</strong><small>{range} derniers mois disponibles · cellule NASA POWER {series?.gridPoint.latitude.toFixed(3)}, {series?.gridPoint.longitude.toFixed(3)}</small></span></div><div className="scenario-chart-ranges" role="group" aria-label="Période du graphique">{[[3, '3 mois'], [6, '6 mois'], [12, '1 an']].map(([months, label]) => <button key={months} type="button" className={range === months ? 'is-active' : ''} onClick={() => setRange(Number(months))}>{label}</button>)}</div></div>
+      <PowerClimateChart records={series?.records ?? []} source={series?.source.join(' + ') ?? 'en attente'} months={range} title="Précipitations moyennes et température · NASA POWER" />
     </section>
-  )
+  </section>
 }
 
-function MetricRow({ icon, label, metric, activeScenarios }: { icon: React.ReactNode; label: string; metric: 'organic' | 'yield' | 'emissions' | 'coverage'; activeScenarios: ScenarioId[] }) {
-  return <div className="scenario-table-row metric-row" role="row"><span role="rowheader">{icon}{label}</span>{activeScenarios.map(id => <span key={id} className={`scenario-cell-${id.toLowerCase()}`} role="cell">{scores[id][metric]}</span>)}</div>
+function MetricRow({ icon, label, metric, records }: { icon: React.ReactNode; label: string; metric: 'rain' | 'temperature' | 'wetness'; records: ClimateCase[] }) {
+  return <div className="scenario-table-row metric-row" role="row"><span role="rowheader">{icon}{label}</span>{records.map(item => { const value = metric === 'rain' ? formatMetric(item.rain, 'mm/j', 2) : metric === 'temperature' ? formatMetric(item.temperature, '°C') : formatMetric(item.wetness === undefined ? undefined : item.wetness * 100, '%', 0); return <span key={item.id} className={`scenario-cell-${item.id}`} role="cell" title={`${item.period} · ${value}`}>{value}</span> })}</div>
 }
