@@ -1,15 +1,17 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
-import { PublicLanding } from '../features/landing/PublicLanding'
-import { LoginPage } from '../features/auth/LoginPage'
 import { AppShell } from './layouts/AppShell'
 import { featureRoutes } from './navigation'
+
+const PublicLanding = lazy(() => import('../features/landing/PublicLanding').then(module => ({ default: module.PublicLanding })))
+const LoginPage = lazy(() => import('../features/auth/LoginPage').then(module => ({ default: module.LoginPage })))
 
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<PublicLanding />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<Suspense fallback={<RouteLoading />}><PublicLanding /></Suspense>} />
+        <Route path="/login" element={<Suspense fallback={<RouteLoading />}><LoginPage /></Suspense>} />
         <Route path="/app" element={<AppShell />}>
           <Route index element={<Navigate to="overview" replace />} />
           {featureRoutes.map(({ path, Component }) => (
@@ -20,4 +22,8 @@ export function App() {
       </Routes>
     </BrowserRouter>
   )
+}
+
+function RouteLoading() {
+  return <div className="route-loading" role="status">Ouverture de la vue…</div>
 }
