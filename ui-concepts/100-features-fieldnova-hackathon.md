@@ -18,9 +18,10 @@ Cette liste reste un portefeuille de 100 idées, pas un engagement à toutes les
 - **Contexte de décision :** séries NASA POWER mensuelles avec coordonnées de grille et valeurs comparées aux mêmes mois des années précédentes; profil de sol local avec origine, date et référence déclarées.
 - **Parcelle et preuves :** import GeoJSON WGS84, contour synchronisé sur les cartes, superficie géodésique approximative et export d’une fiche Markdown contenant sources, calculs, valeurs manquantes et limites.
 - **Assistant outillé :** chat à gauche et carte à droite; lectures de NASA POWER, du profil local et des rotations; changements de couche réels; questions hors périmètre sans appel NASA automatique.
+- **Réponses conversationnelles démo :** Codex CLI rédige les réponses à partir des résultats retournés par les outils locaux FieldNova; la connexion est limitée au serveur Vite de développement.
 - **Démo :** [script de 90 secondes et plans vidéo](demo-script-90s-fieldnova.md).
 
-Le prototype ne possède pas encore de service LLM, d’analyse de pièces jointes, de statistiques NASA calculées à l’intérieur d’une limite de parcelle ni de catalogue agronomique validé par un expert local. Les rotations restent illustratives; aucun rendement, besoin en eau, amélioration de sol ou prévision n’est calculé.
+Le prototype n’analyse pas les pièces jointes et ne calcule pas de statistiques NASA à l’intérieur d’une limite de parcelle. Le catalogue agronomique et les rotations restent illustratifs; aucun rendement, besoin en eau, amélioration de sol ou prévision n’est calculé.
 
 ## Les 12 fonctions à privilégier pour la démonstration
 

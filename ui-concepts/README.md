@@ -30,7 +30,7 @@ L’agriculteur choisit les scénarios et sa priorité à gauche. La comparaison
 
 ## 5. Assistant — chat à gauche, carte à droite
 
-Le chat de l’assistant est le panneau principal à gauche, avec les questions suggérées, le champ de saisie et une trace des outils agricoles consultés (climat, carte, sol, rotations). La carte interactive occupe la droite. Ce concept visuel ne signifie pas qu’un modèle LLM est branché : le prototype actuel utilise un routeur local.
+Le chat de l’assistant est le panneau principal à gauche, avec les questions suggérées, le champ de saisie et une trace des outils agricoles consultés (climat, carte, sol, rotations). La carte interactive occupe la droite. Le routeur local exécute les outils FieldNova; Codex CLI reformule leurs résultats dans la conversation pendant la démo.
 
 ![Assistant FieldNova — chat et carte](05-assistant-chat-map.png)
 

@@ -7,11 +7,12 @@ FieldNova aide une exploitation à examiner des rotations avec le contexte clima
 ## Préparation avant l’enregistrement
 
 1. Lancer le projet sur le réseau local avec `npm run dev -- --port 5180`.
-2. Ouvrir `/app/scenarios` et attendre la fin du chargement NASA POWER. Vérifier que la période mensuelle et les références du même mois précédent sont visibles.
-3. Vérifier que les rotations sont marquées **Exemple illustratif** si aucune rotation locale n’a été saisie.
-4. Ne pas ajouter de valeurs de sol inventées. Un profil inconnu est une bonne démonstration de la façon dont FieldNova garde une inconnue visible.
-5. Si NASA POWER est indisponible, conserver l’état d’erreur à l’écran et expliquer que le prototype ne remplace pas les observations absentes par des nombres fictifs.
-6. Fermer les onglets inutiles et enregistrer en 1625 × 1231 ou dans un format 16:9 qui laisse les panneaux lisibles.
+2. Vérifier que Codex CLI est installé et connecté sur la machine qui lance Vite avec `codex login status`.
+3. Ouvrir `/app/scenarios` et attendre la fin du chargement NASA POWER. Vérifier que la période mensuelle et les références du même mois précédent sont visibles.
+4. Vérifier que les rotations sont marquées **Exemple illustratif** si aucune rotation locale n’a été saisie.
+5. Ne pas ajouter de valeurs de sol inventées. Un profil inconnu est une bonne démonstration de la façon dont FieldNova garde une inconnue visible.
+6. Si NASA POWER ou Codex CLI est indisponible, conserver l’état d’erreur à l’écran et expliquer que FieldNova garde une réponse locale et ne remplace pas les observations absentes par des nombres fictifs.
+7. Fermer les onglets inutiles et enregistrer en 1625 × 1231 ou dans un format 16:9 qui laisse les panneaux lisibles.
 
 ## Script avec actions et narration
 
@@ -38,7 +39,7 @@ Lire les valeurs affichées en direct pendant la narration. Ne pas apprendre par
 
 ## Transparence pour le jury
 
-- L’Assistant actuel utilise un routeur local et des outils de données FieldNova; aucun service LLM externe n’est connecté.
+- Le routeur local exécute les outils de données FieldNova; Codex CLI formule une réponse à partir de leurs résultats et des derniers messages. La démo dépend de la session Codex CLI sur le serveur Vite.
 - Les pièces jointes ne sont pas analysées.
 - Le catalogue de cultures est illustratif et n’a pas été validé par un spécialiste de la région.
 - Le polygone GeoJSON est visualisé et sa superficie approximative calculée; FieldNova ne calcule pas de statistiques NASA zonales à l’intérieur.
