@@ -9,6 +9,11 @@ coverage/
 .env.*
 !.env.example
 
+# Local browser captures and generated build metadata
+playwright-report/
+test-results/
+.vite/
+
 # Editor and operating system files
 .DS_Store
 .vscode/

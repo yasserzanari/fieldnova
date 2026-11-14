@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-forest-950: #12351f;
+  --color-forest-900: #174b2b;
+  --color-forest-800: #20613a;
+  --color-forest-700: #2b7547;
+  --color-leaf-500: #8bbf6a;
+  --color-leaf-200: #e1efcf;
+  --color-soil-900: #342d22;
+  --color-soil-600: #746a57;
+  --color-soil-300: #d9d1c2;
+  --color-cream-100: #fbfaf6;
+  --color-cream-200: #f3f1e9;
+  --color-cream-300: #e9e5d8;
+  --color-warn-600: #b45b27;
+  --color-shell: #f7f6f0;
+  --color-border: #e7e3d7;
+  --shadow-panel: 0 12px 30px rgb(43 49 32 / 8%);
+  --radius-panel: 20px;
+  --radius-control: 12px;
+}
