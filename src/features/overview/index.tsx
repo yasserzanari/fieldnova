@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
-import { ClimateChart } from './ClimateChart'
+import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import './overview.css'
 
 function daysAgo(days: number) {
@@ -142,8 +142,8 @@ export function OverviewPage() {
       </div>
 
       <div className="overview-bottom-grid">
-        <ClimateChart records={series?.records ?? []} title="Série climatique NASA · 12 derniers mois" source={series?.source.join(' + ') ?? 'en attente'} />
-        <ClimateChart records={series?.records ?? []} mode="soil" source={series?.source.join(' + ') ?? 'en attente'} />
+        <PowerClimateChart records={series?.records ?? []} title="Série climatique NASA · 12 derniers mois" source={series?.source.join(' + ') ?? 'en attente'} />
+        <PowerClimateChart records={series?.records ?? []} mode="soil" source={series?.source.join(' + ') ?? 'en attente'} />
       </div>
     </section>
   )

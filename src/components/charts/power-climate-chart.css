@@ -1,0 +1,25 @@
+.power-chart-panel { display:flex; min-width:0; min-height:0; flex-direction:column; overflow:hidden; padding:9px 11px 8px; border:1px solid var(--color-border); border-radius:13px; background:#fffefa; box-shadow:0 3px 12px rgb(42 49 32 / 5%); }
+.power-chart-heading { display:flex; min-height:30px; flex:none; align-items:center; justify-content:space-between; gap:9px; }
+.power-chart-heading > div { display:flex; min-width:0; align-items:center; gap:7px; }
+.power-chart-heading h2 { overflow:hidden; margin:0; color:var(--color-forest-950); font-size:9px; font-weight:720; letter-spacing:-.02em; text-overflow:ellipsis; white-space:nowrap; }
+.power-chart-heading p { overflow:hidden; margin:3px 0 0; color:var(--color-soil-600); font-size:7px; text-overflow:ellipsis; white-space:nowrap; }
+.power-chart-icon { display:grid; width:25px; height:25px; flex:none; place-items:center; border-radius:7px; background:#e8f0df; color:var(--color-forest-800); }
+.power-chart-icon.soil-icon { background:#e5eff0; color:#51849a; }
+.power-chart-source { flex:none; max-width:42%; overflow:hidden; padding:4px 6px; border:1px solid #dce6d4; border-radius:999px; background:#f4f7ef; color:#5c764d; font-size:6px; font-weight:620; text-overflow:ellipsis; white-space:nowrap; }
+.power-chart-summary { flex:none; padding:2px 3px 1px; color:#696657; font-size:7px; }
+.power-climate-chart { display:block; width:100%; min-height:78px; flex:1; overflow:visible; }
+.power-chart-gridline { stroke:#e9e6db; stroke-dasharray:3 4; stroke-width:1; }
+.power-chart-tick,.power-chart-month { fill:#7d7768; font-family:inherit; font-size:8px; }
+.power-chart-month { font-size:8px; }
+.power-chart-rain-bar { fill:#4081ad; fill-opacity:.76; }
+.power-chart-temp-line { fill:none; stroke:#b96d44; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.power-chart-temp-dot { fill:#fffefa; stroke:#b96d44; stroke-width:1.5; }
+.power-chart-soil-area { fill:#2b7547; fill-opacity:.15; }
+.power-chart-soil-line { fill:none; stroke:#2b7547; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.power-chart-soil-dot { fill:#fffefa; stroke:#2b7547; stroke-width:1.5; }
+.power-chart-legend { display:flex; flex:none; align-items:center; gap:13px; min-height:13px; color:#777465; font-size:6px; }
+.power-chart-legend span { display:inline-flex; align-items:center; gap:4px; }
+.power-chart-legend i { display:inline-block; width:8px; height:8px; border-radius:2px; }
+.legend-precip { background:#4081ad; }.legend-temperature { width:10px !important; height:2px !important; border-radius:0 !important; background:#b96d44; }.legend-wetness { background:#2b7547; }
+.power-chart-empty { display:grid; min-height:80px; flex:1; align-content:center; justify-items:center; gap:4px; color:#777465; font-size:8px; }
+@media(max-width:820px) { .power-chart-panel { min-height:180px; } }
