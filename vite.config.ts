@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -144,7 +144,6 @@ function codexDemoPlugin() {
         try {
           if (!(await isCodexAuthenticated())) return sendJson(response, 503, { error: 'Codex CLI est indisponible ou déconnecté sur le serveur local.' })
           temporaryDirectory = await mkdtemp(join(tmpdir(), 'fieldnova-codex-'))
-          const answerPath = join(temporaryDirectory, 'answer.md')
           const prompt = [
             'Tu es l’assistant agricole de démonstration FieldNova. Réponds en français, clairement et de façon concise, comme dans une conversation de chat.',
             'Tu ne disposes d’aucun outil FieldNova dans cette requête. Ne lance aucune commande et n’essaie pas de lire des fichiers. Utilise uniquement l’historique et le contexte fourni ci-dessous.',
@@ -156,10 +155,10 @@ function codexDemoPlugin() {
           const result = await runCodex([
             'exec', '--ephemeral', '--sandbox', 'read-only', '--cd', temporaryDirectory,
             '--skip-git-repo-check', '--ignore-user-config', '--ignore-rules', '--color', 'never',
-            '--output-last-message', answerPath, '-',
+            '-',
           ], prompt)
           if (result.code !== 0) throw new Error('codex-execution-failed')
-          const answer = (await readFile(answerPath, 'utf8')).trim()
+          const answer = result.stdout.trim()
           if (!answer) throw new Error('codex-empty-response')
           return sendJson(response, 200, { answer })
         } catch {
