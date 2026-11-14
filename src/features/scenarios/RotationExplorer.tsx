@@ -164,9 +164,9 @@ export function RotationExplorer() {
       `- Matière organique déclarée : ${soil.organicMatterPercent === undefined ? 'inconnue' : `${soil.organicMatterPercent.toLocaleString('fr-FR')} %`}.`,
       `- Profondeur utile déclarée : ${soil.effectiveDepthCm === undefined ? 'inconnue' : `${soil.effectiveDepthCm} cm`}.`,
       `- Drainage déclaré : ${soil.drainage && soil.drainage !== 'unknown' ? ({ poor: 'lent', moderate: 'modéré', good: 'rapide' } as const)[soil.drainage] : 'inconnu'}.`,
-      `- Origine déclarée : ${soilSourceLabels[soil.sourceType ?? 'farmer-reported']} (non vérifiée).`,
-      `- Référence déclarée : ${soil.sourceName || 'non précisée'}.`,
-      `- Date d’échantillon ou d’observation : ${soil.sampleDate || 'non précisée'}.`,
+      `- Origine déclarée : ${soilValues.length ? `${soilSourceLabels[soil.sourceType ?? 'farmer-reported']} (non vérifiée)` : 'aucune donnée de sol renseignée; origine inconnue'}.`,
+      `- Référence déclarée : ${soilValues.length ? soil.sourceName || 'non précisée' : 'non applicable'}.`,
+      `- Date d’échantillon ou d’observation : ${soilValues.length ? soil.sampleDate || 'non précisée' : 'non applicable'}.`,
       `- Enregistré localement le : ${soil.updatedAt ? new Date(soil.updatedAt).toLocaleDateString('fr-FR') : 'aucune date enregistrée'}.`,
     ]
     const rotationLines = currentWorkspace.plans.map(plan => {
@@ -228,7 +228,7 @@ export function RotationExplorer() {
       <span className="rotation-map-hint">Cliquez pour déplacer le point suivi · les profils et séries suivent la position sélectionnée</span>
 
       <aside className="rotation-context-panel rotation-context-left" aria-label="Contexte du sol local et du climat NASA">
-        <header className="rotation-panel-heading"><span className="rotation-panel-icon soil"><Sprout size={15} /></span><span><strong>Sol local</strong><small>Origine déclarée : {soilSourceLabels[soil.sourceType ?? 'farmer-reported']}</small></span></header>
+        <header className="rotation-panel-heading"><span className="rotation-panel-icon soil"><Sprout size={15} /></span><span><strong>Sol local</strong><small>{soilValues.length ? `Origine déclarée : ${soilSourceLabels[soil.sourceType ?? 'farmer-reported']}` : 'Aucune donnée renseignée'}</small></span></header>
         {soilValues.length ? <ul className="rotation-soil-list">{soilValues.map(value => <li key={value}>{value}</li>)}</ul> : <p className="rotation-context-empty">Aucune caractéristique de sol n’est renseignée pour ce point.</p>}
         <Link to="/app/terrain" className="rotation-context-link">Renseigner le profil du sol <ArrowUpRight size={12} /></Link>
         <div className="rotation-parcel-card">
