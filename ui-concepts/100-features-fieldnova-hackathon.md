@@ -123,7 +123,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 51. **[P0] Réponse liée au scénario et à la parcelle sélectionnés** : le chat ne perd pas son contexte lorsque la carte change.
 52. **[P0 · LIVRÉ] Réponse avec sources consultables** : chaque réponse fondée sur un outil affiche les sources associées à ses données — NASA POWER/GIBS, profil local FieldNova ou références agronomiques — avec distinction explicite entre déclaration locale et source externe.
 53. **[P0] Trace d’outils réelle** : montrer les requêtes exécutées et leur statut, et non une animation prétendant avoir interrogé un outil.
-54. **[P0] Questions de suivi suggérées** : proposer des questions adaptées aux données réellement chargées.
+54. **[P0 · LIVRÉ] Questions de suivi suggérées** : proposer pluie, température et humidité seulement lorsque la variable correspondante existe dans la dernière période NASA exploitable; adapter aussi la question NDVI à la couche affichée et conserver les actions vers les profils locaux et rotations.
 55. **[P1] Réponses séparant fait, calcul et hypothèse** : utiliser des étiquettes visuelles différentes.
 56. **[P1] Réponse courte pour le terrain** : produire une synthèse en langage simple, avec un lien vers les détails.
 57. **[P1] « Pourquoi ce scénario ? »** : expliquer chaque règle et permettre de la désactiver ou la modifier.
