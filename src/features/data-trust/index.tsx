@@ -3,7 +3,7 @@ import { ArrowUpRight, Check, ChevronRight, CloudSun, Database, Droplets, Extern
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
-import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
+import { formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { useSelectedLocation } from '../../lib/geo/location'
 import './data-trust.css'
@@ -36,6 +36,22 @@ function formatFetchedAt(value: string) {
   return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(value)) + ' UTC'
 }
 
+function powerCoverage(series: PowerMonthlySeries) {
+  const metrics: Array<{ field: keyof PowerMonthlyRecord; label: string }> = [
+    { field: 'precipitationMmPerDay', label: 'Pluie corrigée · PRECTOTCORR' },
+    { field: 'temperatureC', label: 'Température moyenne · T2M' },
+    { field: 'temperatureMaxC', label: 'Température maximale · T2M_MAX' },
+    { field: 'temperatureMinC', label: 'Température minimale · T2M_MIN' },
+    { field: 'surfaceSoilWetness', label: 'Humidité de surface modélisée · GWETTOP' },
+    { field: 'rootZoneWetness', label: 'Humidité racinaire modélisée · GWETROOT' },
+  ]
+  const records = new Map(series.records.map(record => [record.date, record]))
+  return metrics.map(metric => {
+    const missing = series.requestedMonths.filter(month => typeof records.get(month)?.[metric.field] !== 'number')
+    return { ...metric, available: series.requestedMonths.length - missing.length, missing }
+  })
+}
+
 export function DataTrustPage() {
   const { location, selectLocation } = useSelectedLocation()
   const [selectedId, setSelectedId] = useState('power')
@@ -50,6 +66,7 @@ export function DataTrustPage() {
   const selected = sources.find(source => source.id === selectedId) ?? sources[0]
   const SourceIcon = selected.icon
   const latest = series ? latestCompleteRecord(series.records) : undefined
+  const coverage = selected.id === 'power' && series ? powerCoverage(series) : []
   const filteredSources = useMemo(() => sources.filter(source => (theme === 'Toutes' || source.kind === theme) && (statusFilter === 'Tous les statuts' || source.status === statusFilter) && `${source.name} ${source.provider} ${source.description}`.toLocaleLowerCase('fr').includes(query.toLocaleLowerCase('fr'))), [query, statusFilter, theme])
 
   const imageryDate = (() => {
@@ -127,6 +144,7 @@ export function DataTrustPage() {
             { title: 'Collecte & validation', desc: 'Aucune requête, validation ou transformation exécutée.', done: false },
             { title: 'Usage dans FieldNova', desc: 'Aucune valeur de cette source n’est affichée comme donnée réelle.', done: false },
           ]).map((item, index) => <li className={item.done ? 'lineage-done' : 'lineage-next'} key={item.title}><span className="lineage-marker">{item.done ? <Check size={11} /> : index + 1}</span><span><strong>{item.title}</strong><small>{item.desc}</small></span></li>)}</ol>
+          {selected.id === 'power' && series && <section className="trust-coverage-audit" aria-label="Couverture des périodes mensuelles NASA POWER"><header><strong>Valeurs disponibles par mois</strong><small>Fenêtre demandée · {series.requestedMonths.length} mois clos</small></header><div>{coverage.map(item => <span key={item.field}><strong>{item.label}</strong><small>{item.available}/{series.requestedMonths.length} mois exploitables</small></span>)}</div><details><summary>Mois sans valeur exploitable</summary><ul>{coverage.map(item => <li key={item.field}><strong>{item.label}</strong><small>{item.missing.length ? item.missing.map(formatPowerMonth).join(' · ') : 'Aucun mois manquant'}</small></li>)}</ul></details></section>}
           <div className="trust-provenance-note"><ShieldCheck size={14} /><p>Les valeurs affichées gardent leur source, leur unité, leur date et leur couverture spatiale. Les données de grille ne décrivent pas une parcelle individuelle.</p></div>
         </div>}
         <footer className="trust-detail-footer"><span><span className={`trust-empty-dot ${selected.status === 'Connecté' && !error ? 'is-connected' : ''}`} />{selected.id === 'power' && error ? 'Récupération en échec' : selected.status === 'Connecté' ? 'Source intégrée' : selected.status}</span><button type="button" onClick={() => setPanel('lineage')}>Voir la traçabilité <ArrowUpRight size={13} /></button></footer>

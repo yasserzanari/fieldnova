@@ -24,6 +24,7 @@ export type PowerMonthlySeries = {
   point: GeoPoint
   gridPoint: GeoPoint
   gridCell: PowerGridCell
+  requestedMonths: string[]
   source: string[]
   timeStandard: string
   fetchedAt: string
@@ -100,7 +101,16 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5): Promise<Pow
 
   const values = body.properties?.parameter
   if (!values) throw new Error('NASA POWER n’a renvoyé aucune série exploitable pour ce point.')
-  const currentMonth = new Date().toISOString().slice(0, 7).replace('-', '')
+  const now = new Date()
+  const currentMonth = now.toISOString().slice(0, 7).replace('-', '')
+  const currentMonthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
+  const requestedMonths: string[] = []
+  for (let time = Date.UTC(startYear, 0, 1); time < currentMonthStart;) {
+    const date = new Date(time)
+    requestedMonths.push(`${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`)
+    date.setUTCMonth(date.getUTCMonth() + 1)
+    time = date.getTime()
+  }
   // The monthly endpoint may already return the in-progress month. Keep only closed
   // calendar months so every consumer can call its latest record "complete" safely.
   const keys = Object.keys(values.PRECTOTCORR ?? values.T2M ?? {}).filter(date => date < currentMonth).sort()
@@ -125,6 +135,7 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5): Promise<Pow
     point,
     gridPoint: gridCell.properties.center,
     gridCell,
+    requestedMonths,
     source: body.header?.sources ?? ['NASA POWER'],
     timeStandard: body.header?.time_standard ?? 'UTC',
     fetchedAt: new Date().toISOString(),
