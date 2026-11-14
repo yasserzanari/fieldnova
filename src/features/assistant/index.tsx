@@ -6,12 +6,14 @@ import AISources, { type AISource } from '../../components/ai-chat/ai-sources'
 import { MessageActions } from '../../components/ai-chat/message-actions'
 import { LiquidMultimodalInput } from '../../components/ai-chat/liquid-multimodal-input'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
-import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { readSoilProfile } from '../../lib/farm/soil-profile'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
+import { cropCatalog, evaluateRotation, readRotationWorkspace } from '../scenarios/rotation-model'
 import './assistant.css'
 
 type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
-type Message = { id: number; role: 'user' | 'assistant'; text: string; trace?: TraceNode[]; running?: boolean; sources?: AISource[] }
+type Message = { id: number; role: 'user' | 'assistant'; text: string; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[] }
 
 const sources: AISource[] = [
   { id: 'power', title: 'NASA POWER · données mensuelles', url: 'https://power.larc.nasa.gov/docs/services/api/temporal/monthly/', snippet: 'Série au point de grille NASA POWER : température, précipitations et humidité du sol modélisée.' },
@@ -35,17 +37,7 @@ function coordinate(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(3).replace('.', ',')}° ${value < 0 ? negative : positive}`
 }
 
-function traceNodes(point: GeoPoint, layer: LayerId, record?: PowerMonthlyRecord, failed = false): TraceNode[] {
-  const layerLabel = layerOptions.find(item => item.id === layer)?.label ?? 'Carte NASA'
-  return [
-    { id: `point-${Date.now()}`, type: 'tool', toolName: 'mcp', args: { label: 'Coordonnée active' }, primary: 'Point suivi', secondary: `${coordinate(point.latitude, 'N', 'S')} · ${coordinate(point.longitude, 'E', 'O')}`, status: 'completed', durationSeconds: 0.1 },
-    { id: `power-${Date.now()}`, type: 'tool', toolName: 'mcp', args: { label: 'NASA POWER · série mensuelle' }, primary: failed ? 'NASA POWER indisponible' : 'NASA POWER consulté', secondary: record ? `Dernier mois exploitable · ${formatPowerMonth(record.date)}` : failed ? 'La requête a échoué' : 'Aucune valeur exploitable reçue', status: failed ? 'failed' : 'completed', durationSeconds: 0.7 },
-    { id: `map-${Date.now()}`, type: 'tool', toolName: 'mcp', args: { label: `Couche cartographique · ${layerLabel}` }, primary: 'Carte mise à jour', secondary: layerLabel, status: 'completed', durationSeconds: 0.2 },
-  ]
-}
-
-function makeAnswer(question: string, series: PowerMonthlySeries | null, layer: LayerId, files: File[]) {
-  if (files.length) return 'Les pièces jointes sont reçues dans cette conversation, mais leur contenu n’est pas encore analysé. Je peux répondre à partir du point sélectionné et des données NASA visibles sur la carte.'
+function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, layer: LayerId) {
   if (!series) return 'Je n’ai pas pu charger NASA POWER pour le point sélectionné. Vérifiez la connexion puis réessayez ; aucune valeur de démonstration n’est substituée aux données manquantes.'
   const records = series.records
   const record = latestCompleteRecord(records)
@@ -77,6 +69,44 @@ function makeAnswer(question: string, series: PowerMonthlySeries | null, layer: 
     record.rootZoneWetness !== undefined ? `humidité racinaire modélisée ${Math.round(record.rootZoneWetness * 100)} %` : '',
   ].filter(Boolean).join(' · ')
   return `${prefix}${summary ? ` NASA POWER indique ${summary}.` : ' Aucune mesure climatique exploitable n’est disponible pour ce mois.'} La carte montre ${requestedLayer}. Dites-moi si vous voulez examiner la pluie, la température, l’humidité du sol ou le NDVI. Les séries POWER sont mensuelles et ne constituent ni une prévision ni un diagnostic parcellaire.`
+}
+
+function classifyQuestion(question: string) {
+  const lower = question.toLocaleLowerCase('fr')
+  const asksSoilProfile = /profil|texture|\bph\b|matière organique|drainage|profondeur|analyse de sol/.test(lower)
+  const asksRotation = /rotation|succession|famille botanique|légumineuse|alternance|cultures?/.test(lower)
+  const asksLayer: LayerId | undefined = /ndvi|vigueur/.test(lower) ? 'ndvi' : /humidité de surface|surface/.test(lower) ? 'surface' : /humidité racinaire|racine/.test(lower) ? 'root' : undefined
+  return { lower, intent: asksSoilProfile ? 'soil' : asksRotation ? 'rotation' : 'climate', asksLayer }
+}
+
+function formatSoilAnswer(point: GeoPoint) {
+  const profile = readSoilProfile(point)
+  const entries = [
+    profile.texture && profile.texture !== 'unknown' ? `texture ${({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[profile.texture]}` : '',
+    profile.ph !== undefined ? `pH ${profile.ph.toLocaleString('fr-FR')}` : '',
+    profile.organicMatterPercent !== undefined ? `${profile.organicMatterPercent.toLocaleString('fr-FR')} % de matière organique` : '',
+    profile.effectiveDepthCm !== undefined ? `${profile.effectiveDepthCm} cm de profondeur utile` : '',
+    profile.drainage && profile.drainage !== 'unknown' ? `drainage ${({ poor: 'lent', moderate: 'modéré', good: 'rapide' } as const)[profile.drainage]}` : '',
+  ].filter(Boolean)
+  if (!entries.length) return 'Aucune caractéristique de sol n’est renseignée pour ce point. Ces champs restent inconnus tant qu’ils ne sont pas saisis; vous pouvez les compléter dans « Mon terrain ». Les données NASA de la carte ne remplacent pas une analyse de sol.'
+  const updated = profile.updatedAt ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(profile.updatedAt)) : 'date non précisée'
+  return `Pour ce point, le profil local saisi dans FieldNova indique : ${entries.join(' · ')}. Dernière mise à jour : ${updated}. Ce sont des informations déclarées localement, pas des mesures NASA ni un résultat de laboratoire vérifié.`
+}
+
+function formatRotationAnswer(point: GeoPoint) {
+  const workspace = readRotationWorkspace(point)
+  const plans = workspace.plans.map(plan => {
+    const metrics = evaluateRotation(plan)
+    if (!metrics.complete) return `${plan.title} : succession incomplète.`
+    const crops = plan.crops.map(id => cropCatalog.find(crop => crop.id === id)?.label ?? 'culture inconnue').join(' → ')
+    return `${plan.title} (${crops}) : ${metrics.distinctFamilies} famille${metrics.distinctFamilies === 1 ? '' : 's'} botanique${metrics.distinctFamilies === 1 ? '' : 's'}, ${metrics.repeatedFamilyTransitions} répétition${metrics.repeatedFamilyTransitions === 1 ? '' : 's'} entre saisons et ${metrics.legumeSeasons} saison${metrics.legumeSeasons === 1 ? '' : 's'} avec légumineuse.`
+  })
+  return `${workspace.isExample ? 'Les scénarios affichés sont des exemples.' : 'Voici les scénarios enregistrés pour ce point.'} ${plans.join(' ')} Ces indicateurs décrivent seulement la succession et les familles; ils ne prédisent ni rendement ni amélioration du sol. Vous pouvez modifier les cultures dans l’onglet Scénarios.`
+}
+
+function traceNode(id: string, toolName: string, label: string, primary: string, secondary: string, status: 'completed' | 'failed' = 'completed'): TraceNode {
+  const args = toolName === 'fetch' ? { url: label } : toolName === 'read' ? { path: label } : { label }
+  return { id, type: 'tool', toolName, args, primary, secondary, status }
 }
 
 export function AssistantPage() {
@@ -119,21 +149,53 @@ export function AssistantPage() {
     if (!question) return
     const id = ++lastId.current
     const userId = ++lastId.current
-    const lower = question.toLocaleLowerCase('fr')
-    const requestedLayer: LayerId = lower.includes('ndvi') || lower.includes('vigueur') ? 'ndvi' : lower.includes('surface') ? 'surface' : lower.includes('racine') || lower.includes('sol') || lower.includes('humid') ? 'root' : 'truecolor'
-    setLayer(requestedLayer)
+    const route = classifyQuestion(question)
+    const requestedLayer = route.asksLayer ?? layer
+    if (route.asksLayer) setLayer(route.asksLayer)
     setMessages(current => [...current, { id: userId, role: 'user', text: question }, { id, role: 'assistant', text: '', running: true }])
+    const trace: TraceNode[] = []
     let currentSeries = series
-    let failed = false
-    try {
-      if (!currentSeries || currentSeries.point.latitude !== location.latitude || currentSeries.point.longitude !== location.longitude) currentSeries = await fetchPowerMonthly(location, 5)
-    } catch {
-      failed = true
+    let answer: string
+    let traceHeading = 'Aucun outil exécuté'
+    let usedSources: AISource[] = []
+    if (files.length) {
+      answer = 'La pièce jointe est reçue, mais son contenu n’est pas encore analysé. Je peux consulter le climat NASA POWER, le profil local du sol ou les rotations enregistrées pour le point suivi.'
+    } else if (route.intent === 'soil') {
+      const profile = readSoilProfile(location)
+      const knownFields = Object.values(profile).filter(value => value !== undefined).length
+      trace.push(traceNode(`soil-${id}`, 'read', 'Profil de sol local · navigateur', 'Profil local consulté', knownFields ? `${knownFields} champ(s) renseigné(s) pour le point suivi` : 'Aucun champ de sol renseigné', 'completed'))
+      traceHeading = 'Profil de sol local consulté'
+      answer = formatSoilAnswer(location)
+    } else if (route.intent === 'rotation') {
+      const workspace = readRotationWorkspace(location)
+      const completePlans = workspace.plans.filter(plan => evaluateRotation(plan).complete).length
+      trace.push(traceNode(`rotation-${id}`, 'read', 'Scénarios de rotation · navigateur', 'Rotations consultées', `${completePlans}/3 scénario(s) complet(s) · priorité ${workspace.priority}`, 'completed'))
+      traceHeading = 'Scénarios de rotation consultés'
+      answer = formatRotationAnswer(location)
+    } else {
+      let failed = false
+      const seriesAlreadyLoaded = Boolean(currentSeries && currentSeries.point.latitude === location.latitude && currentSeries.point.longitude === location.longitude)
+      try {
+        if (!seriesAlreadyLoaded) {
+          currentSeries = await fetchPowerMonthly(location, 5)
+          setSeries(currentSeries)
+        }
+      } catch {
+        failed = true
+        currentSeries = null
+      }
+      const record = currentSeries ? latestCompleteRecord(currentSeries.records) : undefined
+      const gridLabel = currentSeries ? `Cellule ${coordinate(currentSeries.gridPoint.latitude, 'N', 'S')} · ${coordinate(currentSeries.gridPoint.longitude, 'E', 'O')}` : 'La requête n’a pas abouti'
+      trace.push(traceNode(`power-${id}`, seriesAlreadyLoaded ? 'read' : 'fetch', seriesAlreadyLoaded ? 'Série NASA POWER chargée · contexte du point' : 'NASA POWER · API mensuelle', failed ? 'NASA POWER indisponible' : seriesAlreadyLoaded ? 'Série chargée consultée' : 'Série récupérée', record ? `${formatPowerMonth(record.date)} · ${gridLabel}` : gridLabel, failed ? 'failed' : 'completed'))
+      if (route.asksLayer) {
+        const label = layerOptions.find(item => item.id === route.asksLayer)?.label ?? 'Couche NASA'
+        trace.push({ id: `map-${id}`, type: 'step', primary: 'Couche affichée sur la carte', secondary: label, status: 'completed' })
+      }
+      traceHeading = route.asksLayer ? 'NASA POWER consulté · carte mise à jour' : 'NASA POWER consulté'
+      answer = makeClimateAnswer(question, currentSeries, requestedLayer)
+      usedSources = [sources[0], ...(route.asksLayer ? [sources[1]] : [])]
     }
-    const record = currentSeries ? latestCompleteRecord(currentSeries.records) : undefined
-    const answer = makeAnswer(question, currentSeries, requestedLayer, files)
-    const trace = traceNodes(location, requestedLayer, record, failed)
-    setMessages(current => current.map(message => message.id === id ? { ...message, text: answer, trace, running: false, sources } : message))
+    setMessages(current => current.map(message => message.id === id ? { ...message, text: answer, trace, traceHeading, running: false, sources: usedSources.length ? usedSources : undefined } : message))
   }
 
   const activeLayer = layerOptions.find(item => item.id === layer)!
@@ -159,7 +221,7 @@ export function AssistantPage() {
             {message.role === 'assistant' && <div className="assistant-message-mark"><Sparkles size={14} /></div>}
             <div className="assistant-message-body">
               {message.role === 'user' ? <div className="assistant-user-bubble">{message.text}</div> : <>
-                {message.trace && <ThinkingState nodes={message.trace} autoPlay={Boolean(message.running)} defaultExpanded={Boolean(message.running)} workingLabel={message.running ? 'Consultation de NASA POWER et actualisation de la carte' : 'Données NASA consultées'} onSettled={() => setMessages(current => current.map(item => item.id === message.id ? { ...item, running: false } : item))} className="assistant-trace" />}
+                {Boolean(message.trace?.length) && <ThinkingState nodes={message.trace!} autoPlay={Boolean(message.running)} defaultExpanded={Boolean(message.running)} workingLabel={message.running ? 'Exécution des outils FieldNova' : message.traceHeading ?? 'Activité de l’assistant'} onSettled={() => setMessages(current => current.map(item => item.id === message.id ? { ...item, running: false } : item))} className="assistant-trace" />}
                 {message.text ? <p className="assistant-answer-text">{message.text}</p> : message.running ? <p className="assistant-pending">Consultation des données sélectionnées…</p> : null}
                 {message.sources && <AISources className="assistant-sources" label="Sources utilisées" sources={message.sources} />}
                 {message.text && <MessageActions text={message.text} actions={['copy', 'feedback']} quiet={false} className="assistant-actions" />}
@@ -172,6 +234,8 @@ export function AssistantPage() {
           <button type="button" onClick={() => handleSend('Quelle est la pluie mensuelle NASA POWER ?', [])}>Pluie du mois <ChevronDown size={12} /></button>
           <button type="button" onClick={() => handleSend('Que montre l’humidité racinaire ?', [])}>Humidité du sol <ChevronDown size={12} /></button>
           <button type="button" onClick={() => handleSend('Affiche le NDVI et explique ses limites.', [])}>Voir le NDVI <ChevronDown size={12} /></button>
+          <button type="button" onClick={() => handleSend('Lis mon profil de sol pour ce point.', [])}>Mon profil de sol <ChevronDown size={12} /></button>
+          <button type="button" onClick={() => handleSend('Compare mes rotations pour ce point.', [])}>Mes rotations <ChevronDown size={12} /></button>
         </div>
         <div className="assistant-composer-wrap">
           <LiquidMultimodalInput className="assistant-composer" defaultModel="fast" placeholder="Demandez à propos des données NASA…" maxHeight={110} onSubmit={handleSend} />

@@ -4,10 +4,11 @@ The Assistant route pairs a French chat with the shared interactive map. Clickin
 
 ## Live data and limits
 
-- Chat responses use the selected point's NASA POWER monthly temperature, corrected precipitation, and modeled soil-wetness series. The displayed month and grid coordinate travel with the response.
-- Tool traces represent the NASA POWER request and the actual map layer change. Request errors and missing values stay visible; no example measurement is substituted.
+- Climate questions read the selected point's NASA POWER monthly temperature, corrected precipitation, and modeled soil-wetness series. The displayed month and grid coordinate travel with the response.
+- Soil-profile questions read only the locally saved user profile. Rotation questions read the locally saved rotation workspace and calculate the same family/repetition/legume counts shown in Scenarios.
+- Tool traces distinguish the loaded NASA series, a NASA request when required, and local browser data reads. A map-layer action is shown as an interface step. Errors and missing values stay visible; no example measurement is substituted.
 - NASA map layers are coarse regional pixels. They do not outline or diagnose a farm parcel. POWER precipitation is a monthly mean daily rate, not a 7-day total or forecast.
-- The local question router selects the relevant live values and layer. No LLM service is connected, and attached file contents are not parsed.
+- A local question router chooses among those implemented data tools and map-layer actions. No LLM service is connected, and attached file contents are not parsed; the UI says this before upload.
 - Irrigation dose or timing, yield, and crop-health conclusions are not inferred from these regional data.
 
 ## Source references
