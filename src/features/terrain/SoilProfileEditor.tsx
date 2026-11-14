@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Layers3, Pencil, Save, Trash2, X } from 'lucide-react'
 import type { GeoPoint } from '../../lib/geo/location'
-import { clearSoilProfile, readSoilProfile, type FarmSoilProfile, writeSoilProfile } from '../../lib/farm/soil-profile'
+import { clearSoilProfile, readSoilProfile, soilSourceLabels, type FarmSoilProfile, writeSoilProfile } from '../../lib/farm/soil-profile'
 
 const textureLabels = { sandy: 'Sableux', loamy: 'Limoneux', clayey: 'Argileux', unknown: 'Inconnu' } as const
 const drainageLabels = { poor: 'Lent', moderate: 'Modéré', good: 'Rapide', unknown: 'Inconnu' } as const
@@ -77,12 +77,12 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
     <div className={`terrain-profile-missing ${hasProfile ? 'has-user-profile' : ''}`}>
       <span className="terrain-profile-icon"><Layers3 size={16} /></span>
       <span className="terrain-profile-copy">
-        <strong>{hasProfile ? 'Profil de sol déclaré par vous' : 'Texture, pH et matière organique'}</strong>
-        <small>{hasProfile ? soilSummary.join(' · ') || 'Profil enregistré, champs encore inconnus.' : 'Aucune analyse ou mesure locale enregistrée pour ce point.'}</small>
+        <strong>{hasProfile ? profile.sourceType === 'lab-analysis' ? 'Analyse de laboratoire déclarée' : 'Profil de sol déclaré par vous' : 'Texture, pH et matière organique'}</strong>
+        <small>{hasProfile ? [soilSummary.join(' · '), profile.sourceName, profile.sampleDate ? `Échantillon du ${new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${profile.sampleDate}T12:00:00Z`))}` : undefined].filter(Boolean).join(' · ') || 'Profil enregistré, champs encore inconnus.' : 'Aucune analyse ou mesure locale enregistrée pour ce point.'}</small>
       </span>
       <button className="terrain-profile-edit" type="button" onClick={edit} aria-label={hasProfile ? 'Modifier le profil de sol local' : 'Renseigner le profil de sol local'}><Pencil size={13} /><span>{hasProfile ? 'Modifier' : 'Renseigner'}</span></button>
     </div>
-    {profile.updatedAt && <p className="terrain-profile-date">Saisie locale · {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(profile.updatedAt))}</p>}
+    {profile.updatedAt && <p className="terrain-profile-date">Enregistré localement · {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(profile.updatedAt))} · Origine déclarée : {soilSourceLabels[profile.sourceType ?? 'farmer-reported']} (non vérifiée)</p>}
 
     <dialog ref={dialogRef} className="terrain-soil-dialog" aria-labelledby="soil-profile-title" onClose={() => setOpen(false)} onClick={event => { if (event.target === dialogRef.current) setOpen(false) }}>
       <form className="terrain-soil-form" onSubmit={save}>
@@ -94,10 +94,13 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
           <label>Matière organique (%)<input type="number" min="0" max="100" step="0.1" inputMode="decimal" placeholder="Ex. 2,4" value={draft.organicMatterPercent ?? ''} onChange={event => setDraft(value => ({ ...value, organicMatterPercent: event.target.value === '' ? undefined : Number(event.target.value) }))} /></label>
           <label>Profondeur utile (cm)<input type="number" min="0" max="400" step="1" inputMode="numeric" placeholder="Ex. 90" value={draft.effectiveDepthCm ?? ''} onChange={event => setDraft(value => ({ ...value, effectiveDepthCm: event.target.value === '' ? undefined : Number(event.target.value) }))} /></label>
           <label className="terrain-soil-field-wide">Drainage<select value={draft.drainage ?? ''} onChange={event => setDraft(value => ({ ...value, drainage: (event.target.value || undefined) as FarmSoilProfile['drainage'] }))}><option value="">Non renseigné</option><option value="poor">Lent</option><option value="moderate">Modéré</option><option value="good">Rapide</option><option value="unknown">Inconnu</option></select></label>
+          <label>Origine des données<select value={draft.sourceType ?? 'farmer-reported'} onChange={event => setDraft(value => ({ ...value, sourceType: event.target.value as FarmSoilProfile['sourceType'] }))}><option value="farmer-reported">Déclarée par l’exploitation</option><option value="lab-analysis">Analyse de laboratoire</option><option value="other-source">Autre source</option></select></label>
+          <label>Date de l’échantillon<input type="date" value={draft.sampleDate ?? ''} onChange={event => setDraft(value => ({ ...value, sampleDate: event.target.value || undefined }))} /></label>
+          <label className="terrain-soil-field-wide">Laboratoire ou référence de source <span className="terrain-soil-optional">Facultatif</span><input type="text" maxLength={120} placeholder="Ex. laboratoire, numéro d’analyse ou organisme" value={draft.sourceName ?? ''} onChange={event => setDraft(value => ({ ...value, sourceName: event.target.value || undefined }))} /></label>
         </div>
         {error && <p className="terrain-soil-form-error" role="alert">{error}</p>}
         <footer className="terrain-soil-form-actions">{hasProfile && <button className="terrain-soil-delete" type="button" onClick={remove}><Trash2 size={14} />Effacer ce profil</button>}<button className="terrain-soil-save" type="submit"><Save size={14} />Enregistrer</button></footer>
-        <p className="terrain-soil-privacy">Ces informations restent sur cet appareil; elles ne sont envoyées à aucun service.</p>
+        <p className="terrain-soil-privacy">L’origine et la date sont déclarées par vous et non vérifiées par FieldNova. Ces informations restent sur cet appareil; elles ne sont envoyées à aucun service.</p>
       </form>
     </dialog>
   </>
