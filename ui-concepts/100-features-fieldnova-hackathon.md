@@ -68,7 +68,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 ### B. Carte et observations NASA — 11 à 20
 
-11. **[P0] Limite de parcelle dessinable ou importable** : GeoJSON en priorité, avec validation de géométrie et superficie calculée.
+11. **[LIVRÉ] Limite de parcelle dessinable ou importable** : dessiner depuis le point suivi, voir le contour temporaire, annuler ou retirer un sommet, enregistrer seulement un polygone valide, ou importer un GeoJSON WGS84. La superficie géodésique approximative s’affiche; aucune statistique NASA zonale n’est calculée.
 12. **[P0 · LIVRÉ] Empreinte de la maille météo NASA sur la carte** : afficher le centre, les limites MERRA-2 (0,5° × 0,625°) et la taille approximative, séparément du point cliqué, des couches GIBS/SMAP et du polygone agricole. Le centre est dérivé de la grille native, car la géométrie de réponse POWER reprend la coordonnée demandée.
 13. **[LIVRÉ · PARTIEL] Fiche de provenance au clic** : l’onglet Données & confiance expose la source POWER renvoyée, la date de récupération, la grille, les produits GIBS sélectionnés et leurs liens de citation. Les tuiles GIBS SMAP ne fournissent pas encore leur date de produit à l’interface.
 14. **[LIVRÉ · PARTIEL] Légende persistante des couches** : la carte partagée présente les couches visibles, les unités ou échelles publiées par GIBS, les dates connues et les limites de grille/parcelle. Les détails spécifiques de chaque couche continuent d’être améliorés.
