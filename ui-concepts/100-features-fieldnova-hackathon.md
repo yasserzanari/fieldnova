@@ -67,7 +67,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 ### B. Carte et observations NASA — 11 à 20
 
 11. **[P0] Limite de parcelle dessinable ou importable** : GeoJSON en priorité, avec validation de géométrie et superficie calculée.
-12. **[P0] Empreinte de la cellule NASA sur la carte** : montrer la différence entre le polygone agricole et la maille d’observation.
+12. **[P0 · LIVRÉ] Empreinte de la maille météo NASA sur la carte** : afficher le centre, les limites MERRA-2 (0,5° × 0,625°) et la taille approximative, séparément du point cliqué, des couches GIBS/SMAP et du polygone agricole. Le centre est dérivé de la grille native, car la géométrie de réponse POWER reprend la coordonnée demandée.
 13. **[P0] Fiche de provenance au clic** : mission ou produit, variable, période, résolution, date de récupération et lien de source.
 14. **[P0] Légende permanente des couches** : expliquer unités, gamme de couleurs et limites de lecture de chaque couche active.
 15. **[P1] Chronologie des observations** : faire défiler la série historique sans confondre date d’observation et date de téléchargement.

@@ -161,7 +161,7 @@ export function RotationExplorer() {
           `- Précipitations moyennes : ${latest.precipitationMmPerDay === undefined ? 'indisponibles' : `${latest.precipitationMmPerDay.toLocaleString('fr-FR')} mm/j`}.`,
           `- Température moyenne : ${latest.temperatureC === undefined ? 'indisponible' : `${latest.temperatureC.toLocaleString('fr-FR')} °C`}.`,
           `- Humidité racinaire modélisée : ${latest.rootZoneWetness === undefined ? 'indisponible' : `${(latest.rootZoneWetness * 100).toLocaleString('fr-FR')} %`}.`,
-          `- Cellule NASA POWER : ${currentSeries?.gridPoint.latitude.toFixed(3)}, ${currentSeries?.gridPoint.longitude.toFixed(3)} · ${currentSeries?.source.join(', ')}.`,
+          `- Centre de maille NASA POWER / MERRA-2 (0,5° × 0,625°) : ${currentSeries?.gridPoint.latitude.toFixed(3)}, ${currentSeries?.gridPoint.longitude.toFixed(3)} · ${currentSeries?.source.join(', ')}.`,
         ]
       : ['- Données climatiques NASA POWER indisponibles pour ce point lors de l’export.']
     const soilLines = [
@@ -211,7 +211,7 @@ export function RotationExplorer() {
       '',
       ...climate,
       '',
-      'Source : [NASA POWER — API mensuelle](https://power.larc.nasa.gov/docs/services/api/temporal/monthly/). Les valeurs décrivent une cellule de grille et une période mensuelle; elles ne sont pas des mesures à l’échelle de la parcelle ni une prévision.',
+      'Source : [NASA POWER — API mensuelle](https://power.larc.nasa.gov/docs/services/api/temporal/monthly/). L’API reçoit la coordonnée choisie; le centre et les limites de la maille MERRA-2 de plus proche voisin (0,5° × 0,625°) sont dérivés de la grille native documentée. Les valeurs décrivent cette cellule et une période mensuelle; ce ne sont ni des mesures à la parcelle ni une prévision.',
       '',
       '## Profil local du sol',
       '',
@@ -239,7 +239,7 @@ export function RotationExplorer() {
     <header className="rotation-heading"><div><h1>Explorer les rotations</h1><p>Comparez des successions de cultures selon des critères visibles et modifiables.</p></div><div className="rotation-heading-actions"><span className="rotation-example-badge">{currentWorkspace.isExample ? 'Exemple illustratif' : 'Scénario local'}</span><button type="button" className="rotation-export" onClick={exportDecisionBrief}><Download size={13} />Exporter la fiche</button><button type="button" className="rotation-reset" onClick={resetExample}><RotateCcw size={13} />Charger l’exemple</button></div></header>
 
     <div className="rotation-map-stage">
-      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} imageryDate={dayBefore(11)} onPointSelect={moveToPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA et position de l’exploitation pour comparer les rotations" />
+      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} powerGridCell={currentSeries?.gridCell} imageryDate={dayBefore(11)} onPointSelect={moveToPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA et position de l’exploitation pour comparer les rotations" />
       <div className="rotation-map-topline"><div className="rotation-location-chip"><MapPinned size={15} /><span>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</span><small>Point suivi</small></div><div className="rotation-map-options"><div className="rotation-base-switch" role="group" aria-label="Fond de carte"><button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Satellite</button></div><label><input type="checkbox" checked={showNdvi} onChange={event => setShowNdvi(event.target.checked)} />NDVI</label></div></div>
       <div className="rotation-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 220 })}><Plus size={15} /></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 220 })}><Minus size={15} /></button><button type="button" aria-label="Utiliser ma position" onClick={locateMe} disabled={locating}><LocateFixed size={14} /></button></div>
       <span className="rotation-map-hint">Cliquez pour déplacer le point suivi · les profils et séries suivent la position sélectionnée</span>
@@ -257,7 +257,7 @@ export function RotationExplorer() {
         <div className="rotation-context-divider" />
         <header className="rotation-panel-heading"><span className="rotation-panel-icon climate"><Activity size={15} /></span><span><strong>Contexte NASA POWER</strong><small>{climateLoading ? 'Chargement des données…' : latest ? `${formatPowerMonth(latest.date)} · valeur mensuelle` : 'Données non disponibles'}</small></span></header>
         {climateLoading ? <div className="rotation-context-empty" role="status">Récupération de la série climatique…</div> : climateError ? <div className="rotation-context-error" role="alert">{climateError}<button type="button" onClick={() => setRefreshKey(value => value + 1)}>Réessayer</button></div> : <><div className="rotation-climate-metrics"><span><CloudRain size={13} /><div><small>Pluie moyenne</small><small className="rotation-climate-reference">{climateReferences.precipitation}</small></div><strong>{latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j`}</strong></span><span><ThermometerSun size={13} /><div><small>Température</small><small className="rotation-climate-reference">{climateReferences.temperature}</small></div><strong>{latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`}</strong></span><span><Droplets size={13} /><div><small>Humidité racinaire</small><small className="rotation-climate-reference">{climateReferences.roots}</small></div><strong>{latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`}</strong></span></div><small className="rotation-climate-footnote">Repère historique du même mois · pas une prévision</small></>}
-        <p className="rotation-context-source">Cellule NASA POWER {currentSeries?.gridPoint.latitude.toFixed(3)}, {currentSeries?.gridPoint.longitude.toFixed(3)} · {currentSeries?.source.join(' + ') ?? 'source en attente'}</p>
+        <p className="rotation-context-source">Centre de maille MERRA-2 {currentSeries?.gridPoint.latitude.toFixed(3)}, {currentSeries?.gridPoint.longitude.toFixed(3)} · 0,5° × 0,625° · {currentSeries?.source.join(' + ') ?? 'source en attente'}</p>
       </aside>
 
       <aside className="rotation-context-panel rotation-context-right" aria-label="Critère de comparaison et explication">

@@ -145,7 +145,7 @@ function ClimateScenariosPage() {
     <header className="scenarios-heading"><div><h1>Scénarios climatiques</h1><p>Comparez des périodes réellement observées par NASA POWER au point sélectionné.</p></div><span className="scenario-data-badge"><i />Historique NASA · sans prévision</span></header>
 
     <div className="scenario-map-stage">
-      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive satellite NASA et point de sélection des scénarios" />
+      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive satellite NASA et point de sélection des scénarios" />
       <div className="scenario-map-topline">
         <div className="scenario-point-chip"><MapPinned size={15} /><span>{formatCoord(location.latitude, 'N', 'S')} · {formatCoord(location.longitude, 'E', 'O')}</span><small>Point de comparaison</small></div>
         <div className="scenario-map-options"><div className="scenario-base-switch" role="group" aria-label="Fond de carte"><button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Image NASA</button></div><label><input type="checkbox" checked={showNdvi} onChange={event => setShowNdvi(event.target.checked)} /><Activity size={13} />NDVI 8 j</label><label className="scenario-image-date">Date image<input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label></div>
@@ -165,7 +165,7 @@ function ClimateScenariosPage() {
       </aside>
 
       <aside className="scenario-panel scenario-results-panel" aria-label="Comparaison des observations NASA">
-        <header className="scenario-panel-heading results-heading"><div><span className="scenario-icon results-icon"><Droplets size={16} /></span><span><h2>Mesures par période</h2><small>NASA POWER · cellule de grille sélectionnée</small></span></div></header>
+        <header className="scenario-panel-heading results-heading"><div><span className="scenario-icon results-icon"><Droplets size={16} /></span><span><h2>Mesures par période</h2><small>NASA POWER · maille MERRA-2 (0,5° × 0,625°)</small></span></div></header>
         {loading ? <div className="scenario-data-state" role="status">Récupération de NASA POWER…</div> : error ? <div className="scenario-data-error" role="alert">Données indisponibles pour ce point.</div> : displayedCases.length ? <>
           <div className="scenario-results-table" style={{ '--scenario-count': Math.max(1, displayedCases.length) } as CSSProperties} role="table" aria-label="Moyennes NASA POWER des périodes historiques"><div className="scenario-table-row table-header" role="row"><span role="columnheader">Indicateur moyen</span>{displayedCases.map(item => <span key={item.id} className={`scenario-cell-${item.id}`} role="columnheader">{caseCopy[item.id].title}</span>)}</div>
             <MetricRow icon={<CloudRain size={14} />} label="Pluie · mm/j" metric="rain" records={displayedCases} />
@@ -179,7 +179,7 @@ function ClimateScenariosPage() {
     </div>
 
     <section className="scenario-chart-section" aria-label="Historique climatique NASA POWER">
-      <div className="scenario-chart-toolbar"><div><span className="scenario-chart-icon"><Activity size={16} /></span><span><strong>Historique climatique</strong><small>{range} derniers mois disponibles · cellule NASA POWER {series?.gridPoint.latitude.toFixed(3)}, {series?.gridPoint.longitude.toFixed(3)}</small></span></div><div className="scenario-chart-ranges" role="group" aria-label="Période du graphique">{[[3, '3 mois'], [6, '6 mois'], [12, '1 an']].map(([months, label]) => <button key={months} type="button" className={range === months ? 'is-active' : ''} onClick={() => setRange(Number(months))}>{label}</button>)}</div></div>
+      <div className="scenario-chart-toolbar"><div><span className="scenario-chart-icon"><Activity size={16} /></span><span><strong>Historique climatique</strong><small>{range} derniers mois disponibles · centre MERRA-2 {series?.gridPoint.latitude.toFixed(3)}, {series?.gridPoint.longitude.toFixed(3)}</small></span></div><div className="scenario-chart-ranges" role="group" aria-label="Période du graphique">{[[3, '3 mois'], [6, '6 mois'], [12, '1 an']].map(([months, label]) => <button key={months} type="button" className={range === months ? 'is-active' : ''} onClick={() => setRange(Number(months))}>{label}</button>)}</div></div>
       <PowerClimateChart records={series?.records ?? []} source={series?.source.join(' + ') ?? 'en attente'} months={range} title="Précipitations moyennes et température · NASA POWER" />
     </section>
   </section>

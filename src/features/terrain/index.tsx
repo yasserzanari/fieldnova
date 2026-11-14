@@ -68,7 +68,7 @@ export function TerrainPage() {
     <header className="terrain-heading"><div><h1>Mon terrain</h1><p>Humidité de surface, zone racinaire et données de sol pour le point choisi</p></div><span className="terrain-data-live"><i />Sources NASA connectées</span></header>
 
     <div className="terrain-map-stage">
-      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={false} showSurfaceSoil={soilLayer === 'surface'} showRootSoil={soilLayer === 'root'} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA GIBS avec humidité des sols SMAP" />
+      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={false} showSurfaceSoil={soilLayer === 'surface'} showRootSoil={soilLayer === 'root'} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA GIBS avec humidité des sols SMAP" />
       <div className="terrain-map-topline">
         <div className="terrain-map-location"><MapPinned size={15} /><span>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</span><small>Point suivi</small></div>
         <div className="terrain-map-options">
@@ -94,7 +94,7 @@ export function TerrainPage() {
       <aside className="terrain-panel terrain-soil-panel" aria-label="Mesures climatiques NASA POWER et état des données de sol">
         <header className="terrain-soil-heading"><div><span className="terrain-heading-icon soil"><Droplets size={17} /></span><span><h2>Sol & eau · NASA POWER</h2><small>{loading ? 'Chargement de la série mensuelle…' : `Dernière période disponible · ${latestDate}`}</small></span></div><button type="button" className="terrain-refresh" aria-label="Actualiser les données NASA" onClick={() => setRefreshKey(value => value + 1)}><span>↻</span></button></header>
         {loading ? <div className="terrain-data-state" role="status">Récupération des données NASA…</div> : error ? <div className="terrain-data-error" role="alert">{error}<button type="button" onClick={() => setRefreshKey(value => value + 1)}>Réessayer</button></div> : <>
-          <p className="terrain-grid-location">Cellule NASA POWER · {gridPoint?.latitude.toFixed(3)}, {gridPoint?.longitude.toFixed(3)}</p>
+          <p className="terrain-grid-location">Centre maille NASA POWER · {gridPoint?.latitude.toFixed(3)}, {gridPoint?.longitude.toFixed(3)} · 0,5° × 0,625°</p>
           <SoilMetric label="Humidité de surface modélisée" parameter="GWETTOP" value={latest?.surfaceSoilWetness} color="surface" />
           <SoilMetric label="Humidité racinaire modélisée" parameter="GWETROOT" value={latest?.rootZoneWetness} color="root" />
           <p className="terrain-model-detail">Fractions relatives issues du modèle NASA POWER · UTC · {series?.source.join(' + ')}</p>
