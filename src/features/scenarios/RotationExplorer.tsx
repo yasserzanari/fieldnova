@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, ArrowUpRight, CloudRain, Droplets, LocateFixed, MapPinned, Minus, Plus, RotateCcw, ShieldCheck, Sprout, ThermometerSun } from 'lucide-react'
+import { Activity, ArrowUpRight, CloudRain, Download, Droplets, LocateFixed, MapPinned, Minus, Plus, RotateCcw, ShieldCheck, Sprout, ThermometerSun } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { readSoilProfile, type FarmSoilProfile } from '../../lib/farm/soil-profile'
-import { cropCatalog, evaluateRotation, exampleRotationWorkspace, readRotationWorkspace, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
+import { cropCatalog, evaluateRotation, exampleRotationWorkspace, priorityLabels, readRotationWorkspace, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
 import './rotation-explorer.css'
 
 function dayBefore(days: number) {
@@ -75,7 +75,8 @@ export function RotationExplorer() {
   }, [location.latitude, location.longitude, refreshKey])
 
   const currentWorkspace = workspace.pointKey === pointKey ? workspace.value : readRotationWorkspace(location)
-  const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
+  const currentSeries = series && series.point.latitude === location.latitude && series.point.longitude === location.longitude ? series : null
+  const latest = useMemo(() => currentSeries ? latestCompleteRecord(currentSeries.records) : undefined, [currentSeries])
   const leaders = topRotations(currentWorkspace.plans, currentWorkspace.priority)
   const soil = soilState.pointKey === pointKey ? soilState.value : readSoilProfile(location)
   const soilValues = soilSummary(soil)
@@ -107,9 +108,76 @@ export function RotationExplorer() {
       setLocating(false)
     }, () => setLocating(false), { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 })
   }
+  const exportDecisionBrief = () => {
+    const leaderIds = new Set(leaders)
+    const climate = latest
+      ? [
+          `- Période mensuelle complète la plus récente : ${formatPowerMonth(latest.date)} (${latest.date}).`,
+          `- Précipitations moyennes : ${latest.precipitationMmPerDay === undefined ? 'indisponibles' : `${latest.precipitationMmPerDay.toLocaleString('fr-FR')} mm/j`}.`,
+          `- Température moyenne : ${latest.temperatureC === undefined ? 'indisponible' : `${latest.temperatureC.toLocaleString('fr-FR')} °C`}.`,
+          `- Humidité racinaire modélisée : ${latest.rootZoneWetness === undefined ? 'indisponible' : `${(latest.rootZoneWetness * 100).toLocaleString('fr-FR')} %`}.`,
+          `- Cellule NASA POWER : ${currentSeries?.gridPoint.latitude.toFixed(3)}, ${currentSeries?.gridPoint.longitude.toFixed(3)} · ${currentSeries?.source.join(', ')}.`,
+        ]
+      : ['- Données climatiques NASA POWER indisponibles pour ce point lors de l’export.']
+    const soilLines = [
+      `- Texture déclarée : ${soil.texture && soil.texture !== 'unknown' ? ({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[soil.texture] : 'inconnue'}.`,
+      `- pH déclaré : ${soil.ph === undefined ? 'inconnu' : soil.ph.toLocaleString('fr-FR')}.`,
+      `- Matière organique déclarée : ${soil.organicMatterPercent === undefined ? 'inconnue' : `${soil.organicMatterPercent.toLocaleString('fr-FR')} %`}.`,
+      `- Profondeur utile déclarée : ${soil.effectiveDepthCm === undefined ? 'inconnue' : `${soil.effectiveDepthCm} cm`}.`,
+      `- Drainage déclaré : ${soil.drainage && soil.drainage !== 'unknown' ? ({ poor: 'lent', moderate: 'modéré', good: 'rapide' } as const)[soil.drainage] : 'inconnu'}.`,
+      `- Dernière saisie locale : ${soil.updatedAt ? new Date(soil.updatedAt).toLocaleDateString('fr-FR') : 'aucune date enregistrée'}.`,
+    ]
+    const rotationLines = currentWorkspace.plans.map(plan => {
+      const metrics = evaluateRotation(plan)
+      const crops = plan.crops.map((id, index) => {
+        const crop = cropCatalog.find(item => item.id === id)
+        return `${index + 1}. ${crop ? `${crop.label} (${crop.familyLabel})` : 'culture non renseignée'}`
+      }).join(' → ')
+      const result = metrics.complete
+        ? `${metrics.distinctFamilies}/3 familles distinctes; ${metrics.repeatedFamilyTransitions} répétition(s) entre saisons; ${metrics.legumeSeasons} saison(s) avec légumineuse`
+        : 'succession incomplète; métriques non calculées'
+      return `### ${plan.title}${leaderIds.has(plan.id) ? ' — la plus proche du critère choisi' : ''}\n\n${crops}\n\n${result}.`
+    })
+    const generatedAt = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'long', timeStyle: 'short' }).format(new Date())
+    const content = [
+      '# Fiche de comparaison FieldNova',
+      '',
+      `Exportée le ${generatedAt}.`,
+      `Point suivi : ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}.`,
+      `Données du scénario : ${currentWorkspace.isExample ? 'exemple illustratif' : 'scénario enregistré localement'}.`,
+      `Critère choisi : ${priorityLabels[currentWorkspace.priority]}.`,
+      '',
+      '## Rotations comparées',
+      '',
+      ...rotationLines.flatMap(line => [line, '']),
+      '## Contexte climatique NASA POWER',
+      '',
+      ...climate,
+      '',
+      'Source : [NASA POWER — API mensuelle](https://power.larc.nasa.gov/docs/services/api/temporal/monthly/). Les valeurs décrivent une cellule de grille et une période mensuelle; elles ne sont pas des mesures à l’échelle de la parcelle ni une prévision.',
+      '',
+      '## Profil local du sol',
+      '',
+      ...soilLines,
+      'Ces champs sont des saisies locales de l’utilisateur; ils ne sont ni vérifiés par laboratoire ni fournis par la NASA.',
+      '',
+      '## Méthode et limites',
+      '',
+      'Les indicateurs comptent les familles botaniques, leurs répétitions entre saisons consécutives et la présence de légumineuses. Le critère choisi met en avant les scénarios ayant la meilleure valeur sur cette seule métrique. Le catalogue est illustratif et doit être adapté et validé localement.',
+      '',
+      'Cette fiche ne constitue pas un conseil agronomique. Elle ne prédit ni rendement, ni besoin en eau, ni évolution de la santé du sol. Les calendriers, variétés, contraintes de matériel, disponibilité d’eau et règles de succession locales restent à confirmer.',
+      '',
+    ].join('\n')
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/markdown;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `fieldnova-comparaison-${location.latitude.toFixed(4)}-${location.longitude.toFixed(4)}.md`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   return <section className="rotation-explorer" aria-label="Explorateur de rotations culturales">
-    <header className="rotation-heading"><div><h1>Explorer les rotations</h1><p>Comparez des successions de cultures selon des critères visibles et modifiables.</p></div><div className="rotation-heading-actions"><span className="rotation-example-badge">{currentWorkspace.isExample ? 'Exemple illustratif' : 'Scénario local'}</span><button type="button" className="rotation-reset" onClick={resetExample}><RotateCcw size={13} />Charger l’exemple</button></div></header>
+    <header className="rotation-heading"><div><h1>Explorer les rotations</h1><p>Comparez des successions de cultures selon des critères visibles et modifiables.</p></div><div className="rotation-heading-actions"><span className="rotation-example-badge">{currentWorkspace.isExample ? 'Exemple illustratif' : 'Scénario local'}</span><button type="button" className="rotation-export" onClick={exportDecisionBrief}><Download size={13} />Exporter la fiche</button><button type="button" className="rotation-reset" onClick={resetExample}><RotateCcw size={13} />Charger l’exemple</button></div></header>
 
     <div className="rotation-map-stage">
       <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} imageryDate={dayBefore(11)} onPointSelect={moveToPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA et position de l’exploitation pour comparer les rotations" />
@@ -124,7 +192,7 @@ export function RotationExplorer() {
         <div className="rotation-context-divider" />
         <header className="rotation-panel-heading"><span className="rotation-panel-icon climate"><Activity size={15} /></span><span><strong>Contexte NASA POWER</strong><small>{climateLoading ? 'Chargement des données…' : latest ? `${formatPowerMonth(latest.date)} · valeur mensuelle` : 'Données non disponibles'}</small></span></header>
         {climateLoading ? <div className="rotation-context-empty" role="status">Récupération de la série climatique…</div> : climateError ? <div className="rotation-context-error" role="alert">{climateError}<button type="button" onClick={() => setRefreshKey(value => value + 1)}>Réessayer</button></div> : <div className="rotation-climate-metrics"><span><CloudRain size={13} /><small>Pluie moyenne</small><strong>{latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j`}</strong></span><span><ThermometerSun size={13} /><small>Température</small><strong>{latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`}</strong></span><span><Droplets size={13} /><small>Humidité racinaire</small><strong>{latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`}</strong></span></div>}
-        <p className="rotation-context-source">Cellule NASA POWER {series?.gridPoint.latitude.toFixed(3)}, {series?.gridPoint.longitude.toFixed(3)} · {series?.source.join(' + ') ?? 'source en attente'}</p>
+        <p className="rotation-context-source">Cellule NASA POWER {currentSeries?.gridPoint.latitude.toFixed(3)}, {currentSeries?.gridPoint.longitude.toFixed(3)} · {currentSeries?.source.join(' + ') ?? 'source en attente'}</p>
       </aside>
 
       <aside className="rotation-context-panel rotation-context-right" aria-label="Critère de comparaison et explication">
