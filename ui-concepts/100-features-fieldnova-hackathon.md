@@ -10,6 +10,18 @@ Le projet sera jugé sur son impact, sa créativité, sa validité scientifique 
 
 FieldNova dispose déjà d’une base utile : carte interactive, couches NASA GIBS, séries climatiques NASA POWER, comparaison de périodes et assistant contextualisé. NASA POWER fournit plusieurs paramètres météorologiques et hydrologiques, avec une résolution et une période propres à chaque produit. SMAP L4 est notamment une donnée modélisée à environ 9 km; elle ne doit pas être présentée comme une mesure de la parcelle. [NASA POWER, API mensuelle](https://power.larc.nasa.gov/docs/services/api/temporal/monthly/) · [Paramètres hydrologiques NASA POWER](https://power.larc.nasa.gov/docs/methodology/data/sources_hydrology/) · [NASA POWER, sources et résolutions](https://power.larc.nasa.gov/docs/methodology/)
 
+### État de réalisation du dépôt
+
+Cette liste reste un portefeuille de 100 idées, pas un engagement à toutes les livrer. Au 14 novembre 2026, les modules suivants ont été intégrés dans `main` :
+
+- **Rotation au centre du MVP :** rotation actuelle et deux options éditables sur trois saisons; priorité modifiable; métriques lisibles sur familles, répétitions et légumineuses.
+- **Contexte de décision :** séries NASA POWER mensuelles avec coordonnées de grille et valeurs comparées aux mêmes mois des années précédentes; profil de sol local avec origine, date et référence déclarées.
+- **Parcelle et preuves :** import GeoJSON WGS84, contour synchronisé sur les cartes, superficie géodésique approximative et export d’une fiche Markdown contenant sources, calculs, valeurs manquantes et limites.
+- **Assistant outillé :** chat à gauche et carte à droite; lectures de NASA POWER, du profil local et des rotations; changements de couche réels; questions hors périmètre sans appel NASA automatique.
+- **Démo :** [script de 90 secondes et plans vidéo](demo-script-90s-fieldnova.md).
+
+Le prototype ne possède pas encore de service LLM, d’analyse de pièces jointes, de statistiques NASA calculées à l’intérieur d’une limite de parcelle ni de catalogue agronomique validé par un expert local. Les rotations restent illustratives; aucun rendement, besoin en eau, amélioration de sol ou prévision n’est calculé.
+
 ## Les 12 fonctions à privilégier pour la démonstration
 
 Ces fonctions forment le parcours conseillé pour une démonstration courte. Elles relient le problème de l’agriculteur aux données, à une comparaison de rotations et à une décision compréhensible.
