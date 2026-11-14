@@ -178,14 +178,14 @@
 .atlas-panel-note svg { flex:none; margin-top:1px; color:#759168; }
 .atlas-panel-note span { color:#6e6c5e; font-size:7px; line-height:1.4; }
 .atlas-grid-point { flex:none; margin:7px 0 3px; color:#777465; font-size:7px; line-height:1.4; }
-.atlas-live-metrics { display:grid; flex:none; gap:3px; padding:5px 0; }
-.atlas-live-metric { display:flex; min-height:40px; align-items:center; gap:7px; }
-.atlas-live-metric > span { display:grid; width:27px; height:27px; flex:none; place-items:center; border-radius:8px; background:#e7eff0; color:#4b8293; }
-.atlas-live-metric:nth-child(2) > span { background:#fff0e4; color:#bd7144; }
-.atlas-live-metric:nth-child(3) > span { background:#e7f1e7; color:#477f51; }
-.atlas-live-metric > div { display:grid; min-width:0; gap:1px; }
-.atlas-live-metric small { color:#777465; font-size:7px; }
-.atlas-live-metric strong { color:var(--color-forest-950); font-size:11px; font-weight:740; line-height:1.1; }
+.atlas-live-metrics { display:grid; min-height:0; flex:none; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; padding:6px 0; }
+.atlas-live-metric { display:grid; min-width:0; min-height:48px; grid-template-columns:19px minmax(0,1fr); align-items:center; gap:5px; padding:5px; border:1px solid #eeece4; border-radius:8px; background:#fffefa; }
+.atlas-live-metric > span { display:grid; width:19px; height:19px; place-items:center; border-radius:6px; background:#e7eff0; color:#4b8293; }
+.atlas-live-metric:nth-child(2) > span,.atlas-live-metric:nth-child(3) > span,.atlas-live-metric:nth-child(4) > span { background:#fff0e4; color:#bd7144; }
+.atlas-live-metric:nth-child(5) > span,.atlas-live-metric:nth-child(6) > span { background:#e7f1e7; color:#477f51; }
+.atlas-live-metric > div { display:grid; min-width:0; gap:2px; }
+.atlas-live-metric small { overflow:hidden; color:#777465; font-size:7px; line-height:1.2; text-overflow:ellipsis; }
+.atlas-live-metric strong { color:var(--color-forest-950); font-size:10px; font-weight:740; line-height:1.1; }
 .atlas-live-metric em { color:#979282; font-size:6px; font-style:normal; }
 .atlas-live-source { flex:none; margin:2px 0 4px; padding-top:5px; border-top:1px solid #eae7dd; color:#817d6e; font-size:6px; line-height:1.4; }
 .atlas-data-state,.atlas-data-error { display:grid; min-height:96px; flex:1; align-content:center; justify-items:center; gap:8px; color:#777465; font-size:8px; text-align:center; }
