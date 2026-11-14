@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Activity, CloudRain, Droplets, ExternalLink, LocateFixed, MapPinned, Minus, Plus, RefreshCw, Satellite, Search, ShieldCheck, ThermometerSun } from 'lucide-react'
+import { Activity, ChevronRight, CloudRain, Droplets, ExternalLink, LocateFixed, MapPinned, Minus, Plus, RefreshCw, Satellite, Search, ShieldCheck, Sprout, ThermometerSun } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
+import { readFarmProfile, type FarmProfile } from '../../lib/farm/farm-profile'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
+import { FarmSetupWizard } from './FarmSetupWizard'
 import './overview.css'
 
 function daysAgo(days: number) {
@@ -26,6 +28,8 @@ export function OverviewPage() {
   const [imageryDate, setImageryDate] = useState(daysAgo(2))
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const { series, loading, error, retry } = usePowerMonthly(location)
+  const [farmProfile, setFarmProfile] = useState<FarmProfile | null>(() => readFarmProfile(location))
+  const [farmSetupOpen, setFarmSetupOpen] = useState(false)
   const [latitude, setLatitude] = useState(String(location.latitude))
   const [longitude, setLongitude] = useState(String(location.longitude))
   const [coordError, setCoordError] = useState('')
@@ -34,6 +38,7 @@ export function OverviewPage() {
   useEffect(() => {
     setLatitude(String(location.latitude))
     setLongitude(String(location.longitude))
+    setFarmProfile(readFarmProfile(location))
     setCoordError('')
   }, [location.latitude, location.longitude])
 
@@ -76,7 +81,9 @@ export function OverviewPage() {
     <section className="overview-page" aria-label="Vue d’ensemble avec données NASA en direct">
       <header className="overview-heading">
         <div><h1>Vue d’ensemble</h1><p>Choisissez un point sur la carte pour charger le climat NASA à cet emplacement.</p></div>
-        <div className="overview-live-badge"><span />NASA POWER · service en direct</div>
+        <button className="overview-farm-profile-button" type="button" onClick={() => setFarmSetupOpen(true)} aria-label={farmProfile ? `Modifier le profil de ${farmProfile.name}` : 'Configurer le profil de ma ferme'}>
+          <span className="overview-farm-profile-icon"><Sprout size={16} /></span><span><strong>{farmProfile?.name ?? 'Configurer ma ferme'}</strong><small>{farmProfile ? 'Profil enregistré localement' : 'Ajouter mes priorités et contraintes'}</small></span><ChevronRight size={16} />
+        </button>
       </header>
 
       <div className="overview-map-stage">
@@ -130,6 +137,7 @@ export function OverviewPage() {
         <PowerClimateChart records={series?.records ?? []} title="Série climatique NASA · 12 derniers mois" source={series?.source.join(' + ') ?? 'en attente'} />
         <PowerClimateChart records={series?.records ?? []} mode="soil" source={series?.source.join(' + ') ?? 'en attente'} />
       </div>
+      <FarmSetupWizard open={farmSetupOpen} point={location} onClose={() => setFarmSetupOpen(false)} onSaved={setFarmProfile} />
     </section>
   )
 }

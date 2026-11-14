@@ -8,6 +8,7 @@ import { LiquidMultimodalInput } from '../../components/ai-chat/liquid-multimoda
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
+import { farmWaterAccessLabels, farmWaterConstraintLabels, readFarmProfile } from '../../lib/farm/farm-profile'
 import { readSoilProfile, soilSourceLabels } from '../../lib/farm/soil-profile'
 import { readRotationConstraints } from '../scenarios/rotation-constraints'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
@@ -44,7 +45,7 @@ function coordinate(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(3).replace('.', ',')}° ${value < 0 ? negative : positive}`
 }
 
-function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, layer: LayerId) {
+function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, layer: LayerId, selectedPoint: GeoPoint) {
   if (!series) return 'Je n’ai pas pu charger NASA POWER pour le point sélectionné. Vérifiez la connexion puis réessayez ; aucune valeur de démonstration n’est substituée aux données manquantes.'
   const records = series.records
   const record = latestCompleteRecord(records)
@@ -61,7 +62,11 @@ function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, 
     const root = record.rootZoneWetness
     const surface = record.surfaceSoilWetness
     const values = [root !== undefined ? `humidité racinaire modélisée ${Math.round(root * 100)} %` : '', surface !== undefined ? `humidité de surface modélisée ${Math.round(surface * 100)} %` : ''].filter(Boolean).join(' ; ')
-    return `${prefix}${values ? ` NASA POWER estime ${values} sur son pixel de grille.` : ' NASA POWER ne fournit pas de valeur d’humidité exploitable pour ce mois.'} La couche SMAP de la carte est une observation satellite agrégée à environ 9 km. Ces valeurs régionales ne suffisent pas à calculer un besoin, une dose ou une date d’irrigation pour une parcelle. Il faut notamment des mesures terrain, la culture, son stade et l’eau disponible.`
+    const farm = readFarmProfile(selectedPoint)
+    const farmContext = lower.includes('irrig')
+      ? farm ? ` Le profil local de ${farm.name} déclare : ${farmWaterAccessLabels[farm.waterAccess].toLocaleLowerCase('fr')}, ${farmWaterConstraintLabels[farm.waterConstraint].toLocaleLowerCase('fr')}${farm.waterNotes ? `; précision : « ${farm.waterNotes} »` : ''}. Cette déclaration ne mesure pas le volume disponible.` : ' Aucun profil local d’accès à l’eau n’est renseigné pour ce point.'
+      : ''
+    return `${prefix}${values ? ` NASA POWER estime ${values} sur son pixel de grille.` : ' NASA POWER ne fournit pas de valeur d’humidité exploitable pour ce mois.'} La couche SMAP de la carte est une observation satellite agrégée à environ 9 km. Ces valeurs régionales ne suffisent pas à calculer un besoin, une dose ou une date d’irrigation pour une parcelle. Il faut notamment des mesures terrain, la culture, son stade et l’eau disponible.${farmContext}`
   }
   if (lower.includes('pluie') || lower.includes('précip')) {
     const value = record.precipitationMmPerDay
@@ -80,12 +85,26 @@ function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, 
 
 function classifyQuestion(question: string) {
   const lower = question.toLocaleLowerCase('fr')
-  const asksSoilProfile = /profil|texture|\bph\b|matière organique|drainage|profondeur|horizon|couche|analyse de sol/.test(lower)
+  const asksSoilProfile = /profil de (?:mon |la )?sol|texture|\bph\b|matière organique|drainage|profondeur|horizon|couche|analyse de sol/.test(lower)
   const asksRotation = /rotation|succession|famille botanique|légumineuse|alternance|cultures?/.test(lower)
-  const asksClimate = /pluie|précip|température|\bchaud\b|\bfroid\b|humidité|climat|météo|nasa|ndvi|vigueur|satellite|imagerie/.test(lower)
+  const asksFarmProfile = /ma ferme|mon exploitation|accès.{0,3}eau|eau disponible|ressource en eau|approvisionnement en eau|restriction.{0,12}eau|contrainte.{0,12}eau|profil (?:de (?:ma |la )?ferme|d'exploitation|agricole)/.test(lower)
+  const asksClimate = /pluie|précip|température|\bchaud\b|\bfroid\b|humidité|climat|météo|nasa|ndvi|vigueur|satellite|imagerie|irrig/.test(lower)
   const asksLayer: LayerId | undefined = /ndvi|vigueur/.test(lower) ? 'ndvi' : /humidité de surface|smap surface/.test(lower) ? 'surface' : /humidité racinaire|humidité du sol|racine/.test(lower) ? 'root' : undefined
-  const intent = asksSoilProfile ? 'soil' : asksRotation ? 'rotation' : asksClimate ? 'climate' : 'unknown'
+  const intent = asksSoilProfile ? 'soil' : asksRotation ? 'rotation' : asksFarmProfile ? 'farm' : asksClimate ? 'climate' : 'unknown'
   return { intent, asksLayer }
+}
+
+function formatFarmProfileAnswer(point: GeoPoint) {
+  const farm = readFarmProfile(point)
+  if (!farm) return 'Aucun profil d’exploitation n’est enregistré pour ce point. Vous pouvez le configurer depuis la Vue d’ensemble. FieldNova ne déduit pas l’accès à l’eau ni les priorités de la ferme à partir des données satellite.'
+  const workspace = readRotationWorkspace(point)
+  const constraints = readRotationConstraints(point)
+  const soil = readSoilProfile(point)
+  const reference = workspace.plans.find(plan => plan.id === 'reference')
+  const crops = reference?.crops.map(id => cropCatalog.find(crop => crop.id === id)?.shortLabel ?? '').filter(Boolean) ?? []
+  const knownSoil = Boolean(soil.texture && soil.texture !== 'unknown' || soil.ph !== undefined || soil.organicMatterPercent !== undefined || soil.effectiveDepthCm !== undefined || soil.drainage && soil.drainage !== 'unknown' || soil.horizons?.length)
+  const waterNote = farm.waterNotes ? ` Précision déclarée : « ${farm.waterNotes} ».` : ''
+  return `Le profil local de ${farm.name} indique : ${farmWaterAccessLabels[farm.waterAccess].toLocaleLowerCase('fr')} et ${farmWaterConstraintLabels[farm.waterConstraint].toLocaleLowerCase('fr')}.${waterNote} ${crops.length ? `La rotation actuelle renseignée contient ${crops.join(' → ')}.` : 'Aucune culture n’est renseignée dans la rotation actuelle.'} Sol local : ${knownSoil ? 'des caractéristiques ont été saisies ou importées dans Mon terrain.' : 'aucune caractéristique renseignée; le sol reste inconnu.'} Priorité de comparaison choisie : ${priorityLabels[workspace.priority]}. ${constraints.unavailableCropIds.length ? `Cultures exclues des options : ${constraints.unavailableCropIds.map(id => cropCatalog.find(crop => crop.id === id)?.shortLabel ?? id).join(', ')}.` : 'Aucune culture exclue des options.'} Ces éléments sont des déclarations locales; ils ne prouvent pas un volume d’eau disponible et ne constituent pas un conseil agronomique.`
 }
 
 function formatSoilAnswer(point: GeoPoint) {
@@ -207,6 +226,14 @@ export function AssistantPage() {
       answer = formatRotationAnswer(location)
       evidence = answer
       usedSources = rotationReferences
+    } else if (route.intent === 'farm') {
+      const profile = readFarmProfile(location)
+      const workspace = readRotationWorkspace(location)
+      const constraints = readRotationConstraints(location)
+      trace.push(traceNode(`farm-${id}`, 'read', 'Profil de ferme et contraintes locales · navigateur', profile ? `Profil de ${profile.name} consulté` : 'Aucun profil de ferme renseigné', `${farmWaterAccessLabels[profile?.waterAccess ?? 'unknown']} · priorité ${priorityLabels[workspace.priority]} · ${constraints.unavailableCropIds.length} culture(s) exclue(s)`, 'completed'))
+      traceHeading = 'Profil et contraintes de ferme consultés'
+      answer = formatFarmProfileAnswer(location)
+      evidence = answer
     } else if (route.intent === 'unknown') {
       answer = 'Je peux agir sur les données NASA POWER mensuelles, les couches NASA de la carte, le profil de sol saisi localement et les rotations enregistrées. Posez une question sur la pluie, la température, l’humidité, le NDVI, le sol ou une rotation; aucune donnée n’a été consultée pour cette question.'
       evidence = 'Capacités disponibles : NASA POWER mensuel, couches MODIS/SMAP de la carte, profil de sol local saisi par l’utilisateur, scénarios de rotation locaux. Aucun outil n’a été exécuté pour cette question.'
@@ -229,7 +256,7 @@ export function AssistantPage() {
         trace.push({ id: `map-${id}`, type: 'step', primary: 'Couche affichée sur la carte', secondary: label, status: 'completed' })
       }
       traceHeading = route.asksLayer ? 'NASA POWER consulté · carte mise à jour' : 'NASA POWER consulté'
-      answer = makeClimateAnswer(question, currentSeries, requestedLayer)
+      answer = makeClimateAnswer(question, currentSeries, requestedLayer, location)
       evidence = answer
       usedSources = [sources[0], ...(route.asksLayer ? [sources[1]] : [])]
     }
@@ -297,6 +324,7 @@ export function AssistantPage() {
           <button type="button" onClick={() => handleSend('Que montre l’humidité racinaire ?', [])}>Humidité du sol <ChevronDown size={12} /></button>
           <button type="button" onClick={() => handleSend('Affiche le NDVI et explique ses limites.', [])}>Voir le NDVI <ChevronDown size={12} /></button>
           <button type="button" onClick={() => handleSend('Lis mon profil de sol pour ce point.', [])}>Mon profil de sol <ChevronDown size={12} /></button>
+          <button type="button" onClick={() => handleSend('Résume mon profil de ferme et mes contraintes d’eau.', [])}>Profil de ferme <ChevronDown size={12} /></button>
           <button type="button" onClick={() => handleSend('Compare mes rotations pour ce point.', [])}>Mes rotations <ChevronDown size={12} /></button>
         </div>
         <div className="assistant-composer-wrap">

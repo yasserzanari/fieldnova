@@ -22,6 +22,7 @@ Cette liste reste un portefeuille de 100 idées, pas un engagement à toutes les
 - **Réponses conversationnelles démo :** Codex CLI rédige les réponses à partir des résultats retournés par les outils locaux FieldNova; la connexion est limitée au serveur Vite de développement.
 - **Traits agronomiques sourcés :** la comparaison affiche familles, légumineuses et architectures racinaires à partir de références INRAE et DRAAF; les valeurs inconnues restent exclues du calcul.
 - **Démo :** [script de 90 secondes et plans vidéo](demo-script-90s-fieldnova.md).
+- **Profil guidé :** cinq étapes locales pour le point confirmé, la rotation actuelle, l’accès à l’eau, les cultures indisponibles et la priorité; l’état du sol existant est consultable dans « Mon terrain ».
 
 Le prototype n’analyse pas les pièces jointes et ne calcule pas de statistiques NASA à l’intérieur d’une limite de parcelle. Le catalogue et les rotations restent illustratifs, et les références racinaires générales ne sont pas validées localement; aucun rendement, besoin en eau, amélioration de sol ou prévision n’est calculé.
 
@@ -54,10 +55,10 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 ### A. Comprendre la ferme et la décision — 1 à 10
 
-1. **[P0] Assistant de démarrage en cinq questions** : recueillir localisation, culture actuelle, horizon de rotation, accès à l’eau et objectif principal.
-2. **[P0] Profil de ferme sauvegardé localement** : conserver les réponses entre deux visites et permettre leur modification.
-3. **[P0] Priorité explicite de l’agriculteur** : eau, santé du sol, stabilité du calendrier, diversité ou simplicité des opérations.
-4. **[P1] Choix du mode d’exploitation** : pluvial, irrigué ou mixte, sans déduire ce choix des seules données satellites.
+1. **[LIVRÉ] Assistant de démarrage en cinq étapes** : confirmer le point, saisir jusqu’à cinq années de cultures actuelles, déclarer l’accès et les restrictions d’eau, exclure des cultures et choisir la priorité; champs vides conservés comme inconnus, données locales par point.
+2. **[LIVRÉ] Profil de ferme sauvegardé localement** : conserver le nom, l’accès et les restrictions d’eau déclarés entre deux visites; profil modifiable et séparé par point suivi.
+3. **[LIVRÉ] Priorité explicite de l’agriculteur** : choisir parmi les indicateurs descriptifs disponibles pour classer les rotations, sans les transformer en rendement ou bénéfice prédit.
+4. **[LIVRÉ] Choix du mode d’exploitation** : pluvial, irrigué, mixte ou inconnu, sans déduire ce choix des seules données satellites.
 5. **[P1] Disponibilité des équipements** : indiquer les opérations faisables avec le matériel réel de l’exploitation.
 6. **[P1] Fenêtre de travail habituelle** : saisir les périodes où semis, récolte et travail du sol sont possibles.
 7. **[P1] Préférences et exclusions de cultures** : cultures appréciées, impossibles ou soumises à un contrat local.
