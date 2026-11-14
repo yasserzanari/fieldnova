@@ -14,14 +14,15 @@ FieldNova dispose déjà d’une base utile : carte interactive, couches NASA GI
 
 Cette liste reste un portefeuille de 100 idées, pas un engagement à toutes les livrer. Au 14 novembre 2026, les modules suivants ont été intégrés dans `main` :
 
-- **Rotation au centre du MVP :** rotation actuelle et deux options éditables sur trois saisons; priorité modifiable; métriques lisibles sur familles, répétitions et légumineuses.
+- **Rotation au centre du MVP :** rotation actuelle et deux options éditables sur cinq années; priorité modifiable; métriques sur familles, répétitions, légumineuses et alternance de systèmes racinaires documentés.
 - **Contexte de décision :** séries NASA POWER mensuelles avec coordonnées de grille et valeurs comparées aux mêmes mois des années précédentes; profil de sol local avec origine, date et référence déclarées.
 - **Parcelle et preuves :** import GeoJSON WGS84, contour synchronisé sur les cartes, superficie géodésique approximative et export d’une fiche Markdown contenant sources, calculs, valeurs manquantes et limites.
 - **Assistant outillé :** chat à gauche et carte à droite; lectures de NASA POWER, du profil local et des rotations; changements de couche réels; questions hors périmètre sans appel NASA automatique.
 - **Réponses conversationnelles démo :** Codex CLI rédige les réponses à partir des résultats retournés par les outils locaux FieldNova; la connexion est limitée au serveur Vite de développement.
+- **Traits agronomiques sourcés :** la comparaison affiche familles, légumineuses et architectures racinaires à partir de références INRAE et DRAAF; les valeurs inconnues restent exclues du calcul.
 - **Démo :** [script de 90 secondes et plans vidéo](demo-script-90s-fieldnova.md).
 
-Le prototype n’analyse pas les pièces jointes et ne calcule pas de statistiques NASA à l’intérieur d’une limite de parcelle. Le catalogue agronomique et les rotations restent illustratifs; aucun rendement, besoin en eau, amélioration de sol ou prévision n’est calculé.
+Le prototype n’analyse pas les pièces jointes et ne calcule pas de statistiques NASA à l’intérieur d’une limite de parcelle. Le catalogue et les rotations restent illustratifs, et les références racinaires générales ne sont pas validées localement; aucun rendement, besoin en eau, amélioration de sol ou prévision n’est calculé.
 
 ## Les 12 fonctions à privilégier pour la démonstration
 
@@ -212,6 +213,8 @@ Prioriser l’import de données locales, la validation indépendante, les profi
 - [NASA POWER — paramètres hydrologiques](https://power.larc.nasa.gov/docs/methodology/data/sources_hydrology/)
 - [NASA POWER — méthodologie et résolution des sources](https://power.larc.nasa.gov/docs/methodology/)
 - [NASA POWER — paramètres disponibles et dictionnaire](https://power.larc.nasa.gov/docs/tutorials/parameters/)
+- [DRAAF Hauts-de-France — rotations, familles culturales et architectures racinaires](https://draaf.hauts-de-france.agriculture.gouv.fr/grandes-cultures-les-systemes-cerealiers-au-coeur-des-assolements-des-hauts-de-a4927.html)
+- [INRAE — diversité végétale, rotations et légumineuses](https://www.inrae.fr/actualites/augmenter-diversite-vegetale-espaces-agricoles-proteger-cultures)
 - [NASA Space Apps 2026 — critères de jugement relayés par l’événement d’Ajmer](https://www.spaceappschallenge.org/2026/local-events/ajmer/)
 - [Guide de jugement Space Apps](https://spaceapps-v2-staging.s3.amazonaws.com/media/documents/Final_Space_Apps_2025_Judging_Guidelines_for_web.pdf)
 

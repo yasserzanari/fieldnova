@@ -7,7 +7,7 @@ import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { readSoilProfile, soilSourceLabels, type FarmSoilProfile } from '../../lib/farm/soil-profile'
-import { cropCatalog, evaluateRotation, exampleRotationWorkspace, priorityLabels, readRotationWorkspace, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
+import { cropCatalog, evaluateRotation, exampleRotationWorkspace, priorityLabels, readRotationWorkspace, rotationSources, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
 import { clearSavedParcelBoundary, parseParcelGeoJSON, saveParcelBoundary, useParcelBoundary } from '../../lib/geo/parcel-boundary'
 import './rotation-explorer.css'
 
@@ -173,10 +173,11 @@ export function RotationExplorer() {
       const metrics = evaluateRotation(plan)
       const crops = plan.crops.map((id, index) => {
         const crop = cropCatalog.find(item => item.id === id)
-        return `${index + 1}. ${crop ? `${crop.label} (${crop.familyLabel})` : 'culture non renseignée'}`
+        const root = crop?.rootArchitecture === 'fibrous' ? 'racines fasciculées' : crop?.rootArchitecture === 'taproot' ? 'racines pivotantes' : 'racines inconnues'
+        return `${index + 1}. ${crop ? `${crop.label} (${crop.familyLabel}${crop.isLegume ? ', légumineuse' : ''}; ${root})` : 'culture non renseignée'}`
       }).join(' → ')
       const result = metrics.complete
-        ? `${metrics.distinctFamilies}/3 familles distinctes; ${metrics.repeatedFamilyTransitions} répétition(s) entre saisons; ${metrics.legumeSeasons} saison(s) avec légumineuse`
+        ? `${metrics.distinctFamilies}/5 familles distinctes; ${metrics.repeatedFamilyTransitions} répétition(s) de famille entre années consécutives; ${metrics.legumeSeasons} année(s) avec légumineuse; ${metrics.knownRootTransitions} alternance(s) de racines connues`
         : 'succession incomplète; métriques non calculées'
       return `### ${plan.title}${leaderIds.has(plan.id) ? ' — la plus proche du critère choisi' : ''}\n\n${crops}\n\n${result}.`
     })
@@ -205,7 +206,9 @@ export function RotationExplorer() {
       '',
       '## Méthode et limites',
       '',
-      'Les indicateurs comptent les familles botaniques, leurs répétitions entre saisons consécutives et la présence de légumineuses. Le critère choisi met en avant les scénarios ayant la meilleure valeur sur cette seule métrique. Le catalogue est illustratif et doit être adapté et validé localement.',
+      `Sources des traits génériques : [${rotationSources.rootArchitecture.label}](${rotationSources.rootArchitecture.url}) et [${rotationSources.legumes.label}](${rotationSources.legumes.url}). Ces références ne valident pas les traits pour cette parcelle ou sa variété.`,
+      '',
+      'Les indicateurs comptent les familles botaniques, leurs répétitions entre années consécutives, la présence de légumineuses et les transitions entre architectures racinaires documentées. Le critère choisi met en avant les scénarios ayant la meilleure valeur sur cette seule métrique. Le contexte NASA POWER et le profil local ne sont pas intégrés à un score de culture.',
       '',
       'Cette fiche ne constitue pas un conseil agronomique. Elle ne prédit ni rendement, ni besoin en eau, ni évolution de la santé du sol. Les calendriers, variétés, contraintes de matériel, disponibilité d’eau et règles de succession locales restent à confirmer.',
       '',
@@ -246,17 +249,18 @@ export function RotationExplorer() {
       <aside className="rotation-context-panel rotation-context-right" aria-label="Critère de comparaison et explication">
         <header className="rotation-panel-heading"><span className="rotation-panel-icon goal"><ShieldCheck size={15} /></span><span><strong>Votre priorité</strong><small>Modifie les options mises en avant</small></span></header>
         <label className="rotation-priority-label" htmlFor="rotation-priority">Comparer selon</label>
-        <select id="rotation-priority" className="rotation-priority-select" value={currentWorkspace.priority} onChange={event => updatePriority(event.target.value as RotationPriority)}><option value="diversity">Diversité des familles</option><option value="alternation">Alternance des familles</option><option value="legume">Présence de légumineuses</option></select>
-        <div className="rotation-best-match" aria-live="polite"><small>Options les plus proches de ce critère</small>{leaders.length ? <strong>{leaders.map(id => currentWorkspace.plans.find(plan => plan.id === id)?.title).join(' · ')}</strong> : <strong>Complétez les 3 années d’une rotation</strong>}</div>
-        <ul className="rotation-rule-list"><li>Familles botaniques différentes, sans bénéfice de sol présumé.</li><li>La présence de légumineuses est comptée, sans estimer l’azote fixé.</li><li>NASA POWER décrit le climat de la cellule, pas le rendement d’une culture.</li></ul>
+        <select id="rotation-priority" className="rotation-priority-select" value={currentWorkspace.priority} onChange={event => updatePriority(event.target.value as RotationPriority)}><option value="diversity">Diversité des familles</option><option value="alternation">Alternance des familles</option><option value="legume">Présence de légumineuses</option><option value="root">Alternance des racines connues</option></select>
+        <div className="rotation-best-match" aria-live="polite"><small>Options les plus proches de ce critère</small>{leaders.length ? <strong>{leaders.map(id => currentWorkspace.plans.find(plan => plan.id === id)?.title).join(' · ')}</strong> : <strong>Complétez les 5 années d’une rotation</strong>}</div>
+        <ul className="rotation-rule-list"><li>Familles et légumineuses comptées depuis le catalogue; l’azote fixé n’est pas estimé.</li><li>Racines pivotantes ou fasciculées comptées seulement si la référence les documente; les autres restent inconnues.</li><li>NASA POWER donne un contexte historique régional; il ne classe pas les cultures et ne prédit pas leur rendement.</li></ul>
+        <div className="rotation-source-links"><a href={rotationSources.rootArchitecture.url} target="_blank" rel="noreferrer">{rotationSources.rootArchitecture.label}</a><a href={rotationSources.legumes.url} target="_blank" rel="noreferrer">{rotationSources.legumes.label}</a></div>
         <p className="rotation-catalog-note">Catalogue illustratif France métropolitaine · à adapter et valider localement.</p>
         {saveError && <p className="rotation-save-error" role="alert">{saveError}</p>}
       </aside>
     </div>
 
-    <section className="rotation-plans" aria-label="Rotations de trois saisons à comparer">
+    <section className="rotation-plans" aria-label="Rotations culturales sur cinq années à comparer">
       {currentWorkspace.plans.map((plan, planIndex) => <RotationCard key={plan.id} plan={plan} planIndex={planIndex} priority={currentWorkspace.priority} isLeader={leaders.includes(plan.id)} example={currentWorkspace.isExample} onCropChange={updateCrop} />)}
-      <p className="rotation-plans-footnote">Indicateurs descriptifs uniquement · aucun rendement, besoin en eau ou effet agronomique n’est prédit.</p>
+      <p className="rotation-plans-footnote">Rotation illustrative sur 5 ans · les traits racinaires inconnus sont exclus du classement · aucun rendement, besoin en eau ou effet agronomique n’est prédit.</p>
     </section>
   </section>
 }
@@ -266,14 +270,15 @@ function RotationCard({ plan, planIndex, priority, isLeader, example, onCropChan
   const icon = planIndex === 0 ? <Sprout size={15} /> : planIndex === 1 ? <RotateCcw size={15} /> : <Activity size={15} />
   return <article className={`rotation-plan-card ${isLeader ? 'is-leading' : ''}`}>
     <header><span className="rotation-card-icon">{icon}</span><span><strong>{plan.title}</strong><small>{example ? 'Cultures d’exemple' : 'Votre scénario'}</small></span>{isLeader && <span className="rotation-leading-tag">Critère choisi</span>}</header>
-    <div className="rotation-season-selects">{plan.crops.map((cropId, index) => <label key={index}><span>Saison {index + 1}</span><select aria-label={`${plan.title}, saison ${index + 1}`} value={cropId} onChange={event => onCropChange(plan.id, index, event.target.value)}><option value="">Choisir une culture</option>{cropCatalog.map(crop => <option key={crop.id} value={crop.id}>{crop.label}</option>)}</select></label>)}</div>
-    <div className="rotation-card-metrics" aria-label={`Indicateurs de ${plan.title}`}><span><strong>{metrics.complete ? `${metrics.distinctFamilies}/3` : '—'}</strong><small>familles</small></span><span><strong>{metrics.complete ? metrics.repeatedFamilyTransitions : '—'}</strong><small>répétitions</small></span><span><strong>{metrics.complete ? metrics.legumeSeasons : '—'}</strong><small>légumineuses</small></span></div>
-    <p className="rotation-card-detail">{metrics.complete ? rotationDetail(metrics.distinctFamilies, metrics.repeatedFamilyTransitions, metrics.legumeSeasons, priority) : 'Choisissez une culture pour chacune des trois saisons.'}</p>
+    <div className="rotation-season-selects">{plan.crops.map((cropId, index) => <label key={index}><span>Année {index + 1}</span><select aria-label={`${plan.title}, année ${index + 1}`} title={cropCatalog.find(crop => crop.id === cropId)?.label ?? 'Choisir une culture'} value={cropId} onChange={event => onCropChange(plan.id, index, event.target.value)}><option value="">Choisir</option>{cropCatalog.map(crop => <option key={crop.id} value={crop.id}>{crop.shortLabel}</option>)}</select></label>)}</div>
+    <div className="rotation-card-metrics" aria-label={`Indicateurs de ${plan.title}`}><span><strong>{metrics.complete ? `${metrics.distinctFamilies}/5` : '—'}</strong><small>familles</small></span><span><strong>{metrics.complete ? metrics.repeatedFamilyTransitions : '—'}</strong><small>répétitions</small></span><span><strong>{metrics.complete ? metrics.legumeSeasons : '—'}</strong><small>légumineuses</small></span><span><strong>{metrics.complete ? metrics.knownRootTransitions : '—'}</strong><small>racines alternées</small></span></div>
+    <p className="rotation-card-detail">{metrics.complete ? rotationDetail(metrics.distinctFamilies, metrics.repeatedFamilyTransitions, metrics.legumeSeasons, metrics.knownRootTransitions, priority) : 'Renseignez les 5 années pour comparer ce scénario.'}</p>
   </article>
 }
 
-function rotationDetail(families: number, repeats: number, legumes: number, priority: RotationPriority) {
-  if (priority === 'diversity') return `${families} famille${families > 1 ? 's' : ''} distincte${families > 1 ? 's' : ''} sur 3 saisons.`
-  if (priority === 'alternation') return `${repeats} répétition${repeats > 1 ? 's' : ''} de famille entre saisons consécutives.`
-  return `${legumes} saison${legumes > 1 ? 's' : ''} avec une légumineuse.`
+function rotationDetail(families: number, repeats: number, legumes: number, rootTransitions: number, priority: RotationPriority) {
+  if (priority === 'diversity') return `${families} famille${families > 1 ? 's' : ''} distincte${families > 1 ? 's' : ''} sur 5 années.`
+  if (priority === 'alternation') return `${repeats} répétition${repeats > 1 ? 's' : ''} de famille entre années consécutives.`
+  if (priority === 'root') return `${rootTransitions} transition${rootTransitions > 1 ? 's' : ''} entre racines documentées; les cultures inconnues sont ignorées.`
+  return `${legumes} année${legumes > 1 ? 's' : ''} avec une légumineuse.`
 }

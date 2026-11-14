@@ -9,7 +9,7 @@ import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { readSoilProfile, soilSourceLabels } from '../../lib/farm/soil-profile'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
-import { cropCatalog, evaluateRotation, readRotationWorkspace } from '../scenarios/rotation-model'
+import { cropCatalog, evaluateRotation, priorityLabels, readRotationWorkspace, rotationSources } from '../scenarios/rotation-model'
 import './assistant.css'
 
 type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
@@ -19,6 +19,10 @@ type CodexStatus = 'checking' | 'ready' | 'unavailable'
 const sources: AISource[] = [
   { id: 'power', title: 'NASA POWER · données mensuelles', url: 'https://power.larc.nasa.gov/docs/services/api/temporal/monthly/', snippet: 'Série au point de grille NASA POWER : température, précipitations et humidité du sol modélisée.' },
   { id: 'gibs', title: 'NASA GIBS · imagerie et humidité du sol', url: 'https://nasa-gibs.github.io/gibs-api-docs/access-basics/', snippet: 'Tuiles cartographiques MODIS et SMAP affichées à leur résolution native.' },
+]
+const rotationReferences: AISource[] = [
+  { id: 'draaf-rotation', title: rotationSources.rootArchitecture.label, url: rotationSources.rootArchitecture.url, snippet: 'La DRAAF décrit les rotations, l’alternance des familles et des architectures racinaires; référence régionale à confirmer pour la parcelle.' },
+  { id: 'inrae-rotation', title: rotationSources.legumes.label, url: rotationSources.legumes.url, snippet: 'INRAE explique la diversification végétale, les successions pluriannuelles et le rôle des légumineuses.' },
 ]
 
 const layerOptions: Array<{ id: LayerId; label: string; short: string; icon: typeof Activity }> = [
@@ -102,10 +106,15 @@ function formatRotationAnswer(point: GeoPoint) {
   const plans = workspace.plans.map(plan => {
     const metrics = evaluateRotation(plan)
     if (!metrics.complete) return `${plan.title} : succession incomplète.`
-    const crops = plan.crops.map(id => cropCatalog.find(crop => crop.id === id)?.label ?? 'culture inconnue').join(' → ')
-    return `${plan.title} (${crops}) : ${metrics.distinctFamilies} famille${metrics.distinctFamilies === 1 ? '' : 's'} botanique${metrics.distinctFamilies === 1 ? '' : 's'}, ${metrics.repeatedFamilyTransitions} répétition${metrics.repeatedFamilyTransitions === 1 ? '' : 's'} entre saisons et ${metrics.legumeSeasons} saison${metrics.legumeSeasons === 1 ? '' : 's'} avec légumineuse.`
+    const crops = plan.crops.map(id => {
+      const crop = cropCatalog.find(item => item.id === id)
+      if (!crop) return 'culture inconnue'
+      const root = crop.rootArchitecture === 'fibrous' ? 'racines fasciculées' : crop.rootArchitecture === 'taproot' ? 'racines pivotantes' : 'racines non documentées'
+      return `${crop.label} (${crop.familyLabel}${crop.isLegume ? ', légumineuse' : ''}, ${root})`
+    }).join(' → ')
+    return `${plan.title} (${crops}) : ${metrics.distinctFamilies} familles botaniques distinctes, ${metrics.repeatedFamilyTransitions} répétition(s) de famille, ${metrics.legumeSeasons} année(s) avec légumineuse et ${metrics.knownRootTransitions} transition(s) entre architectures racinaires connues.`
   })
-  return `${workspace.isExample ? 'Les scénarios affichés sont des exemples.' : 'Voici les scénarios enregistrés pour ce point.'} ${plans.join(' ')} Ces indicateurs décrivent seulement la succession et les familles; ils ne prédisent ni rendement ni amélioration du sol. Vous pouvez modifier les cultures dans l’onglet Scénarios.`
+  return `${workspace.isExample ? 'Les scénarios affichés sont des exemples sur cinq années.' : 'Voici les scénarios enregistrés pour ce point.'} Critère sélectionné : ${priorityLabels[workspace.priority]}. ${plans.join(' ')} Les architectures racinaires absentes de la référence sont laissées inconnues. Ces indicateurs décrivent la séquence; ils ne prédisent ni rendement ni amélioration du sol. La référence racinaire est régionale et doit être confirmée localement. Vous pouvez modifier les cultures dans l’onglet Scénarios.`
 }
 
 function traceNode(id: string, toolName: string, label: string, primary: string, secondary: string, status: 'completed' | 'failed' = 'completed'): TraceNode {
@@ -188,6 +197,7 @@ export function AssistantPage() {
       traceHeading = 'Scénarios de rotation consultés'
       answer = formatRotationAnswer(location)
       evidence = answer
+      usedSources = rotationReferences
     } else if (route.intent === 'unknown') {
       answer = 'Je peux agir sur les données NASA POWER mensuelles, les couches NASA de la carte, le profil de sol saisi localement et les rotations enregistrées. Posez une question sur la pluie, la température, l’humidité, le NDVI, le sol ou une rotation; aucune donnée n’a été consultée pour cette question.'
       evidence = 'Capacités disponibles : NASA POWER mensuel, couches MODIS/SMAP de la carte, profil de sol local saisi par l’utilisateur, scénarios de rotation locaux. Aucun outil n’a été exécuté pour cette question.'

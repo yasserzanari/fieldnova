@@ -1,7 +1,11 @@
 # Scénarios et rotations
 
 - **Route :** `/app/scenarios`
-- **Explorateur de rotations :** compare une rotation de référence et deux options modifiables sur trois saisons. Le petit catalogue français est un exemple de prototype; les familles botaniques et les calculs de répétition/diversité sont descriptifs, sans score de rendement ni effet de sol inféré.
+- **Explorateur de rotations :** compare une rotation de référence et deux options modifiables sur cinq années. Les profils enregistrés à trois années sont conservés et restent à compléter pour les années 4 et 5.
+- **Traits documentés des cultures :** famille botanique, statut de légumineuse et architecture racinaire (fasciculée, pivotante ou inconnue). Les inconnues sont exclues du compte des alternances racinaires. Les références DRAAF Hauts-de-France et INRAE sont affichées; elles ne valident pas une variété ni un conseil pour une parcelle donnée.
+- **Critères de comparaison :** familles distinctes, répétitions de famille, présence de légumineuses, alternance entre racines documentées. Le classement ne transforme pas ces comptes en score de rendement ou en bénéfice de sol.
+- **Climat NASA POWER :** série et repères historiques du point suivis comme contexte visible à côté des rotations; ils ne changent pas le classement et ne sont pas interprétés comme une prévision.
+- **Migration locale :** les scénarios `fieldnova:rotation-workspace:v1` à trois années gardent leurs trois cultures et ajoutent deux années vides. Les scénarios d’exemple sont désormais définis sur cinq ans.
 - **Persistance locale :** les rotations et la priorité choisie sont sauvegardées dans le navigateur pour le point sélectionné. Le profil de sol utilisateur reste distinct; son origine, sa référence et sa date sont décrites dans `src/lib/farm/soil-profile.ts` sans vérification indépendante.
 - **Fiche de comparaison :** le bouton « Exporter la fiche » télécharge un Markdown local avec les trois rotations, le critère, les valeurs POWER disponibles, le profil de sol déclaré, la méthode et les limites. Aucune donnée n’est envoyée par cet export.
 - **Parcelle :** un GeoJSON WGS84 avec géométrie Polygon ou MultiPolygon peut être importé, visualisé et supprimé. Le contour et la superficie géodésique approximative sont stockés localement. L’application ne calcule pas de statistiques NASA à l’intérieur du polygone.
