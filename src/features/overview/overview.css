@@ -35,6 +35,14 @@
 .overview-coordinate-error { margin:5px 0 0; color:#a65336; font-size:7px; line-height:1.35; }
 .overview-locate-action { display:flex; min-height:30px; flex:none; align-items:center; justify-content:center; gap:5px; margin-top:7px; border:1px solid #e5e6db; border-radius:7px; background:#f7f7f1; color:#596c4c; font-size:8px; font-weight:660; cursor:pointer; }.overview-locate-action:hover { background:#eef3e7; }.overview-locate-action:disabled { opacity:.6; cursor:progress; }
 .overview-point-note { display:flex; align-items:flex-start; gap:6px; margin-top:8px; padding:7px; border:1px solid #e8eadf; border-radius:8px; background:#f8f8f3; color:#6e765f; }.overview-point-note svg { flex:none; margin-top:1px; color:#759168; }.overview-point-note span { color:#6e6c5e; font-size:7px; line-height:1.4; }
+.overview-evidence { display:grid; gap:1px; margin-top:9px; padding-top:8px; border-top:1px solid #eae7dd; }
+.overview-evidence > header { display:flex; align-items:center; justify-content:space-between; color:#45583e; font-size:8px; }
+.overview-evidence > header span { padding:2px 6px; border-radius:10px; background:#e8efdf; color:#466d3e; font-size:7px; font-weight:720; }
+.overview-evidence > p { margin:2px 0 4px; color:#898675; font-size:6.5px; }
+.overview-evidence-row { display:grid; grid-template-columns:7px minmax(58px,.8fr) minmax(0,1.2fr); min-height:21px; align-items:center; gap:5px; padding:2px 3px; border:0; border-radius:5px; background:transparent; color:inherit; text-align:left; text-decoration:none; cursor:pointer; }
+.overview-evidence-row:hover { background:#f2f3eb; }.overview-evidence-row:focus-visible { outline:2px solid #7da46c; outline-offset:1px; }
+.overview-evidence-row > span { width:6px; height:6px; border-radius:50%; background:#c5c4b9; }.overview-evidence-row > span.is-available { background:#5b9a57; box-shadow:0 0 0 2px #e3f0dc; }
+.overview-evidence-row strong { overflow:hidden; color:#555648; font-size:7px; font-weight:650; text-overflow:ellipsis; white-space:nowrap; }.overview-evidence-row small { overflow:hidden; color:#848171; font-size:6.5px; text-overflow:ellipsis; white-space:nowrap; }
 .overview-panel-link { display:flex; flex:none; align-items:center; justify-content:space-between; margin-top:9px; padding-top:8px; border-top:1px solid #eae7dd; color:var(--color-forest-800); font-size:8px; font-weight:690; text-decoration:none; }.overview-panel-link:hover { color:#12351f; }
 .climate-indicators { display:grid; flex:none; gap:4px; padding:6px 0 5px; }
 .climate-indicator { display:flex; min-height:44px; align-items:center; gap:7px; }

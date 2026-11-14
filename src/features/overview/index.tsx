@@ -7,6 +7,8 @@ import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { readFarmProfile, type FarmProfile } from '../../lib/farm/farm-profile'
+import { readSoilProfile } from '../../lib/farm/soil-profile'
+import { evaluateRotation, readRotationWorkspace } from '../scenarios/rotation-model'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { FarmSetupWizard } from './FarmSetupWizard'
 import './overview.css'
@@ -29,6 +31,7 @@ export function OverviewPage() {
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const { series, loading, error, retry } = usePowerMonthly(location)
   const [farmProfile, setFarmProfile] = useState<FarmProfile | null>(() => readFarmProfile(location))
+  const [evidence, setEvidence] = useState(() => ({ soil: readSoilProfile(location), rotation: readRotationWorkspace(location) }))
   const [farmSetupOpen, setFarmSetupOpen] = useState(false)
   const [latitude, setLatitude] = useState(String(location.latitude))
   const [longitude, setLongitude] = useState(String(location.longitude))
@@ -39,13 +42,17 @@ export function OverviewPage() {
     setLatitude(String(location.latitude))
     setLongitude(String(location.longitude))
     setFarmProfile(readFarmProfile(location))
+    setEvidence({ soil: readSoilProfile(location), rotation: readRotationWorkspace(location) })
     setCoordError('')
   }, [location.latitude, location.longitude])
 
   useEffect(() => {
-    const reloadFarmProfile = () => setFarmProfile(readFarmProfile(location))
-    window.addEventListener('fieldnova:demo-mode-change', reloadFarmProfile)
-    return () => window.removeEventListener('fieldnova:demo-mode-change', reloadFarmProfile)
+    const reloadLocalData = () => {
+      setFarmProfile(readFarmProfile(location))
+      setEvidence({ soil: readSoilProfile(location), rotation: readRotationWorkspace(location) })
+    }
+    window.addEventListener('fieldnova:demo-mode-change', reloadLocalData)
+    return () => window.removeEventListener('fieldnova:demo-mode-change', reloadLocalData)
   }, [location.latitude, location.longitude])
 
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
@@ -82,6 +89,12 @@ export function OverviewPage() {
 
   const latestDate = latest ? formatPowerMonth(latest.date) : 'aucune période valide'
   const dataPoint = series?.gridPoint
+  const soilAvailable = Boolean(evidence.soil.texture || evidence.soil.ph !== undefined || evidence.soil.organicMatterPercent !== undefined || evidence.soil.effectiveDepthCm !== undefined || evidence.soil.drainage || evidence.soil.horizons?.length)
+  const completeRotations = evidence.rotation.plans.filter(plan => evaluateRotation(plan).complete).length
+  const rotationAvailable = !evidence.rotation.isExample && completeRotations > 0
+  const farmAvailable = Boolean(farmProfile && !farmProfile.isExample)
+  const nasaAvailable = Boolean(series && latest)
+  const availableEvidenceCount = [nasaAvailable, farmAvailable, soilAvailable, rotationAvailable].filter(Boolean).length
 
   return (
     <section className="overview-page" aria-label="Vue d’ensemble avec données NASA en direct">
@@ -123,6 +136,14 @@ export function OverviewPage() {
           {coordError && <p className="overview-coordinate-error" role="alert">{coordError}</p>}
           <button className="overview-locate-action" type="button" onClick={locateMe} disabled={locating}><LocateFixed size={14} />{locating ? 'Localisation…' : 'Utiliser ma position'}</button>
           <div className="overview-point-note"><ShieldCheck size={13} /><span>Le point cliqué est rapproché de la cellule de grille NASA correspondante. Ce n’est pas une mesure de parcelle.</span></div>
+          <section className="overview-evidence" aria-label="Couverture des données disponibles">
+            <header><strong>Éléments disponibles</strong><span>{availableEvidenceCount}/4</span></header>
+            <p>Sources exploitables · les exemples sont exclus</p>
+            <EvidenceRow label="Climat NASA" detail={nasaAvailable ? `${series?.records.length ?? 0} mois chargés` : loading ? 'Chargement…' : 'Indisponible'} available={nasaAvailable} to="/app/atlas" />
+            <EvidenceRow label="Profil ferme" detail={farmProfile ? farmProfile.isExample ? 'Exemple fictif' : 'Déclaré localement' : 'Absent'} available={farmAvailable} to="#farm-profile" onClick={() => setFarmSetupOpen(true)} />
+            <EvidenceRow label="Sol" detail={soilAvailable ? 'Renseigné localement' : 'Inconnu'} available={soilAvailable} to="/app/terrain" />
+            <EvidenceRow label="Rotations" detail={rotationAvailable ? `${completeRotations} plan${completeRotations > 1 ? 's' : ''} renseigné${completeRotations > 1 ? 's' : ''}` : evidence.rotation.isExample ? 'Exemple fictif' : 'À renseigner'} available={rotationAvailable} to="/app/scenarios" />
+          </section>
           <Link to="/app/atlas" className="overview-panel-link">Ouvrir l’Atlas NASA <ExternalLink size={14} /></Link>
         </aside>
 
@@ -150,4 +171,9 @@ export function OverviewPage() {
 
 function Metric({ icon, tone, label, value, detail }: { icon: React.ReactNode; tone: string; label: string; value: string; detail: string }) {
   return <div className="climate-indicator"><span className={`climate-symbol ${tone}`}>{icon}</span><span><small>{label}</small><strong>{value}</strong><em>{detail}</em></span></div>
+}
+
+function EvidenceRow({ label, detail, available, to, onClick }: { label: string; detail: string; available: boolean; to: string; onClick?: () => void }) {
+  if (onClick) return <button className="overview-evidence-row" type="button" onClick={onClick}><span className={available ? 'is-available' : ''} aria-hidden="true" /><strong>{label}</strong><small>{detail}</small></button>
+  return <Link className="overview-evidence-row" to={to}><span className={available ? 'is-available' : ''} aria-hidden="true" /><strong>{label}</strong><small>{detail}</small></Link>
 }
