@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Download, FileSpreadsheet, Layers3, Pencil, Save, Trash2, Upload, X } from 'lucide-react'
 import type { GeoPoint } from '../../lib/geo/location'
-import { clearSoilProfile, readSoilProfile, resolveSoilHorizonProvenance, soilSourceLabels, validateSoilHorizons, type FarmSoilProfile, type SoilHorizon, writeSoilProfile } from '../../lib/farm/soil-profile'
+import { clearSoilProfile, readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, validateSoilHorizons, type FarmSoilProfile, type SoilFieldKey, type SoilFieldProvenance, type SoilHorizon, writeSoilProfile } from '../../lib/farm/soil-profile'
 import { parseSoilAnalysisCsv, soilAnalysisCsvTemplate, type SoilAnalysisCsvImport } from '../../lib/farm/soil-analysis-csv'
 
 const textureLabels = { sandy: 'Sableux', loamy: 'Limoneux', clayey: 'Argileux', unknown: 'Inconnu' } as const
@@ -79,14 +79,15 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
 
   const hasGeneralProfile = profile.texture !== undefined || profile.ph !== undefined || profile.organicMatterPercent !== undefined || profile.effectiveDepthCm !== undefined || profile.drainage !== undefined
   const hasSampleMetadata = Boolean(profile.sampleDate || profile.samplingMethod || profile.sourceName)
-  const hasProfile = hasGeneralProfile || Boolean(profile.horizons?.length) || hasSampleMetadata
+  const hasFieldMetadata = Boolean(Object.keys(profile.fieldProvenance ?? {}).length)
+  const hasProfile = hasGeneralProfile || Boolean(profile.horizons?.length) || hasSampleMetadata || hasFieldMetadata
   const fieldSource = `${soilSourceLabels[profile.sourceType ?? 'farmer-reported']}${profile.sourceName ? ` · ${profile.sourceName}` : ''}${profile.sampleDate ? ` · ${new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${profile.sampleDate}T12:00:00Z`))}` : ''}${profile.samplingMethod ? ` · méthode : ${profile.samplingMethod}` : ''} · non vérifiée`
   const generalFieldRows = [
-    { label: 'Texture', value: profile.texture && profile.texture !== 'unknown' ? textureLabels[profile.texture] : undefined },
-    { label: 'pH', value: profile.ph === undefined ? undefined : decimal(profile.ph) },
-    { label: 'Matière organique', value: profile.organicMatterPercent === undefined ? undefined : `${decimal(profile.organicMatterPercent)} %` },
-    { label: 'Profondeur utile', value: profile.effectiveDepthCm === undefined ? undefined : `${decimal(profile.effectiveDepthCm)} cm` },
-    { label: 'Drainage', value: profile.drainage && profile.drainage !== 'unknown' ? drainageLabels[profile.drainage] : undefined },
+    { key: 'texture' as const, label: soilFieldLabels.texture, value: profile.texture && profile.texture !== 'unknown' ? textureLabels[profile.texture] : undefined },
+    { key: 'ph' as const, label: soilFieldLabels.ph, value: profile.ph === undefined ? undefined : decimal(profile.ph) },
+    { key: 'organicMatterPercent' as const, label: soilFieldLabels.organicMatterPercent, value: profile.organicMatterPercent === undefined ? undefined : `${decimal(profile.organicMatterPercent)} %` },
+    { key: 'effectiveDepthCm' as const, label: soilFieldLabels.effectiveDepthCm, value: profile.effectiveDepthCm === undefined ? undefined : `${decimal(profile.effectiveDepthCm)} cm` },
+    { key: 'drainage' as const, label: soilFieldLabels.drainage, value: profile.drainage && profile.drainage !== 'unknown' ? drainageLabels[profile.drainage] : undefined },
   ]
   const acquisitionRows = [
     { label: 'Texture', known: Boolean(profile.texture && profile.texture !== 'unknown' || profile.horizons?.some(horizon => horizon.texture && horizon.texture !== 'unknown')) },
@@ -97,7 +98,7 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
   ]
   const missingAcquisitionCount = acquisitionRows.filter(row => !row.known).length
   const hasDraftValue = draft.texture !== undefined || draft.ph !== undefined || draft.organicMatterPercent !== undefined || draft.effectiveDepthCm !== undefined || draft.drainage !== undefined
-    || Boolean(draft.horizons?.length || draft.sampleDate || draft.samplingMethod?.trim() || draft.sourceName?.trim())
+    || Boolean(draft.horizons?.length || draft.sampleDate || draft.samplingMethod?.trim() || draft.sourceName?.trim() || Object.keys(draft.fieldProvenance ?? {}).length)
   const soilSummary = [
     profile.texture && profile.texture !== 'unknown' ? textureLabels[profile.texture] : undefined,
     profile.ph !== undefined ? `pH ${decimal(profile.ph)}` : undefined,
@@ -122,6 +123,14 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
     ...value,
     horizons: (value.horizons ?? []).map((horizon, horizonIndex) => horizonIndex === index ? { ...horizon, ...update } : horizon),
   }))
+
+  const updateFieldProvenance = (field: SoilFieldKey, update: Partial<SoilFieldProvenance>) => setDraft(value => {
+    const fieldProvenance = { ...value.fieldProvenance }
+    const next = { ...fieldProvenance[field], ...update }
+    if (Object.values(next).some(Boolean)) fieldProvenance[field] = next
+    else delete fieldProvenance[field]
+    return { ...value, fieldProvenance: Object.keys(fieldProvenance).length ? fieldProvenance : undefined }
+  })
 
   const removeHorizon = (index: number) => setDraft(value => ({ ...value, horizons: (value.horizons ?? []).filter((_, horizonIndex) => horizonIndex !== index) }))
 
@@ -167,15 +176,20 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
     <div className={`terrain-profile-missing ${hasProfile ? 'has-user-profile' : ''}`}>
       <span className="terrain-profile-icon"><Layers3 size={16} /></span>
       <span className="terrain-profile-copy">
-        <strong>{hasProfile ? !hasGeneralProfile && profile.horizons?.length ? 'Profil de sol par horizons' : profile.sourceType === 'lab-analysis' ? 'Analyse de laboratoire déclarée' : 'Profil de sol déclaré par vous' : 'Texture, pH et matière organique'}</strong>
+        <strong>{hasProfile ? hasFieldMetadata ? 'Profil de sol · origines par champ' : !hasGeneralProfile && profile.horizons?.length ? 'Profil de sol par horizons' : profile.sourceType === 'lab-analysis' ? 'Analyse de laboratoire déclarée' : 'Profil de sol déclaré par vous' : 'Texture, pH et matière organique'}</strong>
         <small>{hasProfile ? [soilSummary.join(' · '), profile.sourceName, profile.sampleDate ? `Échantillon du ${new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${profile.sampleDate}T12:00:00Z`))}` : undefined].filter(Boolean).join(' · ') || 'Profil enregistré, champs encore inconnus.' : 'Aucune analyse ou mesure locale enregistrée pour ce point.'}</small>
       </span>
       <button className="terrain-profile-edit" type="button" onClick={edit} aria-label={hasProfile ? 'Modifier le profil de sol local' : 'Renseigner le profil de sol local'}><Pencil size={13} /><span>{hasProfile ? 'Modifier' : 'Renseigner'}</span></button>
     </div>
     {hasProfile && <section className="terrain-field-provenance" aria-label="État et provenance de chaque champ de sol">
-      <header><strong>État des champs généraux</strong><small>Origine commune déclarée · non vérifiée</small></header>
-      <dl>{generalFieldRows.map(field => <div key={field.label}><dt>{field.label}</dt><dd><strong>{field.value ?? 'Inconnu'}</strong><span className={field.value ? 'is-known' : ''}>{field.value ? 'Renseigné' : 'Non renseigné'}</span></dd></div>)}</dl>
-      {hasGeneralProfile && <small className="terrain-field-source">Origine appliquée aux valeurs renseignées : {fieldSource}. Aucun niveau de fiabilité indépendant n’est calculé.</small>}
+      <header><strong>État et origine par champ</strong><small>Chaque origine reste une déclaration non vérifiée.</small></header>
+      <dl>{generalFieldRows.map(field => {
+        const provenance = resolveSoilFieldProvenance(profile, field.key)
+        const sourceDate = provenance.sampleDate ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${provenance.sampleDate}T12:00:00Z`)) : undefined
+        const source = [soilSourceLabels[provenance.sourceType], provenance.sourceName, sourceDate, provenance.samplingMethod ? `méthode : ${provenance.samplingMethod}` : undefined].filter(Boolean).join(' · ')
+        return <div className="terrain-field-provenance-row" key={field.label}><dt>{field.label}</dt><dd><strong>{field.value ?? 'Inconnu'}</strong><span className={field.value ? 'is-known' : ''}>{field.value ? 'Renseigné' : 'Non renseigné'}</span></dd><small>{field.value ? `${source} · non vérifiée` : 'Aucune valeur à attribuer'}</small></div>
+      })}</dl>
+      {hasGeneralProfile && <small className="terrain-field-source">Les champs sans origine spécifique héritent de la fiche générale : {fieldSource}. Aucune fiabilité indépendante n’est calculée.</small>}
       {!hasGeneralProfile && <small className="terrain-field-source">Aucun champ général saisi. La provenance des horizons est affichée avec leur composition.</small>}
     </section>}
     <details className="terrain-acquisition-plan">
@@ -194,11 +208,11 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
         <header className="terrain-soil-form-heading"><span className="terrain-heading-icon soil"><Layers3 size={17} /></span><span><h2 id="soil-profile-title">Profil de sol local</h2><small>Point suivi · {point.latitude.toFixed(3)}, {point.longitude.toFixed(3)}</small></span><button type="button" className="terrain-soil-close" onClick={() => setOpen(false)} aria-label="Fermer"><X size={17} /></button></header>
         <p className="terrain-soil-form-note">Saisissez uniquement des valeurs connues. Elles sont enregistrées dans ce navigateur et restent distinctes des données NASA.</p>
         <div className="terrain-soil-fields">
-          <label>Texture du sol<select value={draft.texture ?? ''} onChange={event => setDraft(value => ({ ...value, texture: (event.target.value || undefined) as FarmSoilProfile['texture'] }))}><option value="">Non renseignée</option><option value="sandy">Sableux</option><option value="loamy">Limoneux</option><option value="clayey">Argileux</option><option value="unknown">Inconnue</option></select></label>
-          <label>pH<input type="number" min="0" max="14" step="0.1" inputMode="decimal" placeholder="Ex. 6,5" value={draft.ph ?? ''} onChange={event => setDraft(value => ({ ...value, ph: event.target.value === '' ? undefined : Number(event.target.value) }))} /></label>
-          <label>Matière organique (%)<input type="number" min="0" max="100" step="0.1" inputMode="decimal" placeholder="Ex. 2,4" value={draft.organicMatterPercent ?? ''} onChange={event => setDraft(value => ({ ...value, organicMatterPercent: event.target.value === '' ? undefined : Number(event.target.value) }))} /></label>
-          <label>Profondeur utile (cm)<input type="number" min="0" max="400" step="1" inputMode="numeric" placeholder="Ex. 90" value={draft.effectiveDepthCm ?? ''} onChange={event => setDraft(value => ({ ...value, effectiveDepthCm: event.target.value === '' ? undefined : Number(event.target.value) }))} /></label>
-          <label className="terrain-soil-field-wide">Drainage<select value={draft.drainage ?? ''} onChange={event => setDraft(value => ({ ...value, drainage: (event.target.value || undefined) as FarmSoilProfile['drainage'] }))}><option value="">Non renseigné</option><option value="poor">Lent</option><option value="moderate">Modéré</option><option value="good">Rapide</option><option value="unknown">Inconnu</option></select></label>
+          <div className="terrain-soil-field"><label>Texture du sol<select value={draft.texture ?? ''} onChange={event => setDraft(value => ({ ...value, texture: (event.target.value || undefined) as FarmSoilProfile['texture'] }))}><option value="">Non renseignée</option><option value="sandy">Sableux</option><option value="loamy">Limoneux</option><option value="clayey">Argileux</option><option value="unknown">Inconnue</option></select></label><SoilFieldOriginEditor field="texture" profile={draft} onChange={updateFieldProvenance} /></div>
+          <div className="terrain-soil-field"><label>pH<input type="number" min="0" max="14" step="0.1" inputMode="decimal" placeholder="Ex. 6,5" value={draft.ph ?? ''} onChange={event => setDraft(value => ({ ...value, ph: event.target.value === '' ? undefined : Number(event.target.value) }))} /></label><SoilFieldOriginEditor field="ph" profile={draft} onChange={updateFieldProvenance} /></div>
+          <div className="terrain-soil-field"><label>Matière organique (%)<input type="number" min="0" max="100" step="0.1" inputMode="decimal" placeholder="Ex. 2,4" value={draft.organicMatterPercent ?? ''} onChange={event => setDraft(value => ({ ...value, organicMatterPercent: event.target.value === '' ? undefined : Number(event.target.value) }))} /></label><SoilFieldOriginEditor field="organicMatterPercent" profile={draft} onChange={updateFieldProvenance} /></div>
+          <div className="terrain-soil-field"><label>Profondeur utile (cm)<input type="number" min="0" max="400" step="1" inputMode="numeric" placeholder="Ex. 90" value={draft.effectiveDepthCm ?? ''} onChange={event => setDraft(value => ({ ...value, effectiveDepthCm: event.target.value === '' ? undefined : Number(event.target.value) }))} /></label><SoilFieldOriginEditor field="effectiveDepthCm" profile={draft} onChange={updateFieldProvenance} /></div>
+          <div className="terrain-soil-field"><label>Drainage<select value={draft.drainage ?? ''} onChange={event => setDraft(value => ({ ...value, drainage: (event.target.value || undefined) as FarmSoilProfile['drainage'] }))}><option value="">Non renseigné</option><option value="poor">Lent</option><option value="moderate">Modéré</option><option value="good">Rapide</option><option value="unknown">Inconnu</option></select></label><SoilFieldOriginEditor field="drainage" profile={draft} onChange={updateFieldProvenance} /></div>
           <section className="terrain-horizon-editor terrain-soil-field-wide" aria-label="Horizons de sol déclarés">
             <header><span><strong>Composition par profondeur</strong><small>Ajoutez uniquement les couches décrites par votre relevé ou analyse.</small></span></header>
             <div className="terrain-horizon-import-actions">
@@ -239,6 +253,27 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
       </form>
     </dialog>
   </>
+}
+
+function SoilFieldOriginEditor({ field, profile, onChange }: { field: SoilFieldKey; profile: FarmSoilProfile; onChange: (field: SoilFieldKey, update: Partial<SoilFieldProvenance>) => void }) {
+  const override = profile.fieldProvenance?.[field]
+  const isDistinctOrigin = override?.sourceType !== undefined && override.sourceType !== (profile.sourceType ?? 'farmer-reported')
+  return <details className="terrain-field-origin-editor">
+    <summary>{isDistinctOrigin ? 'Origine spécifique déclarée' : override ? 'Détails de source propres à ce champ' : 'Utiliser une autre origine ?'}</summary>
+    <div className="terrain-field-origin-fields">
+      <label>Origine du champ<select value={override?.sourceType ?? ''} onChange={event => onChange(field, { sourceType: (event.target.value || undefined) as SoilFieldProvenance['sourceType'] })}>
+        <option value="">Hériter de la fiche générale</option>
+        <option value="farmer-reported">Déclarée par l’exploitation</option>
+        <option value="lab-analysis">Analyse de laboratoire</option>
+        <option value="other-source">Autre source</option>
+      </select></label>
+      <label>Référence de ce champ<input type="text" maxLength={120} placeholder="Ex. labo, numéro d’analyse" value={override?.sourceName ?? ''} onChange={event => onChange(field, { sourceName: event.target.value || undefined })} /></label>
+      <label>Date de ce champ<input type="date" value={override?.sampleDate ?? ''} onChange={event => onChange(field, { sampleDate: event.target.value || undefined })} /></label>
+      <label>Méthode de ce champ<input type="text" maxLength={120} placeholder="Facultatif" value={override?.samplingMethod ?? ''} onChange={event => onChange(field, { samplingMethod: event.target.value || undefined })} /></label>
+      {override && <button type="button" onClick={() => onChange(field, { sourceType: undefined, sourceName: undefined, sampleDate: undefined, samplingMethod: undefined })}>Effacer cette origine</button>}
+      <small>Champ : {soilFieldLabels[field]}. La source et ses métadonnées sont déclarées par l’utilisateur et ne sont pas vérifiées par FieldNova.</small>
+    </div>
+  </details>
 }
 
 function SoilHorizonVisual({ horizons, defaultSourceType, defaultSourceName, defaultSampleDate, defaultSamplingMethod }: { horizons: SoilHorizon[]; defaultSourceType?: FarmSoilProfile['sourceType']; defaultSourceName?: string; defaultSampleDate?: string; defaultSamplingMethod?: string }) {

@@ -77,7 +77,8 @@ export function FarmSetupWizard({ open, point, onClose, onSaved }: { open: boole
 
   const selectedCrops = useMemo(() => draft.crops.filter(Boolean).length, [draft.crops])
   const soil = readSoilProfile(point)
-  const hasSoilInformation = Boolean(soil.texture && soil.texture !== 'unknown' || soil.ph !== undefined || soil.organicMatterPercent !== undefined || soil.effectiveDepthCm !== undefined || soil.drainage && soil.drainage !== 'unknown' || soil.horizons?.length)
+  const soilHasFieldOrigins = Boolean(Object.keys(soil.fieldProvenance ?? {}).length)
+  const hasSoilInformation = Boolean(soil.texture && soil.texture !== 'unknown' || soil.ph !== undefined || soil.organicMatterPercent !== undefined || soil.effectiveDepthCm !== undefined || soil.drainage && soil.drainage !== 'unknown' || soil.horizons?.length || soilHasFieldOrigins)
   const update = <Key extends keyof Draft>(key: Key, value: Draft[Key]) => setDraft(current => ({ ...current, [key]: value }))
 
   const save = (event: FormEvent<HTMLFormElement>) => {
@@ -148,7 +149,7 @@ export function FarmSetupWizard({ open, point, onClose, onSaved }: { open: boole
           <div className="farm-setup-location-card"><MapPin size={17} /><div><strong>Point associé au profil</strong><span>{formatCoordinate(point.latitude, 'N', 'S')} · {formatCoordinate(point.longitude, 'E', 'O')}</span><small>Les séries NASA utilisent une maille régionale; ce point ne dessine pas la parcelle.</small></div></div>
           <label className="farm-setup-confirm"><input type="checkbox" checked={draft.locationConfirmed} onChange={event => { update('locationConfirmed', event.target.checked); setErrors(current => ({ ...current, location: undefined })) }} aria-invalid={Boolean(errors.location)} /><span>Ce point suivi représente l’emplacement de ma ferme.</span></label>
           {errors.location && <small className="farm-setup-error">{errors.location}</small>}
-          <div className="farm-setup-soil-card"><span><strong>État du profil de sol</strong><small>{hasSoilInformation ? `Données locales présentes · ${soilSourceLabels[soil.sourceType ?? 'farmer-reported']}` : 'Aucune analyse ou caractéristique locale saisie'}</small></span><Link to="/app/terrain" target="_blank" rel="noreferrer">{hasSoilInformation ? 'Consulter Mon terrain' : 'Renseigner le sol'}</Link></div>
+          <div className="farm-setup-soil-card"><span><strong>État du profil de sol</strong><small>{hasSoilInformation ? soilHasFieldOrigins ? 'Données locales présentes · origines déclarées par caractéristique' : `Données locales présentes · ${soilSourceLabels[soil.sourceType ?? 'farmer-reported']}` : 'Aucune analyse ou caractéristique locale saisie'}</small></span><Link to="/app/terrain" target="_blank" rel="noreferrer">{hasSoilInformation ? 'Consulter Mon terrain' : 'Renseigner le sol'}</Link></div>
           <p className="farm-setup-help">Si ce n’est pas le bon endroit, fermez cette fenêtre, choisissez le point sur la carte, puis rouvrez le profil.</p>
         </div>}
 

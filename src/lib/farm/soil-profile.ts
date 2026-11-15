@@ -3,6 +3,23 @@ import type { GeoPoint } from '../geo/location'
 export type SoilTexture = 'sandy' | 'loamy' | 'clayey' | 'unknown'
 export type SoilDrainage = 'poor' | 'moderate' | 'good' | 'unknown'
 export type SoilSourceType = 'farmer-reported' | 'lab-analysis' | 'other-source'
+export type SoilFieldKey = 'texture' | 'ph' | 'organicMatterPercent' | 'effectiveDepthCm' | 'drainage'
+export type SoilFieldProvenance = {
+  sourceType?: SoilSourceType
+  sourceName?: string
+  sampleDate?: string
+  samplingMethod?: string
+}
+export type SoilFieldProvenanceMap = Partial<Record<SoilFieldKey, SoilFieldProvenance>>
+
+export const soilFieldLabels: Record<SoilFieldKey, string> = {
+  texture: 'Texture',
+  ph: 'pH',
+  organicMatterPercent: 'Matière organique',
+  effectiveDepthCm: 'Profondeur utile',
+  drainage: 'Drainage',
+}
+
 export type SoilHorizon = {
   topCm: number
   bottomCm: number
@@ -31,6 +48,7 @@ export type FarmSoilProfile = {
   sourceName?: string
   sampleDate?: string
   samplingMethod?: string
+  fieldProvenance?: SoilFieldProvenanceMap
   updatedAt?: string
 }
 
@@ -56,10 +74,24 @@ export function readSoilProfile(point: GeoPoint): FarmSoilProfile {
       sourceName: typeof parsed.sourceName === 'string' ? parsed.sourceName.slice(0, 120) : undefined,
       sampleDate: isIsoDate(parsed.sampleDate) ? parsed.sampleDate : undefined,
       samplingMethod: typeof parsed.samplingMethod === 'string' ? parsed.samplingMethod.slice(0, 120) : undefined,
+      fieldProvenance: readFieldProvenance(parsed.fieldProvenance),
       updatedAt: typeof parsed.updatedAt === 'string' && Number.isFinite(Date.parse(parsed.updatedAt)) ? parsed.updatedAt : undefined,
     }
   } catch {
     return {}
+  }
+}
+
+export function resolveSoilFieldProvenance(profile: FarmSoilProfile, field: SoilFieldKey): Required<Pick<SoilFieldProvenance, 'sourceType'>> & Omit<SoilFieldProvenance, 'sourceType'> {
+  const override = profile.fieldProvenance?.[field]
+  const profileSourceType = profile.sourceType ?? 'farmer-reported'
+  const sourceType = override?.sourceType ?? profileSourceType
+  const inheritsProfileMetadata = override?.sourceType === undefined || override.sourceType === profileSourceType
+  return {
+    sourceType,
+    sourceName: override?.sourceName ?? (inheritsProfileMetadata ? profile.sourceName : undefined),
+    sampleDate: override?.sampleDate ?? (inheritsProfileMetadata ? profile.sampleDate : undefined),
+    samplingMethod: override?.samplingMethod ?? (inheritsProfileMetadata ? profile.samplingMethod : undefined),
   }
 }
 
@@ -89,10 +121,47 @@ export function writeSoilProfile(point: GeoPoint, profile: FarmSoilProfile) {
     sourceName: typeof profile.sourceName === 'string' ? profile.sourceName.trim().slice(0, 120) || undefined : undefined,
     sampleDate: isIsoDate(profile.sampleDate) ? profile.sampleDate : undefined,
     samplingMethod: typeof profile.samplingMethod === 'string' ? profile.samplingMethod.trim().slice(0, 120) || undefined : undefined,
+    fieldProvenance: cleanFieldProvenance(profile.fieldProvenance),
     updatedAt: new Date().toISOString(),
   }
   localStorage.setItem(soilProfileStorageKey(point), JSON.stringify(clean))
   return clean
+}
+
+function readFieldProvenance(value: unknown): SoilFieldProvenanceMap | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const input = value as Record<string, unknown>
+  const result: SoilFieldProvenanceMap = {}
+  for (const field of Object.keys(soilFieldLabels) as SoilFieldKey[]) {
+    const item = input[field]
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    const source = item as Partial<SoilFieldProvenance>
+    const provenance: SoilFieldProvenance = {
+      sourceType: isOneOf(source.sourceType, ['farmer-reported', 'lab-analysis', 'other-source']) ? source.sourceType : undefined,
+      sourceName: typeof source.sourceName === 'string' ? source.sourceName.slice(0, 120) : undefined,
+      sampleDate: isIsoDate(source.sampleDate) ? source.sampleDate : undefined,
+      samplingMethod: typeof source.samplingMethod === 'string' ? source.samplingMethod.slice(0, 120) : undefined,
+    }
+    if (Object.values(provenance).some(Boolean)) result[field] = provenance
+  }
+  return Object.keys(result).length ? result : undefined
+}
+
+function cleanFieldProvenance(value: SoilFieldProvenanceMap | undefined) {
+  if (!value) return undefined
+  const cleaned: SoilFieldProvenanceMap = {}
+  for (const field of Object.keys(soilFieldLabels) as SoilFieldKey[]) {
+    const source = value[field]
+    if (!source) continue
+    const provenance: SoilFieldProvenance = {
+      sourceType: isOneOf(source.sourceType, ['farmer-reported', 'lab-analysis', 'other-source']) ? source.sourceType : undefined,
+      sourceName: typeof source.sourceName === 'string' ? source.sourceName.trim().slice(0, 120) || undefined : undefined,
+      sampleDate: isIsoDate(source.sampleDate) ? source.sampleDate : undefined,
+      samplingMethod: typeof source.samplingMethod === 'string' ? source.samplingMethod.trim().slice(0, 120) || undefined : undefined,
+    }
+    if (Object.values(provenance).some(Boolean)) cleaned[field] = provenance
+  }
+  return Object.keys(cleaned).length ? cleaned : undefined
 }
 
 export function clearSoilProfile(point: GeoPoint) {
