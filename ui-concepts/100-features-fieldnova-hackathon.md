@@ -125,7 +125,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 53. **[P0 · LIVRÉ] Trace d’outils réelle** : le chat affiche les lectures locales, requêtes NASA POWER, actions de couche et statuts réellement exécutés.
 54. **[P0 · LIVRÉ] Questions de suivi suggérées** : proposer pluie, température et humidité seulement lorsque la variable correspondante existe dans la dernière période NASA exploitable; adapter aussi la question NDVI à la couche affichée et conserver les actions vers les profils locaux et rotations.
 55. **[P1 · LIVRÉ] Réponses séparant source, calcul, déclaration et limite** : des badges distincts qualifient NASA POWER/GIBS, les calculs descriptifs FieldNova, les déclarations locales, les valeurs manquantes et les limites. Aucune hypothèse non calculée n’est présentée comme un fait.
-56. **[P1] Réponse courte pour le terrain** : produire une synthèse en langage simple, avec un lien vers les détails.
+56. **[P1 · LIVRÉ] Réponse courte pour le terrain** : les réponses longues s’ouvrent sur leur première phrase utile, nettoyée du balisage Markdown; la réponse complète, ses sources et les actions restent accessibles dans un panneau dépliable. Le résumé est extrait du texte de réponse et n’ajoute aucun fait.
 57. **[P1] « Pourquoi ce scénario ? »** : expliquer chaque règle et permettre de la désactiver ou la modifier.
 58. **[P1 · LIVRÉ] Refus des questions hors périmètre et des conseils non calculables** : une question non prise en charge n’appelle ni Codex ni un outil; une demande de dose/date d’irrigation ou de prédiction de rendement reçoit une explication des données manquantes et des limites, sans conseil inventé.
 59. **[P2] Dictée vocale** : capturer une question en extérieur et la relire avant envoi.

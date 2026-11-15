@@ -76,6 +76,21 @@ function coordinate(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(3).replace('.', ',')}° ${value < 0 ? negative : positive}`
 }
 
+function summarizeForField(answer: string) {
+  const explicitSummary = answer.match(/(?:^|\n)\s*En bref\s*:\s*([^\n]+)/i)?.[1]
+  const firstParagraph = answer.split(/\n\s*\n/).map(part => part.trim()).find(part => part && !/^(?:\||[-*•]\s|#{1,6}\s)/.test(part)) ?? answer.trim()
+  const usableParagraph = explicitSummary ? explicitSummary : /:\s*$/.test(firstParagraph) ? 'La comparaison complète et ses critères sont disponibles dans les détails.' : firstParagraph
+  const firstSentence = explicitSummary ? usableParagraph : usableParagraph.match(/^[\s\S]*?[.!?](?:\s|$)/)?.[0] ?? usableParagraph
+  const plain = firstSentence.replace(/\*\*|__|[*_`#]/g, '').replace(/\s+/g, ' ').trim()
+  if (plain.length <= 220) return plain
+  const cut = plain.slice(0, 217).lastIndexOf(' ')
+  return `${plain.slice(0, cut > 120 ? cut : 217).trimEnd()}…`
+}
+
+function detailedFieldAnswer(answer: string) {
+  return answer.replace(/^\s*En bref\s*:\s*[^\n]+\n(?:\s*\n)?/i, '').trim()
+}
+
 function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, layer: LayerId, selectedPoint: GeoPoint) {
   if (!series) return 'Je n’ai pas pu charger NASA POWER pour le point sélectionné. Vérifiez la connexion puis réessayez ; aucune valeur de démonstration n’est substituée aux données manquantes.'
   const records = series.records
@@ -217,6 +232,7 @@ export function AssistantPage() {
     { id: 1, role: 'assistant', text: 'Bonjour. Je peux consulter les données climatiques mensuelles NASA POWER et afficher les couches MODIS ou SMAP sur la carte. Cliquez sur la carte pour changer le point suivi, puis demandez-moi la pluie, la température, le NDVI ou l’humidité du sol.' },
   ])
   const [showDetails, setShowDetails] = useState(true)
+  const [expandedAnswers, setExpandedAnswers] = useState<Record<number, boolean>>({})
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const threadRef = useRef<HTMLDivElement>(null)
@@ -385,9 +401,7 @@ export function AssistantPage() {
                 {message.point && <small className="assistant-answer-point">Point utilisé · {message.point.latitude.toFixed(5).replace('.', ',')}° · {message.point.longitude.toFixed(5).replace('.', ',')}°</small>}
                 {Boolean(message.trace?.length) && <ThinkingState nodes={message.trace!} autoPlay={Boolean(message.running)} defaultExpanded={Boolean(message.running)} workingLabel={message.running ? 'Exécution des outils FieldNova' : message.traceHeading ?? 'Activité de l’assistant'} onSettled={() => setMessages(current => current.map(item => item.id === message.id ? { ...item, running: false } : item))} className="assistant-trace" />}
                 {Boolean(message.evidenceTags?.length) && <div className="assistant-evidence-tags" aria-label="Nature et limites des éléments utilisés">{message.evidenceTags!.map((tag, index) => <span key={`${message.id}-${index}`} className={`is-${tag.kind}`}>{tag.label}</span>)}</div>}
-                {message.text ? <p className="assistant-answer-text">{message.text}</p> : message.running ? <p className="assistant-pending">Consultation des données sélectionnées…</p> : null}
-                {message.sources && <AISources className="assistant-sources" label="Sources utilisées" sources={message.sources} />}
-                {message.text && <MessageActions text={message.text} actions={['copy', 'feedback']} quiet={false} className="assistant-actions" />}
+                {message.text && summarizeForField(message.text).length + 80 < message.text.trim().length ? <div className="assistant-field-answer"><div className="assistant-field-summary"><strong>En bref</strong><p>{summarizeForField(message.text)}</p></div><div className="assistant-answer-details"><button type="button" aria-expanded={Boolean(expandedAnswers[message.id])} onClick={() => setExpandedAnswers(current => ({ ...current, [message.id]: !current[message.id] }))}>{expandedAnswers[message.id] ? 'Masquer les détails' : 'Voir la réponse détaillée'}</button>{expandedAnswers[message.id] && <div className="assistant-answer-full"><p className="assistant-answer-text">{detailedFieldAnswer(message.text)}</p>{message.sources && <AISources className="assistant-sources" label="Sources utilisées" sources={message.sources} />}<MessageActions text={message.text} actions={['copy', 'feedback']} quiet={false} className="assistant-actions" /></div>}</div></div> : message.text ? <><p className="assistant-answer-text">{message.text}</p>{message.sources && <AISources className="assistant-sources" label="Sources utilisées" sources={message.sources} />}<MessageActions text={message.text} actions={['copy', 'feedback']} quiet={false} className="assistant-actions" /></> : message.running ? <p className="assistant-pending">Consultation des données sélectionnées…</p> : null}
               </>}
             </div>
           </article>)}
