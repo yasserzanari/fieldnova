@@ -132,9 +132,9 @@ export function OverviewPage() {
           <div className="map-location"><MapPinned size={15} /><span>{formatCoord(location.latitude, location.latitude < 0 ? 'S' : 'N')} · {formatCoord(location.longitude, location.longitude < 0 ? 'O' : 'E')}</span><small>Point suivi</small></div>
           <div className="overview-map-options">
             <div className="map-mode-switch" role="group" aria-label="Fond de carte">
-              <button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}><MapPinned size={13} />Plan</button>
-              <button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}><Satellite size={13} />NASA</button>
-              <button type="button" className={showNdvi ? 'is-active' : ''} onClick={() => setShowNdvi(value => !value)}><Activity size={13} />NDVI</button>
+              <button type="button" aria-pressed={baseLayer === 'streets'} className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}><MapPinned size={13} />Plan</button>
+              <button type="button" aria-pressed={baseLayer === 'nasa'} className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}><Satellite size={13} />NASA</button>
+              <button type="button" aria-pressed={showNdvi} className={showNdvi ? 'is-active' : ''} onClick={() => setShowNdvi(value => !value)}><Activity size={13} />NDVI</button>
             </div>
             <label className="overview-imagery-date">Date souhaitée <input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label>
           </div>

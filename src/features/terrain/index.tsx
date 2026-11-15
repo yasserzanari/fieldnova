@@ -60,7 +60,7 @@ export function TerrainPage() {
       <div className="terrain-map-topline">
         <div className="terrain-map-location"><MapPinned size={15} /><span>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</span><small>Point suivi</small></div>
         <div className="terrain-map-options">
-          <div className="terrain-base-switch" role="group" aria-label="Fond de carte"><button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Satellite</button></div>
+          <div className="terrain-base-switch" role="group" aria-label="Fond de carte"><button type="button" aria-pressed={baseLayer === 'streets'} className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" aria-pressed={baseLayer === 'nasa'} className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Satellite</button></div>
           <span className="terrain-latest-chip">MODIS · {gibsDateLabel(modisDate)} · SMAP {soilLayer === 'surface' ? 'surface' : 'racines'} · {gibsDateLabel(soilProductDate)}</span>
         </div>
       </div>
@@ -70,8 +70,8 @@ export function TerrainPage() {
       <aside className="terrain-panel terrain-layers-panel" aria-label="Couches d’humidité des sols">
         <header className="terrain-panel-heading"><div><span className="terrain-heading-icon"><Layers3 size={17} /></span><span><h2>Humidité du sol · NASA SMAP</h2><small>Produit L4 analysé · carte quotidienne</small></span></div><Satellite size={17} className="terrain-heading-satellite" /></header>
         <div className="terrain-layer-choice" role="group" aria-label="Profondeur du produit d’humidité">
-          <button type="button" className={soilLayer === 'surface' ? 'is-selected' : ''} onClick={() => setSoilLayer('surface')}><span className="terrain-layer-icon surface"><Droplets size={15} /></span><span><strong>Surface</strong><small>SMAP L4 · analyse de surface</small></span><i /></button>
-          <button type="button" className={soilLayer === 'root' ? 'is-selected' : ''} onClick={() => setSoilLayer('root')}><span className="terrain-layer-icon roots"><Sprout size={15} /></span><span><strong>Zone racinaire</strong><small>SMAP L4 · analyse racinaire</small></span><i /></button>
+          <button type="button" aria-pressed={soilLayer === 'surface'} className={soilLayer === 'surface' ? 'is-selected' : ''} onClick={() => setSoilLayer('surface')}><span className="terrain-layer-icon surface"><Droplets size={15} /></span><span><strong>Surface</strong><small>SMAP L4 · analyse de surface</small></span><i /></button>
+          <button type="button" aria-pressed={soilLayer === 'root'} className={soilLayer === 'root' ? 'is-selected' : ''} onClick={() => setSoilLayer('root')}><span className="terrain-layer-icon roots"><Sprout size={15} /></span><span><strong>Zone racinaire</strong><small>SMAP L4 · analyse racinaire</small></span><i /></button>
         </div>
         <div className="terrain-smap-source"><Satellite size={14} /><span><strong>NASA SMAP · L4</strong><small>Humidité analysée, modèle assimilant des observations SMAP · grille 9 km</small></span></div>
         <div className="terrain-note"><ShieldCheck size={13} /><span>Cette couche cartographique est modélisée et agrégée sur une grille large. Elle ne mesure pas directement votre parcelle.</span></div>
