@@ -163,7 +163,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 82. **[P0 · PARTIEL] Indicateur mesurable de couverture et d’activité** : la vue d’ensemble compte les domaines de données utilisables au point suivi (les exemples fictifs sont exclus) et le nombre de générations de comparaison réussies pour ce point, stocké sur l’appareil. Ce compteur mesure une exploration lancée, pas une décision adoptée ni un impact agricole.
 83. **[P1] Mesure des besoins des agriculteurs** : conduire quelques entretiens et faire apparaître ce qui a changé dans le produit.
 84. **[P1] Scénarios adaptés aux petites exploitations** : prendre en compte coût, main-d’œuvre et matériel, pas seulement la météo.
-85. **[P1] Scénarios de stress hydrique et thermique historiques** : mettre les événements passés en contexte local.
+85. **[P1 · LIVRÉ · INDICATEURS HISTORIQUES] Scénarios de stress hydrique et thermique** : compare les 12 dernières valeurs mensuelles disponibles à la fenêtre consécutive de 3 mois la plus sèche et à celle la plus chaude au point sélectionné; le classement montre pluie, température et humidité racinaire. Ces moyennes de grille ne détectent pas un événement agronomique validé et ne prédisent ni rendement ni impact futur.
 86. **[P1] Partage de modèles de rotation locaux** : publier les règles avec région, source et licence.
 87. **[P2] Comparaison de régions** : expliquer quelles différences proviennent du climat, du sol ou des cultures possibles.
 88. **[P2] Contribution volontaire d’observations** : laisser un agriculteur contribuer sans rendre publiques ses données par défaut.
