@@ -94,7 +94,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 ### D. Cultures et rotations — 31 à 40
 
-31. **[P0 · PARTIEL] Catalogue local de cultures** : un catalogue illustratif est documenté, mais il n’est pas restreint ni validé pour une région pilote.
+31. **[P0 · PARTIEL] Catalogue local de cultures** : l’utilisateur peut ajouter, pour chaque point suivi, une culture avec famille, statut de légumineuse, architecture racinaire et référence facultative. Ces déclarations locales entrent dans les métriques descriptives et sont reprises dans la justification, l’assistant de démarrage et l’export. Le catalogue initial reste illustratif; les entrées personnalisées ne sont pas vérifiées, et le catalogue n’est pas validé pour une région pilote.
 32. **[P0 · LIVRÉ] Carte d’une rotation sur plusieurs saisons** : trois séquences éditables montrent distinctement les cultures de chaque année.
 33. **[P0 · LIVRÉ] Rotation actuelle comme référence** : la séquence de référence est modifiable et sert de base aux écarts affichés.
 34. **[P0 · À VALIDER LOCALEMENT] Vérification des successions incompatibles** : aucune règle d’incompatibilité n’est appliquée sans source agronomique et validation adaptées à la région pilote.

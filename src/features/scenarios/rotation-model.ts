@@ -1,6 +1,6 @@
 import type { GeoPoint } from '../../lib/geo/location'
 
-export type CropId = 'wheat' | 'maize' | 'oats' | 'pea' | 'faba' | 'rapeseed' | 'sunflower' | 'beet'
+export type CropId = string
 export type RotationId = 'reference' | 'option-a' | 'option-b'
 export type RotationPriority = 'diversity' | 'alternation' | 'legume' | 'root'
 export type RotationPriorityWeights = Partial<Record<RotationPriority, 1 | 2 | 3>>
@@ -13,6 +13,9 @@ export type CropDefinition = {
   familyLabel: string
   isLegume: boolean
   rootArchitecture: 'fibrous' | 'taproot' | 'unknown'
+  origin?: 'reference-catalog' | 'local-declaration'
+  sourceName?: string
+  sourceUrl?: string
 }
 
 export type RotationPlan = {
@@ -61,8 +64,57 @@ export const priorityLabels: Record<RotationPriority, string> = {
   root: 'Alternance des racines connues',
 }
 
-const cropIds = new Set(cropCatalog.map(crop => crop.id))
+const customCropStoragePrefix = 'fieldnova:custom-crops:v1:'
 const storagePrefix = 'fieldnova:rotation-workspace:v1:'
+
+export function readCropCatalog(point: GeoPoint): CropDefinition[] {
+  const standard = cropCatalog.map(crop => ({ ...crop, origin: 'reference-catalog' as const }))
+  try {
+    const raw = localStorage.getItem(customCropStorageKey(point))
+    if (!raw) return standard
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return standard
+    const custom = parsed.flatMap((entry): CropDefinition[] => {
+      if (!entry || typeof entry !== 'object' || typeof entry.id !== 'string' || !entry.id.startsWith('local-')
+        || typeof entry.label !== 'string' || !entry.label.trim() || typeof entry.family !== 'string' || !entry.family.trim()
+        || typeof entry.familyLabel !== 'string' || !entry.familyLabel.trim() || typeof entry.isLegume !== 'boolean'
+        || !['fibrous', 'taproot', 'unknown'].includes(entry.rootArchitecture)) return []
+      const label = entry.label.trim().slice(0, 60)
+      return [{
+        id: entry.id.slice(0, 80), label, shortLabel: label.slice(0, 24), family: entry.family.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'custom',
+        familyLabel: entry.familyLabel.trim().slice(0, 60), isLegume: entry.isLegume, rootArchitecture: entry.rootArchitecture,
+        origin: 'local-declaration',
+        sourceName: typeof entry.sourceName === 'string' ? entry.sourceName.trim().slice(0, 120) || undefined : undefined,
+        sourceUrl: typeof entry.sourceUrl === 'string' && isHttpUrl(entry.sourceUrl) ? entry.sourceUrl : undefined,
+      }]
+    })
+    const ids = new Set(standard.map(crop => crop.id))
+    return [...standard, ...custom.filter(crop => !ids.has(crop.id) && (ids.add(crop.id), true))]
+  } catch {
+    return standard
+  }
+}
+
+export function addCustomCrop(point: GeoPoint, input: Omit<CropDefinition, 'id' | 'shortLabel' | 'origin'>) {
+  const label = input.label.trim()
+  const familyLabel = input.familyLabel.trim()
+  const family = input.family.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
+  if (!label || label.length > 60 || !familyLabel || familyLabel.length > 60 || !family || family.length > 40) throw new Error('Renseignez le nom et la famille (60 caractères maximum).')
+  if (input.sourceName && input.sourceName.length > 120) throw new Error('La référence ne peut pas dépasser 120 caractères.')
+  if (input.sourceUrl && !isHttpUrl(input.sourceUrl)) throw new Error('La référence doit être une URL HTTP ou HTTPS valide.')
+  const catalog = readCropCatalog(point)
+  if (catalog.some(crop => crop.label.localeCompare(label, 'fr', { sensitivity: 'base' }) === 0)) throw new Error('Cette culture existe déjà dans le catalogue de ce point.')
+  const id = `local-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`}`
+  const crop: CropDefinition = { ...input, id, label, shortLabel: label.slice(0, 24), family, familyLabel, origin: 'local-declaration' }
+  const custom = catalog.filter(entry => entry.origin === 'local-declaration')
+  localStorage.setItem(customCropStorageKey(point), JSON.stringify([...custom, crop]))
+  return crop
+}
+
+export function removeCustomCrop(point: GeoPoint, cropId: CropId) {
+  const custom = readCropCatalog(point).filter(crop => crop.origin === 'local-declaration' && crop.id !== cropId)
+  localStorage.setItem(customCropStorageKey(point), JSON.stringify(custom))
+}
 
 export function exampleRotationWorkspace(): RotationWorkspace {
   return {
@@ -77,7 +129,7 @@ export function exampleRotationWorkspace(): RotationWorkspace {
   }
 }
 
-export function readRotationWorkspace(point: GeoPoint): RotationWorkspace {
+export function readRotationWorkspace(point: GeoPoint, catalog = readCropCatalog(point)): RotationWorkspace {
   try {
     const raw = localStorage.getItem(rotationStorageKey(point))
     if (!raw) return exampleRotationWorkspace()
@@ -88,7 +140,10 @@ export function readRotationWorkspace(point: GeoPoint): RotationWorkspace {
       return {
         id,
         title: id === 'reference' ? 'Référence actuelle' : id === 'option-a' ? 'Option A' : 'Option B',
-        crops: Array.from({ length: 5 }, (_, index) => isCropId(stored?.crops?.[index]) ? stored.crops[index] : ''),
+        crops: Array.from({ length: 5 }, (_, index) => {
+          const cropId = stored?.crops?.[index]
+          return isCropId(cropId, catalog) ? cropId : ''
+        }),
       }
     })
     const priority = parsed.priority === 'alternation' || parsed.priority === 'legume' || parsed.priority === 'root' ? parsed.priority : 'diversity'
@@ -106,8 +161,8 @@ export function writeRotationWorkspace(point: GeoPoint, workspace: RotationWorks
   return stored
 }
 
-export function evaluateRotation(plan: RotationPlan) {
-  const crops = plan.crops.map(id => cropCatalog.find(crop => crop.id === id)).filter((crop): crop is CropDefinition => Boolean(crop))
+export function evaluateRotation(plan: RotationPlan, catalog = cropCatalog) {
+  const crops = plan.crops.map(id => catalog.find(crop => crop.id === id)).filter((crop): crop is CropDefinition => Boolean(crop))
   const distinctFamilies = new Set(crops.map(crop => crop.family)).size
   const repeatedFamilyTransitions = crops.slice(1).reduce((count, crop, index) => count + Number(crop.family === crops[index].family), 0)
   const legumeSeasons = crops.filter(crop => crop.isLegume).length
@@ -147,29 +202,29 @@ export function rotationCombinedScore(metrics: ReturnType<typeof evaluateRotatio
   return active.reduce((sum, [priority, weight]) => sum + normalized[priority] * weight, 0) / totalWeight
 }
 
-export function topRotations(plans: RotationPlan[], priority: RotationPriority | RotationPriorityWeights, unavailableCropIds: CropId[] = []) {
+export function topRotations(plans: RotationPlan[], priority: RotationPriority | RotationPriorityWeights, unavailableCropIds: CropId[] = [], catalog = cropCatalog) {
   const weights = typeof priority === 'string' ? { [priority]: 2 } : cleanPriorityWeights(priority)
-  const complete = plans.map(plan => ({ plan, metrics: evaluateRotation(plan) })).filter(item => item.metrics.complete && !item.plan.crops.some(id => id && unavailableCropIds.includes(id)))
+  const complete = plans.map(plan => ({ plan, metrics: evaluateRotation(plan, catalog) })).filter(item => item.metrics.complete && !item.plan.crops.some(id => id && unavailableCropIds.includes(id)))
   if (!complete.length) return []
   const best = Math.max(...complete.map(item => rotationCombinedScore(item.metrics, weights)))
   return complete.filter(item => Math.abs(rotationCombinedScore(item.metrics, weights) - best) < 1e-9).map(item => item.plan.id)
 }
 
-export function rotationWeightSensitivity(plans: RotationPlan[], weights: RotationPriorityWeights, unavailableCropIds: CropId[] = []) {
+export function rotationWeightSensitivity(plans: RotationPlan[], weights: RotationPriorityWeights, unavailableCropIds: CropId[] = [], catalog = cropCatalog) {
   const completeCount = plans.filter(plan => {
-    const metrics = evaluateRotation(plan)
+    const metrics = evaluateRotation(plan, catalog)
     return metrics.complete && !plan.crops.some(id => id && unavailableCropIds.includes(id))
   }).length
   if (completeCount < 2) return null
 
-  const baselineWinners = topRotations(plans, weights, unavailableCropIds).sort()
+  const baselineWinners = topRotations(plans, weights, unavailableCropIds, catalog).sort()
   const changedCriteria = new Set<RotationPriority>()
   let testedVariants = 0
   for (const [priority, weight] of Object.entries(weights) as Array<[RotationPriority, 1 | 2 | 3]>) {
     for (const delta of [-1, 1]) {
       const nextWeight = weight + delta
       if (nextWeight < 1 || nextWeight > 3) continue
-      const winners = topRotations(plans, { ...weights, [priority]: nextWeight as 1 | 2 | 3 }, unavailableCropIds).sort()
+      const winners = topRotations(plans, { ...weights, [priority]: nextWeight as 1 | 2 | 3 }, unavailableCropIds, catalog).sort()
       testedVariants += 1
       if (winners.join('|') !== baselineWinners.join('|')) changedCriteria.add(priority)
     }
@@ -177,9 +232,9 @@ export function rotationWeightSensitivity(plans: RotationPlan[], weights: Rotati
   return { completeCount, testedVariants, changedCriteria: [...changedCriteria] }
 }
 
-export function generateRotationOptions(reference: RotationPlan, priority: RotationPriority | RotationPriorityWeights, unavailableCropIds: CropId[]): [RotationPlan, RotationPlan] | null {
+export function generateRotationOptions(reference: RotationPlan, priority: RotationPriority | RotationPriorityWeights, unavailableCropIds: CropId[], catalog = cropCatalog): [RotationPlan, RotationPlan] | null {
   const weights = typeof priority === 'string' ? { [priority]: 2 } : cleanPriorityWeights(priority)
-  const available = cropCatalog.filter(crop => !unavailableCropIds.includes(crop.id))
+  const available = catalog.filter(crop => !unavailableCropIds.includes(crop.id))
   if (available.length < 2) return null
 
   const referenceKey = reference.crops.join('|')
@@ -188,7 +243,7 @@ export function generateRotationOptions(reference: RotationPlan, priority: Rotat
     if (crops.length === 5) {
       const key = crops.join('|')
       if (key === referenceKey) return
-      const metrics = evaluateRotation({ id: 'option-a', title: 'Option A', crops })
+      const metrics = evaluateRotation({ id: 'option-a', title: 'Option A', crops }, catalog)
       candidates.push({ crops: [...crops], metrics, score: rotationCombinedScore(metrics, weights), key })
       return
     }
@@ -202,7 +257,7 @@ export function generateRotationOptions(reference: RotationPlan, priority: Rotat
     || right.metrics.legumeSeasons - left.metrics.legumeSeasons
     || right.metrics.knownRootTransitions - left.metrics.knownRootTransitions
     || left.metrics.repeatedFamilyTransitions - right.metrics.repeatedFamilyTransitions
-    || compareCatalogOrder(left.crops, right.crops))
+    || compareCatalogOrder(left.crops, right.crops, catalog))
   const first = byPriority[0]
   const second = byPriority[1]
   if (!second) return null
@@ -217,14 +272,27 @@ function rotationStorageKey(point: GeoPoint) {
   return `${storagePrefix}${point.latitude.toFixed(4)},${point.longitude.toFixed(4)}`
 }
 
-function compareCatalogOrder(left: CropId[], right: CropId[]) {
+function compareCatalogOrder(left: CropId[], right: CropId[], catalog: CropDefinition[]) {
   for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
-    const difference = cropCatalog.findIndex(crop => crop.id === left[index]) - cropCatalog.findIndex(crop => crop.id === right[index])
+    const difference = catalog.findIndex(crop => crop.id === left[index]) - catalog.findIndex(crop => crop.id === right[index])
     if (difference) return difference
   }
   return left.length - right.length
 }
 
-function isCropId(value: unknown): value is CropId {
-  return typeof value === 'string' && cropIds.has(value as CropId)
+function isCropId(value: unknown, catalog: CropDefinition[]): value is CropId {
+  return typeof value === 'string' && catalog.some(crop => crop.id === value)
+}
+
+function customCropStorageKey(point: GeoPoint) {
+  return `${customCropStoragePrefix}${point.latitude.toFixed(4)},${point.longitude.toFixed(4)}`
+}
+
+function isHttpUrl(value: string) {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:'
+  } catch {
+    return false
+  }
 }
