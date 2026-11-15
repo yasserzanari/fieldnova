@@ -18,7 +18,7 @@ import { formatCropMonthWindow, monthWindowsOverlap, readCropCalendar, readFarmW
 import { declaredFarmOperationCount, farmOperations, operationAvailabilityLabels, readFarmOperationProfile } from '../../lib/farm/operation-availability'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatLength, formatPrecipitationRate, formatTemperature, useMeasurementSystem } from '../../lib/units/measurement-units'
-import { evaluateRotation, priorityLabels, readCropCatalog, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightsFor, type CropDefinition, type CropId, type RotationPriority } from '../scenarios/rotation-model'
+import { evaluateRotation, priorityLabels, readCropCatalog, readRotationWorkspace, rotationCombinedScore, rotationScoreMissingTraits, rotationSources, rotationWeightsFor, type CropDefinition, type CropId, type RotationPriority } from '../scenarios/rotation-model'
 import { AssistantSoilImportCard, type AssistantSoilImport } from './AssistantSoilImportCard'
 import './assistant.css'
 
@@ -268,16 +268,18 @@ function formatRotationAnswer(point: GeoPoint) {
       const crop = catalog.find(item => item.id === id)
       if (!crop) return 'culture inconnue'
       const root = crop.rootArchitecture === 'fibrous' ? 'racines fasciculées' : crop.rootArchitecture === 'taproot' ? 'racines pivotantes' : 'racines non documentées'
-      return `${crop.label} (${crop.familyLabel}${crop.isLegume ? ', légumineuse' : ''}, ${root}${crop.origin === 'local-declaration' ? ', traits locaux non vérifiés' : ''})`
+      return `${crop.label} (${crop.familyLabel}${crop.isLegume === true ? ', légumineuse' : crop.isLegume === false ? ', non légumineuse' : ', statut légumineuse inconnu'}, ${root}${crop.origin === 'local-declaration' ? ', traits locaux non vérifiés' : ''})`
     }).join(' → ')
     const unavailable = plan.id === 'reference' ? [] : [...new Set(plan.crops.filter((id): id is CropId => Boolean(id && constraints.unavailableCropIds.includes(id))))]
     const constraintStatus = unavailable.length ? ` Option exclue du classement car le profil déclare ${unavailable.map(id => catalog.find(crop => crop.id === id)?.label ?? id).join(', ')} indisponible(s).` : ''
-    const comparison = plan.id !== 'reference' && metrics.complete && referenceMetrics?.complete
+    const comparison = plan.id !== 'reference' && metrics.complete && referenceMetrics?.complete && rotationCombinedScore(metrics, priorityWeights) !== undefined && rotationCombinedScore(referenceMetrics, priorityWeights) !== undefined
       ? ` Écarts bruts par rapport à la référence : ${metrics.distinctFamilies - referenceMetrics.distinctFamilies} famille(s), ${metrics.repeatedFamilyTransitions - referenceMetrics.repeatedFamilyTransitions} répétition(s), ${metrics.legumeSeasons - referenceMetrics.legumeSeasons} année(s) avec légumineuse, ${metrics.knownRootTransitions - referenceMetrics.knownRootTransitions} transition(s) racinaire(s) documentée(s), ${metrics.preferredCropSeasons - referenceMetrics.preferredCropSeasons} année(s) avec culture préférée.`
       : ''
-    const rankingScore = metrics.complete ? (rotationCombinedScore(metrics, priorityWeights) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) : undefined
-    const priorityEvidence = plan.id !== 'reference' ? ` Note de tri pondérée : ${rankingScore === undefined ? 'non calculée, séquence incomplète' : `${rankingScore}/100`} avec ${prioritySummary}.` : ''
-    return `${plan.title} (${crops}) : ${metrics.distinctFamilies} familles botaniques distinctes, ${metrics.repeatedFamilyTransitions} répétition(s) de famille, ${metrics.legumeSeasons} année(s) avec légumineuse, ${metrics.knownRootTransitions} transition(s) entre architectures racinaires connues et ${metrics.preferredCropSeasons}/5 année(s) avec culture préférée déclarée.${comparison}${priorityEvidence}${constraintStatus}`
+    const scoreValue = metrics.complete ? rotationCombinedScore(metrics, priorityWeights) : undefined
+    const rankingScore = scoreValue === undefined ? undefined : (scoreValue * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })
+    const missingTraits = rotationScoreMissingTraits(metrics, priorityWeights)
+    const priorityEvidence = plan.id !== 'reference' ? ` Note de tri pondérée : ${rankingScore === undefined ? metrics.complete ? `suspendue, trait(s) inconnu(s) : ${missingTraits.join(' et ')}` : 'non calculée, séquence incomplète' : `${rankingScore}/100`} avec ${prioritySummary}.` : ''
+    return `${plan.title} (${crops}) : ${metrics.distinctFamilies} familles botaniques distinctes, ${metrics.repeatedFamilyTransitions} répétition(s) de famille, ${metrics.legumeSeasons} année(s) avec légumineuse connue${metrics.unknownLegumeSeasons ? ` et ${metrics.unknownLegumeSeasons} statut(s) inconnu(s)` : ''}, ${metrics.knownRootTransitions} transition(s) entre architectures racinaires connues${metrics.unknownRootSeasons ? ` et ${metrics.unknownRootSeasons} architecture(s) inconnue(s)` : ''}, ${metrics.preferredCropSeasons}/5 année(s) avec culture préférée déclarée.${comparison}${priorityEvidence}${constraintStatus}`
   })
   const unavailableLabels = constraints.unavailableCropIds.map(id => catalog.find(crop => crop.id === id)?.label ?? id)
   const preferredLabels = constraints.preferredCropIds.map(id => catalog.find(crop => crop.id === id)?.label ?? id)
