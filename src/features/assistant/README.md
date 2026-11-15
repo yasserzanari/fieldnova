@@ -1,6 +1,6 @@
 # Assistant FieldNova
 
-The Assistant route pairs a French chat with the shared interactive map. Clicking the map updates the selected coordinate across the application. The map can switch between OpenStreetMap, NASA MODIS true color and NDVI, and NASA SMAP surface and root-zone soil moisture.
+The Assistant route pairs a French chat with the shared interactive map. Clicking the map updates the selected coordinate across the application. The map can switch between OpenStreetMap, NASA MODIS true color and NDVI, and NASA SMAP surface and root-zone soil moisture. On narrow screens, an accessible Chat/Carte switcher gives the active panel the available viewport; Chat opens first so the composer is immediately reachable.
 
 Each user request and its reply retain the selected coordinate used for that tool call. Later map changes update the active context for new questions without relabeling earlier answers.
 
