@@ -102,7 +102,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 35. **[P1 · PARTIEL] Familles botaniques** : les cartes affichent désormais les familles année par année; le détail ouvre TAXREF/INPN, et les cartes comptent aussi les familles distinctes et répétitions consécutives. Aucune répétition n’est bloquée sans règle et validation locales.
 36. **[P1] Cultures de couverture** : ajouter une option dédiée, avec ses coûts opérationnels et ses limites locales.
 37. **[P1] Intercultures et mélanges** : représenter deux cultures simultanées et éviter de les traiter comme une rotation simple.
-38. **[P1 · PARTIEL] Calendrier cultural local** : fenêtres de semis et de récolte saisies par l’utilisateur et liées au point suivi, avec source/variété facultative. Aucune date n’est préremplie; les fenêtres sont visibles dans la justification de la rotation et consultables dans l’Assistant sans modifier le classement. Les durées de croissance, références régionales et validations agronomiques restent à intégrer.
+38. **[P1 · PARTIEL] Calendrier cultural local** : fenêtres de semis et de récolte saisies par l’utilisateur et liées au point suivi, avec source/variété facultative. Aucune date n’est préremplie; les fenêtres sont visibles dans la justification de la rotation, consultables dans l’Assistant et incluses dans l’export Markdown avec leur provenance, sans modifier le classement. Les durées de croissance, références régionales et validations agronomiques restent à intégrer.
 39. **[P2] Variétés et durées de cycle** : différencier les caractéristiques variétales des valeurs génériques de l’espèce.
 40. **[P2] Rotation éditable manuellement** : laisser l’agriculteur imposer une culture ou un ordre, puis recalculer les contraintes.
 
@@ -156,7 +156,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 77. **[P1 · LIVRÉ · COHÉRENCE PHYSIQUE PARTIELLE] Contrôle d’unité et de plage** : la traçabilité signale pluie négative, humidité de sol hors fraction 0–1 et maximum inférieur au minimum; les valeurs brutes restent inchangées. Pas de seuil statistique ni de validation agronomique.
 78. **[P1] Validation indépendante des règles agronomiques** : documenter la source ou l’avis expert, la région et la date de révision.
 79. **[P2] Comparaison avec une station de terrain** : évaluer un produit NASA contre une observation indépendante lorsque les données existent.
-80. **[P2 · LIVRÉ · MARKDOWN LOCAL] Téléchargement de la fiche de preuves** : « Exporter la fiche » génère une comparaison partageable avec rotations, scores et méthode, contexte NASA POWER sourcé et limites, profil de sol avec provenance déclarée et points à vérifier; les coordonnées précises sont omises par défaut et peuvent être incluses explicitement. Aucun envoi serveur ni PDF n’est prévu dans cet export.
+80. **[P2 · LIVRÉ · MARKDOWN LOCAL] Téléchargement de la fiche de preuves** : « Exporter la fiche » génère une comparaison partageable avec rotations, scores et méthode, contexte NASA POWER sourcé et limites, profil de sol avec provenance déclarée, calendriers culturaux saisis et sources facultatives; les coordonnées précises sont omises par défaut et peuvent être incluses explicitement. Aucun envoi serveur ni PDF n’est prévu dans cet export.
 
 ### I. Impact, adaptation et communauté — 81 à 90
 

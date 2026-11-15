@@ -405,6 +405,16 @@ export function RotationExplorer() {
     ] : [
       '- Aucun profil de ferme n’est renseigné pour ce point; accès et restrictions d’eau restent inconnus.',
     ]
+    const scenarioCropIds = [...new Set(currentWorkspace.plans.flatMap(plan => plan.crops).filter((id): id is CropId => Boolean(id)))]
+    const calendarLines = scenarioCropIds.map(id => {
+      const crop = catalog.find(item => item.id === id)
+      if (!crop) return `- Culture ${id} : calendrier inconnu.`
+      const entry = cropCalendar[id]
+      const source = entry?.sourceUrl
+        ? `; source déclarée : [${entry.sourceName || 'référence'}](${entry.sourceUrl})`
+        : entry?.sourceName ? `; référence déclarée : ${entry.sourceName}` : '; source non renseignée'
+      return `- ${crop.label} : semis ${formatCropMonthWindow(entry?.sowing)}; récolte ${formatCropMonthWindow(entry?.harvest)}${source}.`
+    })
     const rotationLines = currentWorkspace.plans.map(plan => {
       const metrics = evaluateRotation(plan, catalog)
       const crops = plan.crops.map((id, index) => {
@@ -450,6 +460,11 @@ export function RotationExplorer() {
       ...farmLines,
       'Ces catégories proviennent du profil local; elles ne donnent ni quota, ni dose, ni calendrier d’irrigation et ne participent pas au classement des rotations.',
       '',
+      '## Calendriers culturaux déclarés',
+      '',
+      ...(calendarLines.length ? calendarLines : ['- Aucune culture n’est renseignée dans les rotations.']),
+      'Ces fenêtres de semis et de récolte sont des déclarations locales pour le point suivi; les sources indiquées ne sont pas vérifiées par FieldNova. Les calendriers inconnus ne sont pas complétés par des dates supposées. Ces éléments n’influencent pas la génération ou le classement des rotations.',
+      '',
       '## Cultures ajoutées localement',
       '',
       ...(catalog.filter(crop => crop.origin === 'local-declaration').length ? catalog.filter(crop => crop.origin === 'local-declaration').map(crop => `- ${crop.label} · famille déclarée ${crop.familyLabel}; légumineuse déclarée : ${crop.isLegume ? 'oui' : 'non'}; racines : ${crop.rootArchitecture === 'fibrous' ? 'fasciculées' : crop.rootArchitecture === 'taproot' ? 'pivotantes' : 'inconnues'}; traits non vérifiés${crop.sourceName ? `; référence déclarée : ${crop.sourceName}` : ''}${crop.sourceUrl ? ` (${crop.sourceUrl})` : ''}.`) : ['- Aucune culture personnalisée pour ce point.']),
@@ -461,7 +476,7 @@ export function RotationExplorer() {
       '',
       'Les indicateurs comptent les familles botaniques, leurs répétitions entre années consécutives, la présence de légumineuses et les transitions entre architectures racinaires documentées. Chaque indicateur sélectionné est normalisé dans une plage de 0 à 1; son poids explicite est compris entre ×1 et ×3. Le générateur explore les séquences complètes du catalogue non exclues, puis ordonne par note pondérée, indicateurs bruts et ordre du catalogue. Les exclusions sont des contraintes saisies par l’utilisateur; le contexte NASA POWER et le profil local ne sont pas intégrés à cette note.',
       '',
-      'Cette fiche ne constitue pas un conseil agronomique. Elle ne prédit ni rendement, ni besoin en eau, ni évolution de la santé du sol. Les calendriers, variétés, contraintes de matériel, disponibilité d’eau et règles de succession locales restent à confirmer.',
+      'Cette fiche ne constitue pas un conseil agronomique. Elle ne prédit ni rendement, ni besoin en eau, ni évolution de la santé du sol. Les variétés, contraintes de matériel, disponibilité d’eau et règles de succession locales restent à confirmer.',
       '',
     ].join('\n')
     const url = URL.createObjectURL(new Blob([content], { type: 'text/markdown;charset=utf-8' }))
