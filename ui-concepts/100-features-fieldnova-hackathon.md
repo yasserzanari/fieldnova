@@ -109,7 +109,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 
 41. **[P0 · LIVRÉ] Trois scénarios comparables** : rotation de référence, option principale et option alternative générées.
 42. **[P0 · LIVRÉ] Classement compréhensible** : les métriques, règles de départage et raisons de sélection sont consultables; aucun score opaque n’est utilisé.
-43. **[P0 · PARTIEL] Priorité de comparaison** : le classement réagit à un critère unique sélectionné; la pondération de plusieurs préférences n’est pas encore prise en charge.
+43. **[P0 · LIVRÉ] Priorités de comparaison pondérées** : sélectionner plusieurs critères et leur attribuer un poids explicite de ×1 à ×3; les indicateurs bruts, normalisations et départages sont affichés. La note est un outil descriptif de tri, pas un score agronomique validé.
 44. **[P0 · PARTIEL] Panneau des compromis** : compare le critère choisi à la référence, rend visibles les autres écarts descriptifs et signale que rendements, coûts, eau, matériel et calendrier local ne sont pas évalués. Une comparaison fiable de ces contraintes nécessite des données locales validées.
 45. **[P1] Simulation de météo historique** : tester un scénario sur des années observées, sans le présenter comme prévision.
 46. **[P1] Scénario de disponibilité en eau** : comparer des hypothèses définies par l’utilisateur et montrer quelles données sont absentes.
@@ -147,7 +147,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 ### H. Validité, confiance et qualité des données — 71 à 80
 
 71. **[LIVRÉ · PARTIEL] Registre des sources et méthode** : registre suivi avec produits, paramètres, périodes, résolutions, liens et limites pour les sources actuelles; chaque vue ne référence pas encore tous les détails propres à chaque requête.
-72. **[P0 · LIVRÉ] Fiche de méthode du classement** : règles du critère principal, unités, filtres, départages et sélection de l’option alternative consultables depuis le panneau Scénarios; le rôle du climat et du sol est explicité.
+72. **[P0 · LIVRÉ] Fiche de méthode du classement** : formule des critères pondérés normalisés, unités, filtres, départages et sélection de l’option alternative consultables depuis le panneau Scénarios; le rôle du climat et du sol est explicité.
 73. **[P0 · LIVRÉ] Séparation entre observation, modèle et saisie utilisateur** : NASA POWER/MERRA-2 et GIBS/SMAP sont nommés comme données ou produits modélisés; le profil de sol et le profil de ferme gardent leur provenance déclarée; les valeurs inconnues restent vides.
 74. **[P0 · LIVRÉ] Dates et valeurs manquantes auditables** : NASA POWER exclut le mois en cours; la traçabilité expose la fenêtre de mois clos et, variable par variable, le nombre de valeurs exploitables et la liste des mois manquants.
 75. **[P1] Limites spatiales affichées sur la carte** : résolution régionale ou maille NASA visible près de toute valeur importante.
@@ -160,7 +160,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 ### I. Impact, adaptation et communauté — 81 à 90
 
 81. **[P0 · PARTIEL] Histoire d’une ferme pilote** : le script utilise une ferme explicitement fictive et un problème de comparaison générique; il manque un lieu et des priorités validés avec une exploitation réelle.
-82. **[P0 · PARTIEL] Indicateur mesurable de couverture** : la vue d’ensemble compte les domaines de données utilisables (NASA, ferme, sol, rotations) et exclut les profils fictifs. Cela mesure la couverture de la session, pas les décisions explorées ni un impact agricole; l’historique d’usage et une validation terrain restent à établir.
+82. **[P0 · PARTIEL] Indicateur mesurable de couverture** : la vue d’ensemble compte les domaines de données utilisables (NASA, ferme, sol, rotations) au point suivi et exclut les profils fictifs. Cela mesure la couverture de ce point, pas les décisions explorées ni un impact agricole; l’historique d’usage et une validation terrain restent à établir.
 83. **[P1] Mesure des besoins des agriculteurs** : conduire quelques entretiens et faire apparaître ce qui a changé dans le produit.
 84. **[P1] Scénarios adaptés aux petites exploitations** : prendre en compte coût, main-d’œuvre et matériel, pas seulement la météo.
 85. **[P1] Scénarios de stress hydrique et thermique historiques** : mettre les événements passés en contexte local.
