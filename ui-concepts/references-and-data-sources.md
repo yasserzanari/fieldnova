@@ -15,6 +15,14 @@ Dernière vérification documentaire : 15 novembre 2026. Ce registre distingue l
 - FieldNova dérive le centre et l’empreinte approximative de la cellule MERRA-2 native de plus proche voisin (0,5° latitude × 0,625° longitude). L’API appelée par l’application ne renvoie pas la version du service : le tableau de bord l’indique et ne fabrique pas une valeur de version.
 - Pour citer POWER dans une présentation : nommer NASA Langley Research Center et le projet POWER, l’API mensuelle, la date d’accès et la version si elle est fournie. Voir le [guide officiel de référence NASA POWER](https://power.larc.nasa.gov/docs/referencing/).
 
+### NASA POWER — climat quotidien
+
+- Service : [Daily API](https://power.larc.nasa.gov/docs/services/api/temporal/daily/) ; route point utilisée : `https://power.larc.nasa.gov/api/temporal/daily/point`.
+- Paramètres demandés : `PRECTOTCORR`, `T2M_MAX` et `T2M_MIN`; communauté `AG`; sortie JSON; longitude et latitude arrondies à 0,001°; une année choisie par l’utilisateur; dates transmises en UTC. Les données journalières NASA POWER sont définies en temps solaire local par défaut; FieldNova demande explicitement UTC et affiche le standard renvoyé.
+- Les valeurs -999 et les dates sans valeur restent manquantes. La fin de l’année courante est limitée au jour UTC précédent; une année passée demande l’année civile entière. La carte n’associe pas ces valeurs à une parcelle.
+- Les résultats sont conservés dans le cache local par point et année (15 minutes, avec repli ancien jusqu’à 180 jours libellé comme tel). L’export CSV garde les jours absents vides, indique la source et la date de récupération, et arrondit le point.
+- Les courbes et résumés sont descriptifs : cumul de précipitation des jours pourvus, plus forte pluie journalière et extrêmes T2M_MAX/T2M_MIN. Les valeurs quotidiennes ne sont pas des observations de la ferme et ne représentent pas un stress de culture.
+
 ### NASA EOSDIS GIBS — couches cartographiques
 
 FieldNova demande des tuiles à NASA GIBS pour les couches suivantes :
