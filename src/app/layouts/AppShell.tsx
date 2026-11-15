@@ -2,6 +2,7 @@ import { Bell, ChevronDown, ChevronLeft, CircleHelp, CloudRain, FlaskConical, Le
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { featureRoutes } from '../navigation'
+import { HelpDialog } from '../HelpDialog'
 import { isValidGeoPoint, useSelectedLocation } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
@@ -33,10 +34,12 @@ function readSidebarPreferences() {
 export function AppShell() {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
   const [sidebarWidth, setSidebarWidth] = useState(() => readSidebarPreferences().width)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readSidebarPreferences().collapsed)
   const [sidebarResizing, setSidebarResizing] = useState(false)
   const sidebarDrag = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null)
+  const helpButtonRef = useRef<HTMLButtonElement>(null)
   const [demoWorkspace, setDemoWorkspace] = useState<DemoWorkspace | null>(() => readDemoWorkspace())
   const [demoError, setDemoError] = useState('')
   const [quitPromptOpen, setQuitPromptOpen] = useState(false)
@@ -60,6 +63,11 @@ export function AppShell() {
     setPointEditorOpen(false)
     setPointError('')
     if (restoreFocus) requestAnimationFrame(() => pointTriggerRef.current?.focus())
+  }
+
+  const closeHelp = () => {
+    setHelpOpen(false)
+    requestAnimationFrame(() => helpButtonRef.current?.focus())
   }
 
   const openPointEditor = () => {
@@ -271,7 +279,7 @@ export function AppShell() {
           </div>}
           <div className="topbar-actions">
             <button className="icon-button" aria-label="Notifications"><Bell size={18} /></button>
-            <button className="icon-button" aria-label="Aide"><CircleHelp size={18} /></button>
+            <button ref={helpButtonRef} className="icon-button" type="button" aria-label="Ouvrir le guide FieldNova" onClick={() => setHelpOpen(true)}><CircleHelp size={18} /></button>
             <details className="profile-preferences"><summary className="profile-button" aria-label="Préférences de l’utilisateur" title="Préférences"><UserRound size={18} /></summary><div className="unit-preference-popover"><label htmlFor="measurement-system">Unités</label><select id="measurement-system" aria-label="Unités de mesure" value={measurementSystem} onChange={event => setMeasurementSystem(event.target.value === 'us-customary' ? 'us-customary' : 'metric')}><option value="metric">Métriques · °C, mm, km</option><option value="us-customary">États-Unis · °F, in, mi</option></select><small>Les exports NASA gardent leurs unités d’origine.</small></div></details>
           </div>
         </header>
@@ -285,6 +293,7 @@ export function AppShell() {
           <div><button type="button" className="demo-exit-cancel" ref={keepDemoButton} onClick={dismissQuitPrompt}>Continuer la démo</button><button type="button" className="demo-exit-confirm" onClick={quitDemo}>Quitter et restaurer</button></div>
         </section>
       </div>}
+      <HelpDialog open={helpOpen} onClose={closeHelp} />
     </div>
   )
 }
