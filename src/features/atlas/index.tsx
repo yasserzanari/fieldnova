@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Activity, CloudRain, Droplets, Layers2, LocateFixed, MapPinned, Minus, Plus, Search, ShieldCheck, Satellite, Sun, ThermometerSun } from 'lucide-react'
+import { Activity, CloudRain, Download, Droplets, Layers2, LocateFixed, MapPinned, Minus, Plus, Search, ShieldCheck, Satellite, Sun, ThermometerSun } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
+import { downloadPowerMonthlyCsv } from '../../lib/nasa/power-export'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import './atlas.css'
 
@@ -120,7 +121,7 @@ export function AtlasPage() {
     </div>
 
     <section className="atlas-data-timeline" aria-label="Graphiques climatiques NASA POWER">
-      <div className="atlas-timeline-controls"><div><span className="timeline-icon"><Activity size={16} /></span><span><strong>Série climatique NASA POWER</strong><small>{range} derniers mois · point suivi</small></span></div><div className="timeline-ranges" role="group" aria-label="Période du graphique">{[[3, '3 mois'], [6, '6 mois'], [12, '1 an']].map(([months, label]) => <button key={months} type="button" className={range === months ? 'is-active' : ''} onClick={() => setRange(Number(months))}>{label}</button>)}</div></div>
+      <div className="atlas-timeline-controls"><div><span className="timeline-icon"><Activity size={16} /></span><span><strong>Série climatique NASA POWER</strong><small>{range} derniers mois · point suivi</small></span></div><div className="atlas-timeline-actions"><div className="timeline-ranges" role="group" aria-label="Période du graphique">{[[3, '3 mois'], [6, '6 mois'], [12, '1 an']].map(([months, label]) => <button key={months} type="button" className={range === months ? 'is-active' : ''} onClick={() => setRange(Number(months))}>{label}</button>)}</div><button className="atlas-export-button" type="button" aria-label="Télécharger les séries mensuelles NASA POWER en CSV, avec coordonnées arrondies à 0,001 degré" title="CSV · coordonnées arrondies à 0,001° · valeurs absentes conservées vides" disabled={!series} onClick={() => series && downloadPowerMonthlyCsv(series)}><Download size={14} /><span>CSV</span></button></div></div>
       <PowerClimateChart records={series?.records ?? []} source={series?.source.join(' + ') ?? 'en attente'} months={range} title="Précipitations et température · données mensuelles NASA" compact />
     </section>
   </section>

@@ -77,7 +77,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 17. **[P1] Humidité de surface et racinaire SMAP** : distinguer clairement le produit cartographique SMAP des variables NASA POWER.
 18. **[P1] Incertitude ou qualité de couverture** : signaler nuages, trous temporels, valeurs manquantes ou couverture insuffisante lorsqu’une métadonnée existe.
 19. **[P2] Carte de comparaison de deux périodes** : afficher les différences saisonnières avec des plages temporelles comparables.
-20. **[P2] Télécharger les séries de la zone** : exporter un CSV avec coordonnées, unités, dates, source et valeurs manquantes conservées.
+20. **[P2 · LIVRÉ · EXPORT AU POINT] Télécharger les séries NASA POWER** : l’Atlas exporte la fenêtre mensuelle demandée avec les six paramètres, unités, mois absents conservés vides, source, date de récupération et mode réseau/cache. Le point est arrondi à 0,001° pour la confidentialité; ce CSV ne contient pas de statistiques zonales de parcelle.
 
 ### C. Sol et santé des sols — 21 à 30
 
