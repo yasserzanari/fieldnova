@@ -30,4 +30,14 @@
 .legend-gap { border:1px dashed #8d9288; background:#fffefa; }
 .legend-precip { background:#4081ad; }.legend-temperature { width:10px !important; height:2px !important; border-radius:0 !important; background:#b96d44; }.legend-wetness { background:#2b7547; }.legend-surface-wetness { width:10px !important; height:2px !important; border-radius:0 !important; background:#4081ad; }
 .power-chart-empty { display:grid; min-height:80px; flex:1; align-content:center; justify-items:center; gap:4px; color:#777465; font-size:8px; }
+.power-chart-data-table { flex:none; border-top:1px solid #ece9e0; color:#5e5b4c; }
+.power-chart-data-table summary { display:flex; min-height:30px; align-items:center; padding:3px 5px; color:#4f6b45; font-size:8px; font-weight:680; cursor:pointer; }
+.power-chart-data-table summary:focus-visible,.power-chart-data-scroll:focus-visible { outline:2px solid #78a85e; outline-offset:-2px; }
+.power-chart-data-scroll { max-height:148px; overflow:auto; border:1px solid #e9e6dc; border-radius:7px; }
+.power-chart-data-scroll table { width:100%; border-collapse:collapse; color:#555344; font-size:8px; text-align:left; }
+.power-chart-data-scroll th,.power-chart-data-scroll td { padding:5px 7px; border-bottom:1px solid #efede6; white-space:nowrap; }
+.power-chart-data-scroll thead th { position:sticky; z-index:1; top:0; background:#f5f5ee; color:#716e60; font-size:7px; font-weight:680; }
+.power-chart-data-scroll tbody th { color:#454638; font-weight:650; }
+.power-chart-data-table > p { margin:4px 5px 2px; color:#817d6e; font-size:7px; }
 @media(max-width:820px) { .power-chart-panel { min-height:180px; } }
+@media(max-width:560px) { .power-chart-data-table summary { min-height:40px; }.power-chart-data-scroll { max-height:120px; }.power-chart-data-scroll th,.power-chart-data-scroll td { padding:7px 8px; } }

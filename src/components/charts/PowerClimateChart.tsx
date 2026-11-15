@@ -90,5 +90,15 @@ export function PowerClimateChart({ records, requestedMonths, source, mode = 'cl
       {labelIndexes.map(index => <text key={visible[index].date} x={xAt(index)} y="101" className="power-chart-month" textAnchor="middle">{visible[index].month}</text>)}
     </svg> : <div className="power-chart-empty" role="status">{records.length ? 'NASA POWER n’a pas de valeur exploitable pour cet indicateur.' : 'Chargement des données NASA POWER…'}</div>}
     <footer className="power-chart-legend">{isSoil ? <><span><i className="legend-wetness" />GWETROOT · racines</span><span><i className="legend-surface-wetness" />GWETTOP · surface</span></> : <><span><i className="legend-precip" />PRECTOTCORR · {climatePrecipitationRateUnit(measurementSystem)}</span><span><i className="legend-temperature" />T2M · {climateTemperatureUnit(measurementSystem)}</span></>}{missingIndexes.length > 0 && <span><i className="legend-gap" />Mois sans valeur</span>}</footer>
+    <details className="power-chart-data-table">
+      <summary>Valeurs mensuelles · tableau accessible</summary>
+      <div className="power-chart-data-scroll" tabIndex={0} role="region" aria-label={`Valeurs détaillées · ${isSoil ? 'humidité du sol' : 'climat'}`}>
+        <table>
+          <thead><tr><th scope="col">Mois</th>{isSoil ? <><th scope="col">GWETTOP · surface</th><th scope="col">GWETROOT · racines</th></> : <><th scope="col">PRECTOTCORR · {climatePrecipitationRateUnit(measurementSystem)}</th><th scope="col">T2M · {climateTemperatureUnit(measurementSystem)}</th><th scope="col">T2M_MIN · {climateTemperatureUnit(measurementSystem)}</th><th scope="col">T2M_MAX · {climateTemperatureUnit(measurementSystem)}</th></>}</tr></thead>
+          <tbody>{visible.map(row => <tr key={row.date}><th scope="row">{row.month}</th>{isSoil ? <><td>{row.surfaceSoilWetness === undefined ? 'Manquant' : `${(row.surfaceSoilWetness * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`}</td><td>{row.rootZoneWetness === undefined ? 'Manquant' : `${(row.rootZoneWetness * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`}</td></> : <><td>{row.precipitationMmPerDay === undefined ? 'Manquant' : formatPrecipitationRate(row.precipitationMmPerDay, measurementSystem)}</td><td>{row.temperatureC === undefined ? 'Manquant' : formatTemperature(row.temperatureC, measurementSystem)}</td><td>{row.temperatureMinC === undefined ? 'Manquant' : formatTemperature(row.temperatureMinC, measurementSystem)}</td><td>{row.temperatureMaxC === undefined ? 'Manquant' : formatTemperature(row.temperatureMaxC, measurementSystem)}</td></>}</tr>)}</tbody>
+        </table>
+      </div>
+      <p>NASA POWER · période mensuelle demandée · valeurs absentes conservées comme « Manquant ».</p>
+    </details>
   </section>
 }
