@@ -62,7 +62,7 @@ export function startDemoWorkspace(): DemoWorkspace {
       isExample: true,
     })
     localStorage.setItem(`fieldnova:rotation-workspace:v1:${pointKey(point)}`, JSON.stringify(exampleRotationWorkspace()))
-    writeRotationConstraints(point, { unavailableCropIds: ['beet'] })
+    writeRotationConstraints(point, { unavailableCropIds: ['beet'], preferredCropIds: [] })
     localStorage.removeItem(`fieldnova:soil-profile:v1:${pointKey(point)}`)
     localStorage.removeItem(PARCEL_KEY)
     window.dispatchEvent(new CustomEvent('fieldnova:demo-mode-change'))
