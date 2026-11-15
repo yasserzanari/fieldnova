@@ -627,6 +627,7 @@ export function AssistantPage() {
     { label: 'Profil de sol', question: 'Lis mon profil de sol pour ce point.' },
     { label: 'Profil de ferme', question: 'Résume mon profil de ferme et mes contraintes d’eau.' },
     { label: 'Calendrier cultural', question: 'Quelles fenêtres de semis et de récolte sont renseignées ?' },
+    { label: 'Journal de terrain', question: 'Quelles observations ai-je enregistrées dans mon journal de terrain ?' },
     { label: 'Mes rotations', question: 'Compare mes rotations pour ce point.' },
   ].flat()
 
