@@ -152,6 +152,7 @@ export function AppShell() {
 
   return (
     <div className={`app-frame ${sidebarResizing ? 'is-resizing' : ''}`}>
+      <a className="skip-to-content" href="#main-content">Passer au contenu principal</a>
       <aside className={`app-sidebar ${menuOpen ? 'is-open' : ''} ${sidebarCollapsed ? 'is-collapsed' : ''} ${sidebarResizing ? 'is-resizing' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as CSSProperties}>
         <div className="sidebar-brand-row">
         <NavLink className="brand-lockup" to="/app/overview" aria-label="FieldNova, vue d’ensemble">
@@ -208,7 +209,7 @@ export function AppShell() {
             <button className="profile-button" aria-label="Profil de l’utilisateur"><UserRound size={18} /></button>
           </div>
         </header>
-        <main className="app-main"><Suspense fallback={<div className="route-loading" role="status">Ouverture de la vue…</div>}><Outlet /></Suspense></main>
+        <main className="app-main" id="main-content" tabIndex={-1}><Suspense fallback={<div className="route-loading" role="status">Ouverture de la vue…</div>}><Outlet /></Suspense></main>
       </div>
       {quitPromptOpen && <div className="demo-exit-backdrop" onClick={event => { if (event.target === event.currentTarget) dismissQuitPrompt() }}>
         <section className="demo-exit-dialog" role="dialog" aria-modal="true" aria-labelledby="demo-exit-title" aria-describedby="demo-exit-description">
