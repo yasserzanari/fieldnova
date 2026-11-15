@@ -414,10 +414,11 @@ export function RotationExplorer() {
       const crop = catalog.find(item => item.id === id)
       if (!crop) return `- Culture ${id} : calendrier inconnu.`
       const entry = cropCalendar[id]
+      const overlapLabel = (overlap: boolean | undefined) => overlap === undefined ? 'inconnu' : overlap ? 'mois communs déclarés' : 'aucun mois commun déclaré'
       const source = entry?.sourceUrl
         ? `; source déclarée : [${entry.sourceName || 'référence'}](${entry.sourceUrl})`
         : entry?.sourceName ? `; référence déclarée : ${entry.sourceName}` : '; source non renseignée'
-      return `- ${crop.label} : semis ${formatCropMonthWindow(entry?.sowing)}; récolte ${formatCropMonthWindow(entry?.harvest)}${source}.`
+      return `- ${crop.label} : semis ${formatCropMonthWindow(entry?.sowing)} (disponibilité ferme : ${overlapLabel(monthWindowsOverlap(entry?.sowing, farmWorkWindows.sowing))}); récolte ${formatCropMonthWindow(entry?.harvest)} (disponibilité ferme : ${overlapLabel(monthWindowsOverlap(entry?.harvest, farmWorkWindows.harvest))})${source}.`
     })
     const rotationLines = currentWorkspace.plans.map(plan => {
       const metrics = evaluateRotation(plan, catalog)
@@ -466,8 +467,9 @@ export function RotationExplorer() {
       '',
       '## Calendriers culturaux déclarés',
       '',
+      `- Disponibilité habituelle déclarée par la ferme : semis ${formatCropMonthWindow(farmWorkWindows.sowing)}; récolte ${formatCropMonthWindow(farmWorkWindows.harvest)}.`,
       ...(calendarLines.length ? calendarLines : ['- Aucune culture n’est renseignée dans les rotations.']),
-      'Ces fenêtres de semis et de récolte sont des déclarations locales pour le point suivi; les sources indiquées ne sont pas vérifiées par FieldNova. Les calendriers inconnus ne sont pas complétés par des dates supposées. Ces éléments n’influencent pas la génération ou le classement des rotations.',
+      'Ces fenêtres de semis, de récolte et de disponibilité sont des déclarations locales pour le point suivi; les sources indiquées ne sont pas vérifiées par FieldNova. Les chevauchements indiquent seulement des mois communs; ils ne valident ni faisabilité, ni disponibilité réelle du matériel. Les calendriers inconnus ne sont pas complétés par des dates supposées. Ces éléments n’influencent pas la génération ou le classement des rotations.',
       '',
       '## Cultures ajoutées localement',
       '',
