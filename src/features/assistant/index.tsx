@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Activity, ChevronDown, CircleHelp, CloudRain, Droplets, Layers3, Leaf, LocateFixed, MapPin, Maximize2, Minus, Plus, Send, ShieldCheck, Sparkles, Sprout, ThermometerSun, X } from 'lucide-react'
+import { Activity, ChevronDown, CircleHelp, CloudRain, Droplets, Layers3, Leaf, LocateFixed, Map as MapIcon, MapPin, Maximize2, MessageCircle, Minus, Plus, Send, ShieldCheck, Sparkles, Sprout, ThermometerSun, X } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { ThinkingState, type TraceNode } from '../../components/ai-chat/ai-agent-response'
 import AISources, { type AISource } from '../../components/ai-chat/ai-sources'
@@ -242,6 +242,7 @@ export function AssistantPage() {
     { id: 1, role: 'assistant', text: 'Bonjour. Je peux consulter les données climatiques mensuelles NASA POWER et afficher les couches MODIS ou SMAP sur la carte. Cliquez sur la carte pour changer le point suivi, puis demandez-moi la pluie, la température, le NDVI ou l’humidité du sol.' },
   ])
   const [showDetails, setShowDetails] = useState(true)
+  const [mobileView, setMobileView] = useState<'chat' | 'map'>('chat')
   const [expandedAnswers, setExpandedAnswers] = useState<Record<number, boolean>>({})
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
   const [map, setMap] = useState<MapLibreMap | null>(null)
@@ -400,7 +401,11 @@ export function AssistantPage() {
   ].flat()
 
   return (
-    <section className="assistant-workspace" aria-label="Assistant agricole et carte NASA interactive">
+    <section className={`assistant-workspace assistant-mobile-${mobileView}`} aria-label="Assistant agricole et carte NASA interactive">
+      <div className="assistant-mobile-view-switcher" role="group" aria-label="Vue mobile de l’assistant">
+        <button type="button" aria-pressed={mobileView === 'chat'} onClick={() => setMobileView('chat')}><MessageCircle size={16} /> Chat</button>
+        <button type="button" aria-pressed={mobileView === 'map'} onClick={() => setMobileView('map')}><MapIcon size={16} /> Carte</button>
+      </div>
       <aside className="assistant-chat-panel">
         <header className="assistant-chat-header">
           <div className="assistant-avatar"><Sparkles size={18} /></div>
