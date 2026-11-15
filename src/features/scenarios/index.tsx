@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties } from 'react'
-import { Activity, CalendarDays, CloudRain, Droplets, ExternalLink, LocateFixed, MapPinned, RefreshCw, ShieldCheck, ThermometerSun } from 'lucide-react'
+import { Activity, CalendarDays, CloudRain, Download, Droplets, ExternalLink, LocateFixed, MapPinned, RefreshCw, ShieldCheck, ThermometerSun } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link, useSearchParams } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
@@ -14,7 +14,7 @@ import './scenarios.css'
 
 type CaseId = 'reference' | 'dry' | 'heat' | 'year'
 type Priority = 'water' | 'rain' | 'heat'
-type ClimateCase = { id: CaseId; title: string; description: string; period: string; count: number; rain?: number; rainCount: number; temperature?: number; temperatureCount: number; wetness?: number; wetnessCount: number }
+type ClimateCase = { id: CaseId; title: string; description: string; period: string; startMonth: string; endMonth: string; count: number; rain?: number; rainCount: number; temperature?: number; temperatureCount: number; wetness?: number; wetnessCount: number }
 
 const caseCopy: Record<CaseId, { title: string; description: string; icon: typeof Activity }> = {
   reference: { title: 'Référence récente', description: '12 dernières valeurs mensuelles valides', icon: Activity },
@@ -49,6 +49,8 @@ function summarizeCase(id: CaseId, records: PowerMonthlyRecord[]): ClimateCase |
     id,
     ...caseCopy[id],
     period: first === last ? first : `${first} – ${last}`,
+    startMonth: records[0].date,
+    endMonth: records[records.length - 1].date,
     count: records.length,
     rain: average(records.map(record => record.precipitationMmPerDay)),
     rainCount: records.filter(record => record.precipitationMmPerDay !== undefined && Number.isFinite(record.precipitationMmPerDay)).length,
@@ -97,6 +99,43 @@ function formatMetric(value: number | undefined, unit: string, decimals = 1) {
 
 function formatCoord(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(3).replace('.', ',')}° ${value < 0 ? negative : positive}`
+}
+
+function downloadClimateComparisonCsv(series: NonNullable<ReturnType<typeof usePowerMonthly>['series']>, cases: ClimateCase[], priority: Priority) {
+  const quote = (value: string | number) => {
+    let text = String(value)
+    if (typeof value === 'string' && /^[=+@\t\r-]/.test(text)) text = `'${text}`
+    return `"${text.replaceAll('"', '""')}"`
+  }
+  const headers = ['period_id', 'period_name', 'start_month_utc', 'end_month_utc', 'months_in_period', 'precipitation_mean_mm_day', 'precipitation_months_used', 'temperature_mean_c', 'temperature_months_used', 'root_zone_wetness_mean_fraction', 'root_zone_wetness_months_used', 'selected_monitoring_criterion', 'nasa_power_sources', 'retrieved_at_utc', 'delivery_mode', 'merra2_grid_center_latitude', 'merra2_grid_center_longitude', 'merra2_grid_resolution_degrees', 'data_note']
+  const rows = cases.map(item => [
+    item.id,
+    item.title,
+    item.startMonth,
+    item.endMonth,
+    item.count,
+    item.rain ?? '',
+    item.rainCount,
+    item.temperature ?? '',
+    item.temperatureCount,
+    item.wetness ?? '',
+    item.wetnessCount,
+    priorityCopy[priority].title,
+    series.source.join(', '),
+    series.fetchedAt,
+    series.deliveryMode,
+    series.gridPoint.latitude.toFixed(3),
+    series.gridPoint.longitude.toFixed(3),
+    '0.5 x 0.625',
+    series.deliveryMode === 'demo-fixture' ? 'Archived NASA POWER demo snapshot; not current live data. Monthly means use present values only; no interpolation.' : 'NASA POWER monthly grid context, not parcel measurements. Monthly means use present values only; no interpolation.',
+  ])
+  const csv = `\uFEFF${[headers, ...rows].map(row => row.map(quote).join(';')).join('\r\n')}\r\n`
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `fieldnova-climat-historique-${new Date().toISOString().slice(0, 10)}.csv`
+  anchor.click()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
 export function ScenariosPage() {
@@ -183,7 +222,7 @@ function ClimateScenariosPage() {
       </aside>
 
       <aside className="scenario-panel scenario-results-panel" aria-label="Comparaison des observations NASA">
-        <header className="scenario-panel-heading results-heading"><div><span className="scenario-icon results-icon"><Droplets size={16} /></span><span><h2>Mesures par période</h2><small>NASA POWER · maille MERRA-2 (0,5° × 0,625°)</small></span></div></header>
+        <header className="scenario-panel-heading results-heading"><div><span className="scenario-icon results-icon"><Droplets size={16} /></span><span><h2>Mesures par période</h2><small>NASA POWER · maille MERRA-2 (0,5° × 0,625°)</small></span></div><button className="scenario-export-csv" type="button" disabled={!series || !displayedCases.length} aria-label="Télécharger les périodes historiques affichées en CSV" title="CSV des périodes visibles, sans coordonnées précises" onClick={() => series && downloadClimateComparisonCsv(series, displayedCases, priority)}><Download size={12} /><span>CSV</span></button></header>
         {loading ? <div className="scenario-data-state" role="status">Récupération de NASA POWER…</div> : error ? <div className="scenario-data-error" role="alert">Données indisponibles pour ce point.</div> : displayedCases.length ? <>
           <div className="scenario-results-table" style={{ '--scenario-count': Math.max(1, displayedCases.length) } as CSSProperties} role="table" aria-label="Moyennes NASA POWER des périodes historiques"><div className="scenario-table-row table-header" role="row"><span role="columnheader">Indicateur moyen</span>{displayedCases.map(item => <span key={item.id} className={`scenario-cell-${item.id}`} role="columnheader">{item.title}</span>)}</div>
             <MetricRow icon={<CloudRain size={14} />} label={`Pluie · ${climatePrecipitationRateUnit(measurementSystem)}`} metric="rain" records={displayedCases} measurementSystem={measurementSystem} />
