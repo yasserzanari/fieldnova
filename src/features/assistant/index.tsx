@@ -125,6 +125,13 @@ function classifyQuestion(question: string) {
   return { intent, asksLayer }
 }
 
+function asksForUnsupportedFarmDecision(question: string) {
+  const lower = question.toLocaleLowerCase('fr')
+  const asksIrrigationDose = /\b(?:dose|quantité|volume|combien de)\b.{0,35}\b(?:irrig|eau)|\b(?:irrig|arros).{0,35}\b(?:dose|quantité|volume|combien de|date|quand)|\bquand irriguer\b/.test(lower)
+  const asksYieldPrediction = /\b(?:prédire|prediction|prévision|estimer|estimation)\b.{0,35}\b(?:rendement|récolte)|\b(?:rendement|récolte)\b.{0,35}\b(?:prédire|prediction|prévision|estimer|estimation)/.test(lower)
+  return asksIrrigationDose || asksYieldPrediction
+}
+
 function formatFarmProfileAnswer(point: GeoPoint) {
   const farm = readFarmProfile(point)
   if (!farm) return 'Aucun profil d’exploitation n’est enregistré pour ce point. Vous pouvez le configurer depuis la Vue d’ensemble. FieldNova ne déduit pas l’accès à l’eau ni les priorités de la ferme à partir des données satellite.'
@@ -234,6 +241,7 @@ export function AssistantPage() {
     const id = ++lastId.current
     const userId = ++lastId.current
     const route = classifyQuestion(question)
+    const unsupportedFarmDecision = asksForUnsupportedFarmDecision(question)
     const messagePoint = { latitude: location.latitude, longitude: location.longitude }
     const requestedLayer = route.asksLayer ?? layer
     if (route.asksLayer) setLayer(route.asksLayer)
@@ -279,10 +287,16 @@ export function AssistantPage() {
       evidence = answer
       usedSources = [farmProfileSource(location), soilProfileSource(location), rotationWorkspaceSource]
       evidenceTags = [{ label: 'Déclarations locales', kind: 'local' }, { label: 'Calcul FieldNova', kind: 'calculation' }, { label: 'Non vérifié sur le terrain', kind: 'limit' }]
-    } else if (route.intent === 'unknown') {
-      answer = 'Je peux agir sur les données NASA POWER mensuelles, les couches NASA de la carte, le profil de sol saisi localement et les rotations enregistrées. Posez une question sur la pluie, la température, l’humidité, le NDVI, le sol ou une rotation; aucune donnée n’a été consultée pour cette question.'
-      evidence = 'Capacités disponibles : NASA POWER mensuel, couches MODIS/SMAP de la carte, profil de sol local saisi par l’utilisateur, scénarios de rotation locaux. Aucun outil n’a été exécuté pour cette question.'
-      evidenceTags = [{ label: 'Aucun outil consulté', kind: 'missing' }]
+    } else if (route.intent === 'unknown' || unsupportedFarmDecision) {
+      answer = unsupportedFarmDecision
+        ? 'Je ne peux pas calculer une dose ou une date d’irrigation, ni prédire un rendement. Les séries NASA disponibles sont mensuelles et régionales; il manque notamment des mesures de parcelle, la culture et son stade, l’état hydrique local et les contraintes réelles. Je peux expliquer les données climatiques disponibles, lire les informations saisies dans FieldNova ou comparer les rotations enregistrées. Aucun calcul de conseil n’a été exécuté.'
+        : 'Je ne peux pas traiter cette question avec les outils disponibles dans FieldNova. Je peux consulter les séries NASA POWER mensuelles, les couches NASA de la carte, le profil local du sol et les rotations enregistrées. Aucune donnée n’a été consultée pour cette question.'
+      evidence = answer
+      evidenceTags = unsupportedFarmDecision
+        ? [{ label: 'Décision non calculable', kind: 'missing' }, { label: 'Données insuffisantes', kind: 'limit' }]
+        : [{ label: 'Hors périmètre FieldNova', kind: 'missing' }, { label: 'Aucun outil consulté', kind: 'limit' }]
+      trace.push({ id: `scope-${id}`, type: 'step', primary: unsupportedFarmDecision ? 'Demande de conseil non prise en charge' : 'Question hors périmètre FieldNova', secondary: 'Aucun outil NASA ou calcul de scénario exécuté', status: 'completed' })
+      traceHeading = 'Limite de réponse expliquée'
     } else {
       let failed = false
       const seriesAlreadyLoaded = Boolean(currentSeries && currentSeries.point.latitude === location.latitude && currentSeries.point.longitude === location.longitude)
@@ -309,7 +323,7 @@ export function AssistantPage() {
         ? [{ label: 'NASA POWER · donnée mensuelle modélisée', kind: 'source' }, ...(route.asksLayer?.includes('ndvi') ? [{ label: 'Imagerie NASA GIBS', kind: 'source' } as EvidenceTag] : []), { label: 'Maille régionale · pas un diagnostic parcellaire', kind: 'limit' }]
         : [{ label: 'Donnée NASA indisponible', kind: 'missing' }, { label: 'Aucune valeur de remplacement', kind: 'limit' }]
     }
-    if (!files.length && codexStatus === 'ready') {
+    if (!files.length && codexStatus === 'ready' && route.intent !== 'unknown' && !unsupportedFarmDecision) {
       try {
         const response = await fetch('/api/codex/reply', {
           method: 'POST',
@@ -329,7 +343,7 @@ export function AssistantPage() {
         trace.push({ id: `codex-${id}`, type: 'step', primary: 'Codex CLI indisponible · réponse locale utilisée', secondary: 'Aucune donnée supplémentaire n’a été consultée', status: 'failed' })
         traceHeading = 'Réponse locale FieldNova'
       }
-    } else if (!files.length && codexStatus === 'unavailable') {
+    } else if (!files.length && codexStatus === 'unavailable' && route.intent !== 'unknown' && !unsupportedFarmDecision) {
       trace.push({ id: `codex-${id}`, type: 'step', primary: 'Codex CLI non connecté · réponse locale utilisée', secondary: 'Connectez Codex CLI sur le serveur de démonstration', status: 'failed' })
       traceHeading = 'Réponse locale FieldNova'
     }
