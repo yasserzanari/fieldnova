@@ -38,6 +38,13 @@
 .message-user .assistant-message-body { display:flex; flex:0 1 91%; justify-content:flex-end; }
 .assistant-user-bubble { max-width:100%; padding:9px 11px; border:1px solid #e5ead9; border-radius:12px 12px 3px 12px; background:#f0f4e7; color:#3d4437; font-size:10px; line-height:1.48; }
 .assistant-answer-text { margin:7px 0 0; color:#454438; font-size:10px; line-height:1.58; white-space:pre-wrap; }
+.assistant-field-answer { margin-top:7px; padding:9px 10px; border:1px solid #e5eadc; border-radius:10px; background:#f7f8f2; }
+.assistant-field-summary > strong { display:block; margin-bottom:4px; color:#527149; font-size:8px; font-weight:750; letter-spacing:.04em; text-transform:uppercase; }
+.assistant-field-summary > p { margin:0; color:#414438; font-size:10px; font-weight:580; line-height:1.5; white-space:pre-wrap; }
+.assistant-answer-details { margin-top:7px; border-top:1px solid #e7e9e0; }
+.assistant-answer-details > button { display:block; width:max-content; max-width:100%; padding:7px 0 0; border:0; background:transparent; color:#66745a; font-size:8px; font-weight:680; cursor:pointer; }
+.assistant-answer-details > button:hover { color:#335b37; text-decoration:underline; }
+.assistant-answer-full > .assistant-answer-text { margin-top:8px; }
 .assistant-pending { margin:8px 0 0; color:#807c6d; font-size:9px; font-style:italic; }
 .assistant-trace { margin:0 0 6px; }
 .assistant-trace button { font-size:9px !important; }
