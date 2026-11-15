@@ -20,8 +20,8 @@ export const GIBS_PRODUCTS = {
 } as const
 
 export type GibsProduct = keyof typeof GIBS_PRODUCTS
-type DatePeriod = { start: string; end: string; stepDays: number }
-export type GibsAvailability = Record<GibsProduct, DatePeriod[]>
+export type GibsDatePeriod = { start: string; end: string; stepDays: number }
+export type GibsAvailability = Record<GibsProduct, GibsDatePeriod[]>
 
 export function formatGibsDate(date: string | null) {
   if (!date) return 'date du produit indisponible'
@@ -32,7 +32,7 @@ const CACHE_TTL_MS = 15 * 60 * 1000
 let cache: { fetchedAt: number; value: GibsAvailability } | null = null
 let request: Promise<GibsAvailability> | null = null
 
-function parsePeriods(xml: string, product: GibsProduct): DatePeriod[] {
+function parsePeriods(xml: string, product: GibsProduct): GibsDatePeriod[] {
   const document = new DOMParser().parseFromString(xml, 'application/xml')
   if (document.querySelector('parsererror')) throw new Error('Réponse de disponibilité NASA illisible.')
   const domain = document.getElementsByTagName('Domain')[0]?.textContent?.trim()
@@ -70,7 +70,36 @@ function loadAvailability() {
   return request
 }
 
-export function resolveGibsDate(requestedDate: string, periods: DatePeriod[] | undefined): string | null {
+export function listGibsDates(periods: GibsDatePeriod[] | undefined): string[] {
+  if (!periods?.length) return []
+  const dates = new Set<string>()
+  for (const period of periods) {
+    const start = Date.parse(`${period.start}T00:00:00Z`)
+    const end = Date.parse(`${period.end}T00:00:00Z`)
+    if (![start, end].every(Number.isFinite) || end < start || period.stepDays < 1) continue
+    const step = period.stepDays * 86_400_000
+    for (let value = start; value <= end; value += step) dates.add(new Date(value).toISOString().slice(0, 10))
+  }
+  return [...dates].sort()
+}
+
+export function sampleGibsDates(dates: string[], intervalDays: number): string[] {
+  if (!Number.isInteger(intervalDays) || intervalDays < 1) return []
+  const sorted = [...new Set(dates)].sort().reverse()
+  const selected: string[] = []
+  let lastTimestamp: number | undefined
+  for (const date of sorted) {
+    const timestamp = Date.parse(`${date}T00:00:00Z`)
+    if (!Number.isFinite(timestamp)) continue
+    if (lastTimestamp === undefined || lastTimestamp - timestamp >= intervalDays * 86_400_000) {
+      selected.push(date)
+      lastTimestamp = timestamp
+    }
+  }
+  return selected.reverse()
+}
+
+export function resolveGibsDate(requestedDate: string, periods: GibsDatePeriod[] | undefined): string | null {
   if (!periods?.length || !/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) return null
   const requested = Date.parse(`${requestedDate}T00:00:00Z`)
   let nearest: { date: string; distance: number } | null = null
