@@ -14,7 +14,7 @@ import './scenarios.css'
 
 type CaseId = 'reference' | 'dry' | 'heat' | 'year'
 type Priority = 'water' | 'rain' | 'heat'
-type ClimateCase = { id: CaseId; title: string; description: string; period: string; count: number; rain?: number; temperature?: number; wetness?: number }
+type ClimateCase = { id: CaseId; title: string; description: string; period: string; count: number; rain?: number; rainCount: number; temperature?: number; temperatureCount: number; wetness?: number; wetnessCount: number }
 
 const caseCopy: Record<CaseId, { title: string; description: string; icon: typeof Activity }> = {
   reference: { title: 'Référence récente', description: '12 dernières valeurs mensuelles valides', icon: Activity },
@@ -51,8 +51,11 @@ function summarizeCase(id: CaseId, records: PowerMonthlyRecord[]): ClimateCase |
     period: first === last ? first : `${first} – ${last}`,
     count: records.length,
     rain: average(records.map(record => record.precipitationMmPerDay)),
+    rainCount: records.filter(record => record.precipitationMmPerDay !== undefined && Number.isFinite(record.precipitationMmPerDay)).length,
     temperature: average(records.map(record => record.temperatureC)),
+    temperatureCount: records.filter(record => record.temperatureC !== undefined && Number.isFinite(record.temperatureC)).length,
     wetness: average(records.map(record => record.rootZoneWetness)),
+    wetnessCount: records.filter(record => record.rootZoneWetness !== undefined && Number.isFinite(record.rootZoneWetness)).length,
   }
 }
 
@@ -201,5 +204,9 @@ function ClimateScenariosPage() {
 }
 
 function MetricRow({ icon, label, metric, records, measurementSystem }: { icon: React.ReactNode; label: string; metric: 'rain' | 'temperature' | 'wetness'; records: ClimateCase[]; measurementSystem: ReturnType<typeof useMeasurementSystem> }) {
-  return <div className="scenario-table-row metric-row" role="row"><span role="rowheader">{icon}{label}</span>{records.map(item => { const value = metric === 'rain' ? item.rain === undefined ? '—' : formatPrecipitationRate(item.rain, measurementSystem) : metric === 'temperature' ? item.temperature === undefined ? '—' : formatTemperature(item.temperature, measurementSystem) : formatMetric(item.wetness === undefined ? undefined : item.wetness * 100, '%', 0); return <span key={item.id} className={`scenario-cell-${item.id}`} role="cell" title={`${item.period} · ${value}`}>{value}</span> })}</div>
+  return <div className="scenario-table-row metric-row" role="row"><span role="rowheader">{icon}{label}</span>{records.map(item => {
+    const value = metric === 'rain' ? item.rain === undefined ? '—' : formatPrecipitationRate(item.rain, measurementSystem) : metric === 'temperature' ? item.temperature === undefined ? '—' : formatTemperature(item.temperature, measurementSystem) : formatMetric(item.wetness === undefined ? undefined : item.wetness * 100, '%', 0)
+    const available = metric === 'rain' ? item.rainCount : metric === 'temperature' ? item.temperatureCount : item.wetnessCount
+    return <span key={item.id} className={`scenario-cell-${item.id}`} role="cell" title={`${item.period} · ${value} · ${available}/${item.count} mois disponibles`} aria-label={`${value}, ${available} sur ${item.count} mois disponibles`}><span className="scenario-metric-value"><strong>{value}</strong><small>{available}/{item.count} mois</small></span></span>
+  })}</div>
 }
