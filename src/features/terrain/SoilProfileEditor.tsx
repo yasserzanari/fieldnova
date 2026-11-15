@@ -126,7 +126,7 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
     profile.organicMatterPercent !== undefined ? `${decimal(profile.organicMatterPercent)} % MO` : undefined,
     profile.effectiveDepthCm !== undefined ? formatLength(profile.effectiveDepthCm, measurementSystem) : undefined,
     profile.drainage && profile.drainage !== 'unknown' ? `Drainage ${drainageLabels[profile.drainage].toLowerCase()}` : undefined,
-    profile.horizons?.length ? `${profile.horizons.length} horizon${profile.horizons.length > 1 ? 's' : ''} · 0–${profile.horizons[profile.horizons.length - 1].bottomCm} cm` : undefined,
+    profile.horizons?.length ? `${profile.horizons.length} horizon${profile.horizons.length > 1 ? 's' : ''} · 0–${formatLength(profile.horizons[profile.horizons.length - 1].bottomCm, measurementSystem)}` : undefined,
     profile.samplingMethod ? `Méthode · ${profile.samplingMethod}` : undefined,
   ].filter(Boolean)
   const analysisHistory = [...(profile.analysisHistory ?? [])].sort((a, b) => b.sampleDate.localeCompare(a.sampleDate) || b.archivedAt.localeCompare(a.archivedAt))
@@ -139,7 +139,7 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
     if (horizons.length >= 5) return setError('Un profil peut contenir au maximum cinq horizons.')
     const topCm = horizons[horizons.length - 1]?.bottomCm ?? 0
     const bottomCm = Math.min(topCm + 30, 400)
-    if (bottomCm <= topCm) return setError('La profondeur maximale de 400 cm est atteinte.')
+    if (bottomCm <= topCm) return setError(`La profondeur maximale de ${formatLength(400, measurementSystem)} est atteinte.`)
     setDraft(value => ({ ...value, horizons: [...(value.horizons ?? []), { topCm, bottomCm }] }))
     setError('')
   }
