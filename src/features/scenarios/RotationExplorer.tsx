@@ -9,7 +9,7 @@ import { formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord } from 
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { recordRotationComparison } from '../../lib/impact/rotation-comparison-counter'
 import { readSoilProfile, resolveSoilHorizonProvenance, soilSourceLabels, type FarmSoilProfile } from '../../lib/farm/soil-profile'
-import { cropCatalog, evaluateRotation, exampleRotationWorkspace, generateRotationOptions, priorityLabels, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightsFor, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
+import { cropCatalog, evaluateRotation, exampleRotationWorkspace, generateRotationOptions, priorityLabels, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightSensitivity, rotationWeightsFor, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
 import { emptyRotationConstraints, readRotationConstraints, writeRotationConstraints } from './rotation-constraints'
 import { clearSavedParcelBoundary, parseParcelGeoJSON, saveParcelBoundary, useParcelBoundary } from '../../lib/geo/parcel-boundary'
 import './rotation-explorer.css'
@@ -143,6 +143,12 @@ export function RotationExplorer() {
   const selectedPriorities = Object.entries(priorityWeights) as Array<[RotationPriority, 1 | 2 | 3]>
   const prioritySummary = selectedPriorities.map(([priority, weight]) => `${priorityLabels[priority]} ×${weight}`).join(' · ')
   const leaders = topRotations(currentWorkspace.plans, priorityWeights, constraints.unavailableCropIds)
+  const sensitivity = rotationWeightSensitivity(currentWorkspace.plans, priorityWeights, constraints.unavailableCropIds)
+  const sensitivitySummary = sensitivity
+    ? sensitivity.changedCriteria.length
+      ? `Le scénario en tête change quand le poids de ${sensitivity.changedCriteria.map(priority => priorityLabels[priority]).join(', ')} varie d’un niveau.`
+      : `Aucun changement du scénario en tête sur ${sensitivity.testedVariants} variation(s) d’un niveau des poids actifs.`
+    : 'Complétez au moins deux rotations compatibles pour comparer leur stabilité.'
   const detailedPlan = detailPlanId ? currentWorkspace.plans.find(plan => plan.id === detailPlanId) : undefined
   const detailedMetrics = detailedPlan ? evaluateRotation(detailedPlan) : undefined
   const referencePlan = currentWorkspace.plans.find(plan => plan.id === 'reference')
@@ -392,6 +398,7 @@ export function RotationExplorer() {
         <details className="rotation-method-details"><summary>Méthode de comparaison</summary><div><p><strong>Critère détaillé :</strong> {methodPriorityDescription[currentWorkspace.priority]} Les poids actifs sont égaux à 1, 2 ou 3 selon vos choix.</p><p>Chaque indicateur est ramené entre 0 et 1 : familles / 5, répétitions inversées / 4, légumineuses / 5, transitions racinaires documentées / 4. Le score est la moyenne pondérée de ces valeurs, affichée sur 100; il ne représente ni rendement ni bénéfice agricole. Toutes les rotations compatibles à égalité sur la note sont signalées.</p><p><strong>Option A</strong> est la première séquence classée; <strong>Option B</strong> est la suivante. Les égalités sont départagées par familles distinctes, légumineuses, transitions racinaires documentées, moins de répétitions, puis l’ordre du catalogue. Seules les séquences complètes et les exclusions saisies sont prises en compte.</p><p>Le climat NASA et le profil de sol restent du contexte; ils ne participent pas à la note de rotation.</p></div></details>
         <details className="rotation-exclusions"><summary>Cultures indisponibles · {constraints.unavailableCropIds.length}</summary><p>Ces choix excluent une culture des options générées et de leur classement. La référence actuelle reste visible.</p><div>{cropCatalog.map(crop => <label key={crop.id}><input type="checkbox" checked={constraints.unavailableCropIds.includes(crop.id)} onChange={() => toggleUnavailableCrop(crop.id)} /><span>{crop.label}</span></label>)}</div></details>
         <div className="rotation-best-match" aria-live="polite"><small>Options compatibles · {prioritySummary}</small>{leaders.length ? <strong>Meilleure note : {leaders.map(id => currentWorkspace.plans.find(plan => plan.id === id)?.title).join(' · ')}</strong> : <strong>Aucune option complète compatible</strong>}</div>
+        <div className={`rotation-sensitivity ${sensitivity?.changedCriteria.length ? 'is-sensitive' : ''}`} aria-live="polite"><strong>Sensibilité du tri</strong><span>{sensitivitySummary}</span><small>{sensitivity ? `Parmi ${sensitivity.completeCount} rotations complètes affichées · poids modifié un par un de ±1, dans la plage ×1–×3.` : 'Aucun résultat n’est calculé tant que deux options ne sont pas complètes.'}</small></div>
         {generationMessage && <p className="rotation-generation-message" role="status">{generationMessage}</p>}
         {constraintError && <p className="rotation-save-error" role="alert">{constraintError}</p>}
         <ul className="rotation-rule-list"><li>Familles et légumineuses comptées depuis le catalogue; l’azote fixé n’est pas estimé.</li><li>Racines pivotantes ou fasciculées comptées seulement si la référence les documente; les autres restent inconnues.</li><li>NASA POWER donne un contexte historique régional; il ne classe pas les cultures et ne prédit pas leur rendement.</li></ul>

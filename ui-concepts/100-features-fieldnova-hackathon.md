@@ -113,7 +113,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 44. **[P0 · PARTIEL] Panneau des compromis** : compare le critère choisi à la référence, rend visibles les autres écarts descriptifs et signale que rendements, coûts, eau, matériel et calendrier local ne sont pas évalués. Une comparaison fiable de ces contraintes nécessite des données locales validées.
 45. **[P1] Simulation de météo historique** : tester un scénario sur des années observées, sans le présenter comme prévision.
 46. **[P1] Scénario de disponibilité en eau** : comparer des hypothèses définies par l’utilisateur et montrer quelles données sont absentes.
-47. **[P1] Sensibilité des résultats** : indiquer si une petite variation d’entrée change le scénario classé premier.
+47. **[P1 · LIVRÉ] Sensibilité des résultats** : sur les trois rotations affichées, tester les variations d’un niveau (±1) de chaque poids actif et signaler si le scénario en tête change; l’analyse n’implique aucun rendement ou impact agricole.
 48. **[P1] Avertissement « données insuffisantes »** : ne pas classer une rotation quand les variables minimales manquent.
 49. **[P2] Comparaison multi-parcelles** : repérer les rotations communes et les contraintes qui diffèrent selon les parcelles.
 50. **[P2] Historique des versions de scénarios** : retrouver les hypothèses utilisées à chaque comparaison.

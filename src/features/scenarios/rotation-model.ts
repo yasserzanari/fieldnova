@@ -151,6 +151,28 @@ export function topRotations(plans: RotationPlan[], priority: RotationPriority |
   return complete.filter(item => Math.abs(rotationCombinedScore(item.metrics, weights) - best) < 1e-9).map(item => item.plan.id)
 }
 
+export function rotationWeightSensitivity(plans: RotationPlan[], weights: RotationPriorityWeights, unavailableCropIds: CropId[] = []) {
+  const completeCount = plans.filter(plan => {
+    const metrics = evaluateRotation(plan)
+    return metrics.complete && !plan.crops.some(id => id && unavailableCropIds.includes(id))
+  }).length
+  if (completeCount < 2) return null
+
+  const baselineWinners = topRotations(plans, weights, unavailableCropIds).sort()
+  const changedCriteria = new Set<RotationPriority>()
+  let testedVariants = 0
+  for (const [priority, weight] of Object.entries(weights) as Array<[RotationPriority, 1 | 2 | 3]>) {
+    for (const delta of [-1, 1]) {
+      const nextWeight = weight + delta
+      if (nextWeight < 1 || nextWeight > 3) continue
+      const winners = topRotations(plans, { ...weights, [priority]: nextWeight as 1 | 2 | 3 }, unavailableCropIds).sort()
+      testedVariants += 1
+      if (winners.join('|') !== baselineWinners.join('|')) changedCriteria.add(priority)
+    }
+  }
+  return { completeCount, testedVariants, changedCriteria: [...changedCriteria] }
+}
+
 export function generateRotationOptions(reference: RotationPlan, priority: RotationPriority | RotationPriorityWeights, unavailableCropIds: CropId[]): [RotationPlan, RotationPlan] | null {
   const weights = typeof priority === 'string' ? { [priority]: 2 } : cleanPriorityWeights(priority)
   const available = cropCatalog.filter(crop => !unavailableCropIds.includes(crop.id))
