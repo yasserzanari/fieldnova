@@ -77,7 +77,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 16. **[P1] Historique NDVI par point** : afficher un signal de végétation avec la date et la cadence réelle du produit GIBS sélectionné.
 17. **[P1 · LIVRÉ · CARTOGRAPHIE SMAP DISTINCTE DES STATISTIQUES POWER] Humidité de surface et racinaire SMAP** : Mon terrain propose les deux couches cartographiques L4 SMAP et affiche séparément les variables mensuelles POWER GWETTOP/GWETROOT; l’interface précise que la carte SMAP ne fournit pas la valeur numérique du point suivi.
 18. **[P1 · PARTIELLEMENT LIVRÉ] Qualité de couverture POWER** : l’Atlas compte les mois avec valeur pour les six paramètres sur les douze mois demandés et nomme les mois absents. Cela ne mesure ni la couverture nuageuse, ni la qualité d’une estimation; aucune interpolation n’est appliquée.
-19. **[P2] Carte de comparaison de deux périodes** : afficher les différences saisonnières avec des plages temporelles comparables.
+19. **[P2 · LIVRÉ · ANNÉES NASA POWER APPARIÉES] Comparaison de deux périodes** : l’historique de l’Atlas compare deux années pour les six paramètres mensuels sur les mêmes mois calendaires où les deux valeurs existent; l’écart B − A, les unités et le nombre de mois appariés sont indiqués. Une année partielle reste partielle et aucune valeur n’est interpolée; l’outil ne prédit pas de réponse culturale.
 20. **[P2 · LIVRÉ · EXPORT AU POINT] Télécharger les séries NASA POWER** : l’Atlas exporte la fenêtre mensuelle demandée avec les six paramètres, unités, mois absents conservés vides, source, date de récupération et mode réseau/cache. Le point est arrondi à 0,001° pour la confidentialité; ce CSV ne contient pas de statistiques zonales de parcelle.
 
 ### C. Sol et santé des sols — 21 à 30
