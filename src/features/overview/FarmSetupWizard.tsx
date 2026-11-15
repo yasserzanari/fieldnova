@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom'
 import type { GeoPoint } from '../../lib/geo/location'
 import { farmWaterAccessLabels, farmWaterConstraintLabels, readFarmProfile, writeFarmProfile, type FarmProfile, type FarmWaterAccess, type FarmWaterConstraint } from '../../lib/farm/farm-profile'
 import { readSoilProfile, soilSourceLabels } from '../../lib/farm/soil-profile'
-import { cropCatalog, exampleRotationWorkspace, priorityLabels, readRotationWorkspace, type CropId, type RotationPriority, writeRotationWorkspace } from '../scenarios/rotation-model'
+import { exampleRotationWorkspace, priorityLabels, readCropCatalog, readRotationWorkspace, type CropId, type RotationPriority, writeRotationWorkspace } from '../scenarios/rotation-model'
 import { readRotationConstraints, writeRotationConstraints } from '../scenarios/rotation-constraints'
 import './farm-setup-wizard.css'
 
@@ -28,10 +28,11 @@ type Draft = {
 }
 
 function initialDraft(point: GeoPoint): Draft {
+  const catalog = readCropCatalog(point)
   const farm = readFarmProfile(point)
-  const workspace = readRotationWorkspace(point)
+  const workspace = readRotationWorkspace(point, catalog)
   const reference = workspace.plans.find(plan => plan.id === 'reference')
-  const constraints = readRotationConstraints(point)
+  const constraints = readRotationConstraints(point, catalog)
   const exampleFarm = farm?.isExample === true
   return {
     name: farm?.name ?? '',
@@ -57,6 +58,7 @@ export function FarmSetupWizard({ open, point, onClose, onSaved }: { open: boole
   const [draft, setDraft] = useState(() => initialDraft(point))
   const [errors, setErrors] = useState<{ name?: string; location?: string; priority?: string; save?: string }>({})
   const pointKey = `${point.latitude.toFixed(4)},${point.longitude.toFixed(4)}`
+  const catalog = useMemo(() => readCropCatalog(point), [pointKey])
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -100,7 +102,7 @@ export function FarmSetupWizard({ open, point, onClose, onSaved }: { open: boole
     }
 
     try {
-      const workspace = readRotationWorkspace(point)
+      const workspace = readRotationWorkspace(point, catalog)
       const example = exampleRotationWorkspace()
       const blankCrops: Array<CropId | ''> = ['', '', '', '', '']
       const plans = workspace.isExample
@@ -114,7 +116,7 @@ export function FarmSetupWizard({ open, point, onClose, onSaved }: { open: boole
         isExample: readFarmProfile(point)?.isExample === true,
       })
       writeRotationWorkspace(point, { plans, priority: draft.priority as RotationPriority, isExample: false })
-      writeRotationConstraints(point, { unavailableCropIds: draft.unavailableCropIds })
+      writeRotationConstraints(point, { unavailableCropIds: draft.unavailableCropIds }, catalog)
       onSaved(savedProfile)
       onClose()
     } catch (reason) {
@@ -155,7 +157,7 @@ export function FarmSetupWizard({ open, point, onClose, onSaved }: { open: boole
 
         {step === 1 && <div className="farm-setup-fields">
           <p className="farm-setup-help">{readFarmProfile(point)?.isExample ? 'Ces valeurs appartiennent au cas fictif de démonstration. Modifiez-les pour explorer le parcours; elles ne décrivent pas une ferme réelle.' : 'Saisissez uniquement les cultures que vous avez réellement observées. Les cinq années sont facultatives; les champs vides resteront inconnus.'}</p>
-          <div className="farm-setup-crop-grid">{draft.crops.map((crop, index) => <label key={index}>Année {index + 1}<select value={crop} onChange={event => update('crops', draft.crops.map((value, cropIndex) => cropIndex === index ? event.target.value as CropId | '' : value))}><option value="">Non renseignée</option>{cropCatalog.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>)}</div>
+          <div className="farm-setup-crop-grid">{draft.crops.map((crop, index) => <label key={index}>Année {index + 1}<select value={crop} onChange={event => update('crops', draft.crops.map((value, cropIndex) => cropIndex === index ? event.target.value as CropId | '' : value))}><option value="">Non renseignée</option>{catalog.map(item => <option key={item.id} value={item.id}>{item.label}{item.origin === 'local-declaration' ? ' · locale' : ''}</option>)}</select></label>)}</div>
           <p className="farm-setup-data-note">{selectedCrops}/5 années renseignées. Les rotations d’exemple ne sont jamais reprises comme votre historique.</p>
         </div>}
 
@@ -167,7 +169,7 @@ export function FarmSetupWizard({ open, point, onClose, onSaved }: { open: boole
 
         {step === 3 && <div className="farm-setup-fields">
           <p className="farm-setup-help">Les cultures cochées seront exclues des options générées pour ce point. La rotation actuelle reste visible pour comparaison.</p>
-          <div className="farm-setup-exclusion-grid">{cropCatalog.map(crop => <label key={crop.id}><input type="checkbox" checked={draft.unavailableCropIds.includes(crop.id)} onChange={() => toggleCropExclusion(crop.id)} /><span>{crop.label}</span></label>)}</div>
+          <div className="farm-setup-exclusion-grid">{catalog.map(crop => <label key={crop.id}><input type="checkbox" checked={draft.unavailableCropIds.includes(crop.id)} onChange={() => toggleCropExclusion(crop.id)} /><span>{crop.label}{crop.origin === 'local-declaration' ? ' · locale' : ''}</span></label>)}</div>
           <p className="farm-setup-data-note">{draft.unavailableCropIds.length} culture{draft.unavailableCropIds.length === 1 ? '' : 's'} exclue{draft.unavailableCropIds.length === 1 ? '' : 's'} des options.</p>
         </div>}
 

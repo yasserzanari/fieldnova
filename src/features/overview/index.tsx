@@ -9,7 +9,7 @@ import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { readRotationComparisonCount, ROTATION_COMPARISON_RECORDED_EVENT, rotationComparisonStorageKey } from '../../lib/impact/rotation-comparison-counter'
 import { readFarmProfile, type FarmProfile } from '../../lib/farm/farm-profile'
 import { readSoilProfile } from '../../lib/farm/soil-profile'
-import { evaluateRotation, readRotationWorkspace } from '../scenarios/rotation-model'
+import { evaluateRotation, readCropCatalog, readRotationWorkspace } from '../scenarios/rotation-model'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { FarmSetupWizard } from './FarmSetupWizard'
 import './overview.css'
@@ -33,7 +33,7 @@ export function OverviewPage() {
   const { series, loading, error, retry } = usePowerMonthly(location)
   const [farmProfile, setFarmProfile] = useState<FarmProfile | null>(() => readFarmProfile(location))
   const [comparisonCount, setComparisonCount] = useState(() => readRotationComparisonCount(location))
-  const [evidence, setEvidence] = useState(() => ({ soil: readSoilProfile(location), rotation: readRotationWorkspace(location) }))
+  const [evidence, setEvidence] = useState(() => { const catalog = readCropCatalog(location); return { soil: readSoilProfile(location), rotation: readRotationWorkspace(location, catalog) } })
   const [farmSetupOpen, setFarmSetupOpen] = useState(false)
   const [latitude, setLatitude] = useState(String(location.latitude))
   const [longitude, setLongitude] = useState(String(location.longitude))
@@ -45,14 +45,16 @@ export function OverviewPage() {
     setLongitude(String(location.longitude))
     setFarmProfile(readFarmProfile(location))
     setComparisonCount(readRotationComparisonCount(location))
-    setEvidence({ soil: readSoilProfile(location), rotation: readRotationWorkspace(location) })
+    const catalog = readCropCatalog(location)
+    setEvidence({ soil: readSoilProfile(location), rotation: readRotationWorkspace(location, catalog) })
     setCoordError('')
   }, [location.latitude, location.longitude])
 
   useEffect(() => {
     const reloadLocalData = () => {
       setFarmProfile(readFarmProfile(location))
-      setEvidence({ soil: readSoilProfile(location), rotation: readRotationWorkspace(location) })
+      const catalog = readCropCatalog(location)
+      setEvidence({ soil: readSoilProfile(location), rotation: readRotationWorkspace(location, catalog) })
     }
     window.addEventListener('fieldnova:demo-mode-change', reloadLocalData)
     return () => window.removeEventListener('fieldnova:demo-mode-change', reloadLocalData)
@@ -106,7 +108,8 @@ export function OverviewPage() {
   const latestDate = latest ? formatPowerMonth(latest.date) : 'aucune période valide'
   const dataPoint = series?.gridPoint
   const soilAvailable = Boolean(evidence.soil.texture || evidence.soil.ph !== undefined || evidence.soil.organicMatterPercent !== undefined || evidence.soil.effectiveDepthCm !== undefined || evidence.soil.drainage || evidence.soil.horizons?.length)
-  const completeRotations = evidence.rotation.plans.filter(plan => evaluateRotation(plan).complete).length
+  const catalog = readCropCatalog(location)
+  const completeRotations = evidence.rotation.plans.filter(plan => evaluateRotation(plan, catalog).complete).length
   const rotationAvailable = !evidence.rotation.isExample && completeRotations > 0
   const farmAvailable = Boolean(farmProfile && !farmProfile.isExample)
   const nasaAvailable = Boolean(series && latest)
