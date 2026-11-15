@@ -2,8 +2,8 @@ import { CloudRain, Droplets } from 'lucide-react'
 import { formatPowerMonth, type PowerMonthlyRecord } from '../../lib/nasa/power'
 import './power-climate-chart.css'
 
-type Props = { records: PowerMonthlyRecord[]; source: string; mode?: 'climate' | 'soil'; title?: string; months?: number; compact?: boolean }
-type PlotPoint = { x: number; y: number; value: number; month: string; date: string }
+type Props = { records: PowerMonthlyRecord[]; requestedMonths?: string[]; source: string; mode?: 'climate' | 'soil'; title?: string; months?: number; compact?: boolean }
+type PlotPoint = { x: number; y: number; value: number; month: string; date: string; index: number }
 
 const LEFT = 48
 const RIGHT = 682
@@ -14,12 +14,24 @@ function linePath(points: PlotPoint[]) {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ')
 }
 
+function continuousSegments(points: PlotPoint[]) {
+  const segments: PlotPoint[][] = []
+  for (const point of points) {
+    const current = segments[segments.length - 1]
+    if (!current || current[current.length - 1].index !== point.index - 1) segments.push([point])
+    else current.push(point)
+  }
+  return segments.filter(segment => segment.length > 1)
+}
+
 function finite(values: Array<number | undefined>) {
   return values.filter((value): value is number => value !== undefined && Number.isFinite(value))
 }
 
-export function PowerClimateChart({ records, source, mode = 'climate', title, months = 12, compact = false }: Props) {
-  const visible = records.slice(-months).map(record => ({ ...record, month: formatPowerMonth(record.date) }))
+export function PowerClimateChart({ records, requestedMonths, source, mode = 'climate', title, months = 12, compact = false }: Props) {
+  const monthSlots = (requestedMonths?.length ? requestedMonths : records.map(record => record.date)).slice(-months)
+  const recordByMonth = new Map(records.map(record => [record.date, record]))
+  const visible = monthSlots.map(date => ({ ...(recordByMonth.get(date) ?? { date }), month: formatPowerMonth(date) }))
   const isSoil = mode === 'soil'
   const allValues = finite(visible.map(row => isSoil ? row.rootZoneWetness : row.precipitationMmPerDay))
   const surfaceValues = finite(visible.map(row => row.surfaceSoilWetness))
@@ -35,14 +47,20 @@ export function PowerClimateChart({ records, source, mode = 'climate', title, mo
     const raw = isSoil ? row.rootZoneWetness : row.precipitationMmPerDay
     if (raw === undefined || !Number.isFinite(raw)) return []
     const value = isSoil ? raw * 100 : raw
-    return [{ x: xAt(index), y: BOTTOM - (value / valueMax) * (BOTTOM - TOP), value, month: row.month, date: row.date }]
+    return [{ x: xAt(index), y: BOTTOM - (value / valueMax) * (BOTTOM - TOP), value, month: row.month, date: row.date, index }]
   })
   const surfacePoints: PlotPoint[] = isSoil ? visible.flatMap((row, index) => row.surfaceSoilWetness === undefined || !Number.isFinite(row.surfaceSoilWetness) ? [] : [{
-    x: xAt(index), y: BOTTOM - (row.surfaceSoilWetness * 100 / 100) * (BOTTOM - TOP), value: row.surfaceSoilWetness, month: row.month, date: row.date,
+    x: xAt(index), y: BOTTOM - (row.surfaceSoilWetness * 100 / 100) * (BOTTOM - TOP), value: row.surfaceSoilWetness, month: row.month, date: row.date, index,
   }]) : []
   const tempPoints: PlotPoint[] = isSoil ? [] : visible.flatMap((row, index) => row.temperatureC === undefined || !Number.isFinite(row.temperatureC) ? [] : [{
-    x: xAt(index), y: BOTTOM - ((row.temperatureC - tempMin) / (tempMax - tempMin)) * (BOTTOM - TOP), value: row.temperatureC, month: row.month, date: row.date,
+    x: xAt(index), y: BOTTOM - ((row.temperatureC - tempMin) / (tempMax - tempMin)) * (BOTTOM - TOP), value: row.temperatureC, month: row.month, date: row.date, index,
   }])
+  const valueSegments = continuousSegments(valuePoints)
+  const surfaceSegments = continuousSegments(surfacePoints)
+  const tempSegments = continuousSegments(tempPoints)
+  const missingIndexes = visible.map((row, index) => ({ row, index })).filter(({ row }) => isSoil
+    ? row.rootZoneWetness === undefined && row.surfaceSoilWetness === undefined
+    : row.precipitationMmPerDay === undefined && row.temperatureC === undefined)
   const labelIndexes = visible.map((_, index) => index).filter(index => index === 0 || index === visible.length - 1 || index % Math.max(1, Math.ceil(visible.length / 6)) === 0)
 
   return <section className={`power-chart-panel ${isSoil ? 'is-soil-chart' : ''} ${compact ? 'is-compact' : ''}`} aria-label={title ?? (isSoil ? 'Humidité racinaire mensuelle' : 'Précipitations et température mensuelles')}>
@@ -55,19 +73,20 @@ export function PowerClimateChart({ records, source, mode = 'climate', title, mo
         const value = valueMax * fraction
         return <g key={fraction}><line x1={LEFT} x2={RIGHT} y1={y} y2={y} className="power-chart-gridline" /><text x={LEFT - 7} y={y + 3} className="power-chart-tick" textAnchor="end">{isSoil ? `${Math.round(value)}%` : Number(value.toFixed(1))}</text>{!isSoil && <text x={RIGHT + 7} y={y + 3} className="power-chart-tick" textAnchor="start">{(tempMin + fraction * (tempMax - tempMin)).toFixed(0)}°</text>}{index === 0 && <title>NASA POWER</title>}</g>
       })}
+      {missingIndexes.map(({ row, index }) => <line key={`gap-${row.date}`} x1={xAt(index)} x2={xAt(index)} y1={TOP} y2={BOTTOM} className="power-chart-gapline"><title>{row.month} · aucune valeur exploitable pour les variables affichées</title></line>)}
       {isSoil ? <>
-        {valuePoints.length > 0 && <path d={`${linePath(valuePoints)} L ${valuePoints[valuePoints.length - 1].x} ${BOTTOM} L ${valuePoints[0].x} ${BOTTOM} Z`} className="power-chart-soil-area" />}
-        {valuePoints.length > 1 && <path d={linePath(valuePoints)} className="power-chart-soil-line" />}
+        {valueSegments.map(segment => <path key={`area-${segment[0].date}`} d={`${linePath(segment)} L ${segment[segment.length - 1].x} ${BOTTOM} L ${segment[0].x} ${BOTTOM} Z`} className="power-chart-soil-area" />)}
+        {valueSegments.map(segment => <path key={`line-${segment[0].date}`} d={linePath(segment)} className="power-chart-soil-line" />)}
         {valuePoints.map(point => <circle key={point.date} cx={point.x} cy={point.y} r="2.5" className="power-chart-soil-dot"><title>{point.month} · GWETROOT {point.value.toFixed(1)} % (modélisé)</title></circle>)}
-        {surfacePoints.length > 1 && <path d={linePath(surfacePoints)} className="power-chart-surface-line" />}
+        {surfaceSegments.map(segment => <path key={`surface-${segment[0].date}`} d={linePath(segment)} className="power-chart-surface-line" />)}
         {surfacePoints.map(point => <circle key={point.date} cx={point.x} cy={point.y} r="2.4" className="power-chart-surface-dot"><title>{point.month} · GWETTOP {(point.value * 100).toFixed(1)} % (modélisé)</title></circle>)}
       </> : <>
         {valuePoints.map(point => <rect key={point.date} x={point.x - Math.min(12, Math.max(4, stepX * .24)) / 2} y={point.y} width={Math.min(12, Math.max(4, stepX * .24))} height={Math.max(1, BOTTOM - point.y)} rx="2" className="power-chart-rain-bar"><title>{point.month} · PRECTOTCORR {point.value.toFixed(2)} mm/j (moyenne mensuelle)</title></rect>)}
-        {tempPoints.length > 1 && <path d={linePath(tempPoints)} className="power-chart-temp-line" />}
+        {tempSegments.map(segment => <path key={`temperature-${segment[0].date}`} d={linePath(segment)} className="power-chart-temp-line" />)}
         {tempPoints.map(point => <circle key={point.date} cx={point.x} cy={point.y} r="2.7" className="power-chart-temp-dot"><title>{point.month} · T2M {point.value.toFixed(1)} °C</title></circle>)}
       </>}
       {labelIndexes.map(index => <text key={visible[index].date} x={xAt(index)} y="101" className="power-chart-month" textAnchor="middle">{visible[index].month}</text>)}
     </svg> : <div className="power-chart-empty" role="status">{records.length ? 'NASA POWER n’a pas de valeur exploitable pour cet indicateur.' : 'Chargement des données NASA POWER…'}</div>}
-    <footer className="power-chart-legend">{isSoil ? <><span><i className="legend-wetness" />GWETROOT · racines</span><span><i className="legend-surface-wetness" />GWETTOP · surface</span></> : <><span><i className="legend-precip" />PRECTOTCORR · mm/j</span><span><i className="legend-temperature" />T2M · °C</span></>}</footer>
+    <footer className="power-chart-legend">{isSoil ? <><span><i className="legend-wetness" />GWETROOT · racines</span><span><i className="legend-surface-wetness" />GWETTOP · surface</span></> : <><span><i className="legend-precip" />PRECTOTCORR · mm/j</span><span><i className="legend-temperature" />T2M · °C</span></>}{missingIndexes.length > 0 && <span><i className="legend-gap" />Mois sans valeur</span>}</footer>
   </section>
 }

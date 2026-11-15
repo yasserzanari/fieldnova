@@ -164,7 +164,7 @@ function ClimateScenariosPage() {
 
     <section className="scenario-chart-section" aria-label="Historique climatique NASA POWER">
       <div className="scenario-chart-toolbar"><div><span className="scenario-chart-icon"><Activity size={16} /></span><span><strong>Historique climatique</strong><small>{range} derniers mois disponibles · centre MERRA-2 {series?.gridPoint.latitude.toFixed(3)}, {series?.gridPoint.longitude.toFixed(3)}</small></span></div><div className="scenario-chart-ranges" role="group" aria-label="Période du graphique">{[[3, '3 mois'], [6, '6 mois'], [12, '1 an']].map(([months, label]) => <button key={months} type="button" className={range === months ? 'is-active' : ''} onClick={() => setRange(Number(months))}>{label}</button>)}</div></div>
-      <PowerClimateChart records={series?.records ?? []} source={series?.source.join(' + ') ?? 'en attente'} months={range} title="Précipitations moyennes et température · NASA POWER" />
+      <PowerClimateChart records={series?.records ?? []} requestedMonths={series?.requestedMonths} source={series?.source.join(' + ') ?? 'en attente'} months={range} title="Précipitations moyennes et température · NASA POWER" />
     </section>
   </section>
 }
