@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ClipboardList, Droplets, Layers3, LocateFixed, MapPinned, Minus, Plus, Satellite, ShieldCheck, Sprout } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
@@ -12,7 +12,7 @@ import { SoilProfileEditor } from './SoilProfileEditor'
 import { FieldObservations } from './FieldObservations'
 import './terrain.css'
 
-type SoilLayer = 'surface' | 'root'
+type SoilLayer = 'surface' | 'root' | 'clay'
 
 function daysAgo(days: number) {
   const date = new Date()
@@ -31,11 +31,27 @@ export function TerrainPage() {
   const imageryDate = daysAgo(11)
   const { availability: gibsAvailability, error: gibsDateError } = useGibsAvailability()
   const modisDate = resolveGibsDate(imageryDate, gibsAvailability?.trueColor)
-  const soilProductDate = soilLayer === 'surface' ? gibsAvailability?.surfaceSoil.at(-1)?.end ?? null : gibsAvailability?.rootSoil.at(-1)?.end ?? null
+  const soilProductDate = soilLayer === 'surface' ? gibsAvailability?.surfaceSoil.at(-1)?.end ?? null : soilLayer === 'root' ? gibsAvailability?.rootSoil.at(-1)?.end ?? null : null
   const gibsDateLabel = (date: string | null) => date ? formatGibsDate(date) : gibsDateError ? 'date indisponible' : 'date en chargement'
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [locating, setLocating] = useState(false)
   const [mobileView, setMobileView] = useState<'map' | 'layers' | 'soil' | 'chart' | 'journal'>('map')
+  useEffect(() => {
+    if (mobileView !== 'map' || !map) return
+    let repaintFrame = 0
+    const frame = window.requestAnimationFrame(() => {
+      map.resize()
+      if (map.isStyleLoaded() && map.getLayer('soilgrids-clay')) {
+        map.setLayoutProperty('soilgrids-clay', 'visibility', 'none')
+        repaintFrame = window.requestAnimationFrame(() => {
+          if (!map.isStyleLoaded() || !map.getLayer('soilgrids-clay')) return
+          map.setLayoutProperty('soilgrids-clay', 'visibility', soilLayer === 'clay' ? 'visible' : 'none')
+          map.triggerRepaint()
+        })
+      }
+    })
+    return () => { window.cancelAnimationFrame(frame); window.cancelAnimationFrame(repaintFrame) }
+  }, [map, mobileView, soilLayer])
   const [journalOpen, setJournalOpen] = useState(false)
   const { series, loading, error, retry } = usePowerMonthly(location)
 
@@ -63,20 +79,20 @@ export function TerrainPage() {
     <header className="terrain-heading"><div><h1>Mon terrain</h1><p>Humidité de surface, zone racinaire et données de sol pour le point choisi</p></div><div className="terrain-source-statuses" aria-label="État des sources NASA" aria-live="polite"><span className={`terrain-source-status ${powerStatusClass}`}><i />POWER · {powerStatus}</span><span className={`terrain-source-status ${gibsStatusClass}`}><i />Disponibilité GIBS · {gibsStatus}</span></div></header>
 
     <nav className="terrain-mobile-tabs" role="group" aria-label="Panneau de la vue Mon terrain">
-      {([['map', 'Carte'], ['layers', 'SMAP'], ['soil', 'Sol & eau'], ['chart', 'Graphique'], ['journal', 'Journal']] as const).map(([view, label]) => <button key={view} type="button" aria-pressed={mobileView === view} className={mobileView === view ? 'is-active' : ''} onClick={() => setMobileView(view)}>{label}</button>)}
+      {([['map', 'Carte'], ['layers', 'Couches'], ['soil', 'Sol & eau'], ['chart', 'Graphique'], ['journal', 'Journal']] as const).map(([view, label]) => <button key={view} type="button" aria-pressed={mobileView === view} className={mobileView === view ? 'is-active' : ''} onClick={() => setMobileView(view)}>{label}</button>)}
     </nav>
 
     <div className="terrain-map-stage">
-      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={false} showSurfaceSoil={soilLayer === 'surface'} showRootSoil={soilLayer === 'root'} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA GIBS avec humidité des sols SMAP" />
+      <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={false} showSurfaceSoil={soilLayer === 'surface'} showRootSoil={soilLayer === 'root'} showMappedClay={soilLayer === 'clay'} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA GIBS et couche de sol cartographiée ISRIC" />
       <div className="terrain-map-topline">
         <div className="terrain-map-location"><MapPinned size={15} /><span>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</span><small>Point suivi</small></div>
         <div className="terrain-map-options">
           <div className="terrain-base-switch" role="group" aria-label="Fond de carte"><button type="button" aria-pressed={baseLayer === 'streets'} className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" aria-pressed={baseLayer === 'nasa'} className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Satellite</button></div>
-          <span className="terrain-latest-chip">MODIS · {gibsDateLabel(modisDate)} · SMAP {soilLayer === 'surface' ? 'surface' : 'racines'} · {gibsDateLabel(soilProductDate)}</span>
+          <span className="terrain-latest-chip">MODIS · {gibsDateLabel(modisDate)} · {soilLayer === 'clay' ? 'SoilGrids · 0–5 cm' : `SMAP ${soilLayer === 'surface' ? 'surface' : 'racines'} · ${gibsDateLabel(soilProductDate)}`}</span>
         </div>
       </div>
       <div className="terrain-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 250 })}><Plus size={16} /></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 250 })}><Minus size={16} /></button><button type="button" aria-label="Utiliser ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></div>
-      <span className="terrain-map-click-hint">Cliquez pour choisir un point · la couche SMAP s’affiche à une résolution native d’environ 9 km</span>
+      <span className="terrain-map-click-hint">{soilLayer === 'clay' ? 'SoilGrids · argile prédite à 250 m · cliquez pour déplacer le point suivi' : 'Cliquez pour choisir un point · la couche SMAP s’affiche à une résolution native d’environ 9 km'}</span>
 
       <button className="terrain-journal-toggle" type="button" aria-expanded={journalOpen} aria-controls="terrain-journal-panel" onClick={() => setJournalOpen(value => !value)}><ClipboardList size={14} />Journal de terrain</button>
       <aside id="terrain-journal-panel" className="terrain-panel terrain-journal-panel" aria-label="Journal d’observations de terrain" hidden={!journalOpen && mobileView !== 'journal'}>
@@ -84,15 +100,22 @@ export function TerrainPage() {
         <FieldObservations point={location} />
       </aside>
 
-      <aside className="terrain-panel terrain-layers-panel" aria-label="Couches d’humidité des sols">
-        <header className="terrain-panel-heading"><div><span className="terrain-heading-icon"><Layers3 size={17} /></span><span><h2>Humidité du sol · NASA SMAP</h2><small>Produit L4 analysé · carte quotidienne</small></span></div><Satellite size={17} className="terrain-heading-satellite" /></header>
-        <div className="terrain-layer-choice" role="group" aria-label="Profondeur du produit d’humidité">
+      <aside className="terrain-panel terrain-layers-panel" aria-label="Couches d’humidité et composition des sols">
+        <header className="terrain-panel-heading"><div><span className="terrain-heading-icon"><Layers3 size={17} /></span><span><h2>{soilLayer === 'clay' ? 'Texture cartographiée · ISRIC' : 'Humidité du sol · NASA SMAP'}</h2><small>{soilLayer === 'clay' ? 'SoilGrids 2.0 · prédiction 0–5 cm' : 'Produit L4 analysé · carte quotidienne'}</small></span></div><Satellite size={17} className="terrain-heading-satellite" /></header>
+        <div className="terrain-layer-choice" role="group" aria-label="Choisir la couche de sol à afficher">
           <button type="button" aria-pressed={soilLayer === 'surface'} className={soilLayer === 'surface' ? 'is-selected' : ''} onClick={() => setSoilLayer('surface')}><span className="terrain-layer-icon surface"><Droplets size={15} /></span><span><strong>Surface</strong><small>SMAP L4 · analyse de surface</small></span><i /></button>
           <button type="button" aria-pressed={soilLayer === 'root'} className={soilLayer === 'root' ? 'is-selected' : ''} onClick={() => setSoilLayer('root')}><span className="terrain-layer-icon roots"><Sprout size={15} /></span><span><strong>Zone racinaire</strong><small>SMAP L4 · analyse racinaire</small></span><i /></button>
+          <button type="button" aria-pressed={soilLayer === 'clay'} className={soilLayer === 'clay' ? 'is-selected' : ''} onClick={() => setSoilLayer('clay')}><span className="terrain-layer-icon clay"><Layers3 size={15} /></span><span><strong>Argile de surface</strong><small>SoilGrids · prédiction 250 m · 0–5 cm</small></span><i /></button>
         </div>
-        <div className="terrain-smap-source"><Satellite size={14} /><span><strong>NASA SMAP · L4</strong><small>Humidité analysée, modèle assimilant des observations SMAP · grille 9 km</small></span></div>
-        <div className="terrain-note"><ShieldCheck size={13} /><span>Cette couche cartographique est modélisée et agrégée sur une grille large. Elle ne mesure pas directement votre parcelle.</span></div>
-        <div className="terrain-smap-legend"><span>Humidité volumique · m³/m³ · légende NASA</span><img src="https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg" alt="Légende NASA SMAP pour l’humidité volumique du sol. Noir : aucune donnée." /></div>
+        {soilLayer === 'clay' ? <>
+          <div className="terrain-smap-source"><Layers3 size={14} /><span><strong>ISRIC · SoilGrids 2.0</strong><small>Argile 0–2 μm · fraction massique · couche moyenne prédite</small></span></div>
+          <div className="terrain-note"><ShieldCheck size={13} /><span>Carte globale modélisée, résolution nominale 250 m. Ce pixel n’est pas une mesure de la parcelle et ne remplace pas une analyse locale. Licence CC BY 4.0.</span></div>
+          <div className="terrain-smap-legend"><span>Argile · fraction massique en ‰ · noir : absence de donnée</span><img src="https://maps.isric.org/mapserv/clay?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetLegendGraphic&LAYER=clay_0-5cm_mean&FORMAT=image%2Fpng" alt="Légende SoilGrids de la fraction massique d’argile, de 0 à 799 pour mille." /></div>
+        </> : <>
+          <div className="terrain-smap-source"><Satellite size={14} /><span><strong>NASA SMAP · L4</strong><small>Humidité analysée, modèle assimilant des observations SMAP · grille 9 km</small></span></div>
+          <div className="terrain-note"><ShieldCheck size={13} /><span>Cette couche cartographique est modélisée et agrégée sur une grille large. Elle ne mesure pas directement votre parcelle.</span></div>
+          <div className="terrain-smap-legend"><span>Humidité volumique · m³/m³ · légende NASA</span><img src="https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg" alt="Légende NASA SMAP pour l’humidité volumique du sol. Noir : aucune donnée." /></div>
+        </>}
         <div className="terrain-data-source-link"><Link to="/app/data-trust">Voir les sources et limites des données <span>›</span></Link></div>
       </aside>
 
