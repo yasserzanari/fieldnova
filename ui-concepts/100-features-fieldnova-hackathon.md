@@ -65,7 +65,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 7. **[PARTIELLEMENT LIVRÉ · P1] Préférences et exclusions de cultures** : cultures préférées ou indisponibles déclarées par point; la préférence peut pondérer le tri si l’utilisateur active ce critère. Les contrats locaux ne sont pas modélisés.
 8. **[P1] Tolérance au risque** : faible, moyenne ou élevée, avec explication de l’effet sur le classement des scénarios.
 9. **[P2] Plusieurs profils de fermes** : gérer différentes exploitations sans mélanger leurs données.
-10. **[P2] Parcours de prise en main** : faire découvrir carte, profil de sol, scénarios et provenance à un nouvel utilisateur.
+10. **[P2 · LIVRÉ · GUIDE CONTEXTUEL ET CLAVIER] Parcours de prise en main** : le bouton Aide ouvre un guide accessible à partir de toutes les vues, y compris sur mobile. Ses liens conduisent au point et au profil de ferme, aux observations NASA, au sol local, aux rotations, à l’assistant, aux sources et à la méthode; le guide précise aussi les limites de résolution et de classement. Le guide n’impose ni tutoriel pas à pas ni contenu de démonstration.
 
 ### B. Carte et observations NASA — 11 à 20
 
