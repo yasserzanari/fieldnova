@@ -5,6 +5,7 @@ import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { formatPowerMonth, latestCompleteRecord, powerQualityFlags, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
+import { resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { useSelectedLocation } from '../../lib/geo/location'
 import './data-trust.css'
 
@@ -63,6 +64,7 @@ export function DataTrustPage() {
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const { series, loading, error } = usePowerMonthly(location)
+  const { availability: gibsAvailability, error: gibsAvailabilityError } = useGibsAvailability()
   const selected = sources.find(source => source.id === selectedId) ?? sources[0]
   const isDemoSnapshot = series?.deliveryMode === 'demo-fixture'
   const selectedStatus: SourceStatus = selected.id === 'power' && isDemoSnapshot ? 'Extrait hors ligne' : selected.id === 'power' && error ? 'Indisponible' : selected.status
@@ -78,6 +80,23 @@ export function DataTrustPage() {
     date.setUTCDate(date.getUTCDate() - 11)
     return date.toISOString().slice(0, 10)
   })()
+  const displayedGibsDate = layer === 'truecolor'
+    ? resolveGibsDate(imageryDate, gibsAvailability?.trueColor)
+    : layer === 'ndvi'
+      ? resolveGibsDate(imageryDate, gibsAvailability?.ndvi)
+      : layer === 'surface'
+        ? gibsAvailability?.surfaceSoil.at(-1)?.end ?? null
+        : gibsAvailability?.rootSoil.at(-1)?.end ?? null
+  const displayedGibsProduct = layer === 'truecolor'
+    ? 'MODIS Terra · composition couleur'
+    : layer === 'ndvi'
+      ? 'MODIS Terra · NDVI composite 8 jours'
+      : layer === 'surface'
+        ? 'SMAP L4 · humidité de surface'
+        : 'SMAP L4 · humidité zone racinaire'
+  const displayedGibsDateLabel = displayedGibsDate
+    ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${displayedGibsDate}T12:00:00Z`))
+    : null
   const connectedCount = error || isDemoSnapshot ? 1 : 2
 
   return <section className="trust-page" aria-label="Sources de données et traçabilité">
@@ -122,7 +141,7 @@ export function DataTrustPage() {
             <div className="trust-meta-row"><span><Database size={13} /> {isDemoSnapshot ? 'Source archivée' : 'Source API'}</span><strong>{series ? series.source.join(' · ') : loading ? 'En attente de la réponse NASA POWER' : 'Non disponible'}</strong></div>
             <div className="trust-meta-row"><span><CloudSun size={13} /> {isDemoSnapshot ? 'Capture datée' : 'Récupérée'}</span><strong>{series ? `${formatFetchedAt(series.fetchedAt)} · version non fournie par la réponse` : 'Aucune récupération réussie pour ce point'}</strong></div>
           </>}
-          {selected.id === 'gibs' && <div className="trust-meta-row"><span><Layers3 size={13} /> Produit affiché</span><strong>{layer === 'truecolor' ? `MODIS Terra Corrected Reflectance True Color · ${imageryDate}` : layer === 'ndvi' ? `MODIS Terra NDVI 8-Day · ${imageryDate}` : layer === 'surface' ? 'SMAP L4 · humidité de surface · date produit non récupérée' : 'SMAP L4 · humidité racinaire · date produit non récupérée'}</strong></div>}
+          {selected.id === 'gibs' && <div className="trust-meta-row"><span><Layers3 size={13} /> Produit · date source</span><strong>{displayedGibsProduct} · {displayedGibsDateLabel ?? (gibsAvailabilityError ? 'date indisponible; couche récente par défaut' : 'interrogation de NASA GIBS…')}{(layer === 'truecolor' || layer === 'ndvi') && displayedGibsDate && displayedGibsDate !== imageryDate ? ` · demandée ${imageryDate}` : ''}</strong></div>}
           <div className="trust-meta-row"><span><ShieldCheck size={13} /> Limite</span><strong>{selected.id === 'power' ? 'Climatologie mensuelle; pas de prévision ni de mesure parcellaire' : selected.license}</strong></div>
           {selected.id === 'power' && <a className="trust-source-link trust-citation-link" href="https://power.larc.nasa.gov/docs/referencing/" target="_blank" rel="noreferrer">Guide officiel de citation NASA POWER <ExternalLink size={12} /></a>}
           {selected.id === 'gibs' && <a className="trust-source-link trust-citation-link" href={layer === 'surface' || layer === 'root' ? 'https://nsidc.org/data/spl4smgp' : 'https://nasa-gibs.github.io/gibs-api-docs/available-visualizations/'} target="_blank" rel="noreferrer">Référence du produit affiché <ExternalLink size={12} /></a>}

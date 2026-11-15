@@ -4,6 +4,7 @@ import type { FeatureCollection } from 'geojson'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoPoint } from '../../lib/geo/location'
 import type { PowerGridCell } from '../../lib/nasa/power'
+import { resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { useParcelBoundary } from '../../lib/geo/parcel-boundary'
 import './field-map.css'
 
@@ -33,7 +34,19 @@ function gibsTileUrl(layer: string, date: string, format: 'jpg' | 'png', matrixS
   return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/${matrixSet}/{z}/{y}/{x}.${format}`
 }
 
+function productDate(date: string | null, loading: boolean) {
+  if (!date) return loading ? 'récupération…' : 'date NASA indisponible'
+  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`))
+}
+
 export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, powerGridCell, draftParcelPoints = [], drawingParcel = false, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
+  const { availability, error: availabilityError } = useGibsAvailability()
+  const trueColorDate = resolveGibsDate(imageryDate, availability?.trueColor)
+  const ndviDate = resolveGibsDate(imageryDate, availability?.ndvi)
+  const surfaceSoilDate = availability?.surfaceSoil.at(-1)?.end ?? null
+  const rootSoilDate = availability?.rootSoil.at(-1)?.end ?? null
+  const dateStatus = availabilityError ? 'Dates NASA non récupérées; la couche récente par défaut est affichée.' : 'Date réellement disponible sur NASA GIBS.'
+  const dateLoading = !availability && !availabilityError
   const parcel = useParcelBoundary()
   const parcelBoundary = parcel?.feature ?? null
   const parcelLabel = parcel ? ` Limite affichée : ${parcel.feature.properties?.name ?? 'parcelle importée'}, environ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} hectares.` : ''
@@ -41,10 +54,10 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
   const gridCellLabel = powerGridCell ? ` Maille météo NASA POWER indiquée par un contour vert discontinu, environ ${Math.round(powerGridCell.properties.widthKm)} par ${Math.round(powerGridCell.properties.heightKm)} km.` : ''
   const mapLabel = `${ariaLabel}.${parcelLabel}${draftParcelLabel}${gridCellLabel}`
   const legendItems = [
-    ...(baseLayer === 'nasa' ? [{ id: 'truecolor', label: `MODIS Terra · composition couleur · ${imageryDate}`, detail: 'Image composite; pas une mesure unique.' }] : []),
-    ...(showNdvi ? [{ id: 'ndvi', label: `NDVI MODIS Terra · composite 8 jours · ${imageryDate}`, detail: 'Indice sans unité · palette et gamme NASA GIBS.', legendUrl: 'https://gibs.earthdata.nasa.gov/legends/MODIS_NDVI_H.svg' }] : []),
-    ...(showSurfaceSoil ? [{ id: 'surface', label: 'SMAP L4 · humidité de surface · ~9 km', detail: 'Humidité volumétrique · date du produit non récupérée.', legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
-    ...(showRootSoil ? [{ id: 'root', label: 'SMAP L4 · humidité zone racinaire · ~9 km', detail: 'Humidité volumétrique · date du produit non récupérée.', legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
+    ...(baseLayer === 'nasa' ? [{ id: 'truecolor', label: `MODIS Terra · composition couleur · ${productDate(trueColorDate, dateLoading)}`, detail: trueColorDate && trueColorDate !== imageryDate ? `Date demandée : ${imageryDate}; date NASA la plus proche utilisée. ${dateStatus} Image composite, pas une mesure unique.` : dateStatus }] : []),
+    ...(showNdvi ? [{ id: 'ndvi', label: `NDVI MODIS Terra · composite 8 jours · ${productDate(ndviDate, dateLoading)}`, detail: ndviDate && ndviDate !== imageryDate ? `Date demandée : ${imageryDate}; date NASA la plus proche utilisée. ${dateStatus}` : dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/MODIS_NDVI_H.svg' }] : []),
+    ...(showSurfaceSoil ? [{ id: 'surface', label: `SMAP L4 · humidité de surface · ${productDate(surfaceSoilDate, dateLoading)} · ~9 km`, detail: dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
+    ...(showRootSoil ? [{ id: 'root', label: `SMAP L4 · humidité zone racinaire · ${productDate(rootSoilDate, dateLoading)} · ~9 km`, detail: dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
     ...(powerGridCell ? [{ id: 'power', label: 'Maille NASA POWER', detail: `≈ ${Math.round(powerGridCell.properties.widthKm)} × ${Math.round(powerGridCell.properties.heightKm)} km · contour vert discontinu; pas une parcelle.` }] : []),
     ...(parcel ? [{ id: 'parcel', label: parcel.feature.properties?.name ?? 'Parcelle importée', detail: `Contour saisi/importé · ≈ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} ha.` }] : []),
     ...(baseLayer === 'streets' && !showNdvi && !showSurfaceSoil && !showRootSoil ? [{ id: 'osm', label: 'Fond de rues · OpenStreetMap', detail: '© OpenStreetMap contributors.' }] : []),
@@ -83,7 +96,7 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
           },
           nasaTrueColor: {
             type: 'raster',
-            tiles: [gibsTileUrl('MODIS_Terra_CorrectedReflectance_TrueColor', imageryDate, 'jpg')],
+            tiles: [gibsTileUrl('MODIS_Terra_CorrectedReflectance_TrueColor', trueColorDate ?? 'default', 'jpg')],
             tileSize: 256,
             minzoom: 0,
             maxzoom: 9,
@@ -91,7 +104,7 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
           },
           nasaNdvi: {
             type: 'raster',
-            tiles: [gibsTileUrl('MODIS_Terra_NDVI_8Day', imageryDate, 'png')],
+            tiles: [gibsTileUrl('MODIS_Terra_NDVI_8Day', ndviDate ?? 'default', 'png')],
             tileSize: 256,
             minzoom: 0,
             maxzoom: 9,
@@ -99,7 +112,7 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
           },
           smapSurface: {
             type: 'raster',
-            tiles: [gibsTileUrl('SMAP_L4_Analyzed_Surface_Soil_Moisture', 'default', 'png', 'GoogleMapsCompatible_Level6')],
+            tiles: [gibsTileUrl('SMAP_L4_Analyzed_Surface_Soil_Moisture', surfaceSoilDate ?? 'default', 'png', 'GoogleMapsCompatible_Level6')],
             tileSize: 256,
             minzoom: 0,
             maxzoom: 6,
@@ -107,7 +120,7 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
           },
           smapRoot: {
             type: 'raster',
-            tiles: [gibsTileUrl('SMAP_L4_Analyzed_Root_Zone_Soil_Moisture', 'default', 'png', 'GoogleMapsCompatible_Level6')],
+            tiles: [gibsTileUrl('SMAP_L4_Analyzed_Root_Zone_Soil_Moisture', rootSoilDate ?? 'default', 'png', 'GoogleMapsCompatible_Level6')],
             tileSize: 256,
             minzoom: 0,
             maxzoom: 6,
@@ -265,12 +278,16 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
     const updateDate = () => {
       const trueSource = map.getSource('nasaTrueColor') as RasterTileSource | undefined
       const ndviSource = map.getSource('nasaNdvi') as RasterTileSource | undefined
-      trueSource?.setTiles([gibsTileUrl('MODIS_Terra_CorrectedReflectance_TrueColor', imageryDate, 'jpg')])
-      ndviSource?.setTiles([gibsTileUrl('MODIS_Terra_NDVI_8Day', imageryDate, 'png')])
+      trueSource?.setTiles([gibsTileUrl('MODIS_Terra_CorrectedReflectance_TrueColor', trueColorDate ?? 'default', 'jpg')])
+      ndviSource?.setTiles([gibsTileUrl('MODIS_Terra_NDVI_8Day', ndviDate ?? 'default', 'png')])
+      const surfaceSource = map.getSource('smapSurface') as RasterTileSource | undefined
+      const rootSource = map.getSource('smapRoot') as RasterTileSource | undefined
+      surfaceSource?.setTiles([gibsTileUrl('SMAP_L4_Analyzed_Surface_Soil_Moisture', surfaceSoilDate ?? 'default', 'png', 'GoogleMapsCompatible_Level6')])
+      rootSource?.setTiles([gibsTileUrl('SMAP_L4_Analyzed_Root_Zone_Soil_Moisture', rootSoilDate ?? 'default', 'png', 'GoogleMapsCompatible_Level6')])
     }
     if (map.isStyleLoaded()) updateDate()
     else map.once('load', updateDate)
-  }, [imageryDate])
+  }, [imageryDate, trueColorDate, ndviDate, surfaceSoilDate, rootSoilDate])
 
   return <div className={`field-map-shell ${className}`}>
     <div ref={containerRef} className="field-map" role="application" aria-label={mapLabel} />
