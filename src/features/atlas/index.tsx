@@ -119,7 +119,7 @@ export function AtlasPage() {
       <div className="atlas-map-toolbar">
         <div className="atlas-base-switch" role="group" aria-label="Fond de carte"><button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Image NASA</button></div>
         <label className="atlas-ndvi-toggle"><input type="checkbox" checked={showNdvi} onChange={event => setShowNdvi(event.target.checked)} /><Activity size={14} /> NDVI</label>
-        <label className="atlas-image-date">Date affichée <input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label>
+        <label className="atlas-image-date">Date souhaitée <input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label>
       </div>
       <div className="atlas-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 250 })}><Plus size={16} /></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 250 })}><Minus size={16} /></button><button type="button" aria-label="Utiliser ma position" title="Utiliser ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></div>
       <span className="atlas-map-click-hint">Cliquez sur la carte pour choisir un point et charger NASA POWER</span>
@@ -129,7 +129,7 @@ export function AtlasPage() {
         <header className="atlas-panel-header"><div><Layers2 size={18} /><div><h2>Imagerie NASA</h2><p>Produits satellite disponibles</p></div></div><span className="atlas-layer-count">{showNdvi ? '2' : '1'}</span></header>
         <div className="atlas-source-option"><span className="atlas-source-swatch nasa-satellite" /><span><strong>MODIS Terra · True Color</strong><small>Réflectance corrigée · GIBS</small></span><span className="atlas-source-tag">NASA</span></div>
         <label className="atlas-source-option atlas-checkbox-option"><input type="checkbox" checked={showNdvi} onChange={event => setShowNdvi(event.target.checked)} /><span className="atlas-source-swatch nasa-ndvi" /><span><strong>MODIS Terra · NDVI 8 jours</strong><small>Indice satellitaire de végétation</small></span></label>
-        <label className="atlas-panel-date"><span>Date de la couche</span><input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label>
+        <label className="atlas-panel-date"><span>Date souhaitée</span><input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label>
         <div className="atlas-panel-source"><Satellite size={16} /><span><strong>NASA EOSDIS GIBS</strong><small>Tuile cartographique en imagerie reprojetée</small></span></div>
         <div className="atlas-panel-note"><ShieldCheck size={13} /><span>Le NDVI est un produit satellitaire régional. Il ne constitue pas une mesure de parcelle.</span></div>
       </aside>
