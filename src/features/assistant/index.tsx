@@ -211,7 +211,7 @@ function classifyQuestion(question: string, contextualIntent?: Intent) {
   const asksLayer: LayerId | undefined = /ndvi|vigueur/.test(lower) ? 'ndvi' : /humidité de surface|smap surface/.test(lower) ? 'surface' : /humidité racinaire|humidité du sol|racine/.test(lower) ? 'root' : undefined
   const intent: Intent = asksObservations ? 'observations' : asksSoilProfile ? 'soil' : asksEquipment ? 'farm' : asksCalendar ? 'calendar' : asksRotation ? 'rotation' : asksFarmProfile ? 'farm' : asksClimate ? 'climate' : 'unknown'
   const contextual = intent === 'unknown' && contextualIntent !== undefined
-  return { intent: contextual ? contextualIntent : intent, asksLayer, contextual }
+  return { intent: contextual ? contextualIntent : intent, asksClimate, asksLayer, contextual }
 }
 
 function isContextualFollowup(question: string) {
@@ -445,6 +445,38 @@ export function AssistantPage() {
     let evidenceTags: EvidenceTag[] = []
     let soilImport: AssistantSoilImport | undefined
     let observationDraft: AssistantObservationDraft | undefined
+    let additionalClimate: { answer: string; evidence: string; source: AISource; tags: EvidenceTag[] } | undefined
+    if (!files.length && route.asksClimate && !['climate', 'observations', 'unknown'].includes(route.intent) && !unsupportedFarmDecision) {
+      let climateSeries = currentSeries
+      const seriesAlreadyLoaded = Boolean(climateSeries && climateSeries.point.latitude === location.latitude && climateSeries.point.longitude === location.longitude)
+      let failed = false
+      try {
+        if (!seriesAlreadyLoaded) climateSeries = await fetchPowerMonthly(location, 5)
+      } catch {
+        const demo = readDemoWorkspace()
+        const isDemoPoint = demo
+          && location.latitude.toFixed(4) === demo.point.latitude.toFixed(4)
+          && location.longitude.toFixed(4) === demo.point.longitude.toFixed(4)
+        climateSeries = isDemoPoint ? offlineDemoPowerSeries(location, 5) : null
+        failed = !climateSeries
+      }
+      const record = climateSeries ? latestCompleteRecord(climateSeries.records) : undefined
+      const isDemoSnapshot = climateSeries?.deliveryMode === 'demo-fixture'
+      const snapshotNote = isDemoSnapshot ? `Extrait NASA POWER hors ligne · capturé le ${climateSeries?.fetchedAt.slice(0, 10)} · dernière période exploitable ${record ? formatPowerMonth(record.date) : 'inconnue'} · aucune requête actuelle.` : ''
+      const gridLabel = climateSeries ? `Centre maille MERRA-2 ${coordinate(climateSeries.gridPoint.latitude, 'N', 'S')} · ${coordinate(climateSeries.gridPoint.longitude, 'E', 'O')} · résolution 0,5° × 0,625°` : 'La requête n’a pas abouti'
+      trace.push(traceNode(`power-context-${id}`, seriesAlreadyLoaded || isDemoSnapshot ? 'read' : 'fetch', isDemoSnapshot ? 'Extrait NASA POWER local · mode démonstration' : seriesAlreadyLoaded ? 'Série NASA POWER chargée · contexte du point' : 'NASA POWER · API mensuelle', failed ? 'NASA POWER indisponible' : isDemoSnapshot ? 'Extrait local consulté · aucune requête réseau' : seriesAlreadyLoaded ? 'Série chargée consultée' : 'Série récupérée', [record ? formatPowerMonth(record.date) : '', gridLabel, snapshotNote].filter(Boolean).join(' · '), failed ? 'failed' : 'completed'))
+      const answer = makeClimateAnswer(question, climateSeries, requestedLayer, location, measurementSystem)
+      const groundedAnswer = snapshotNote ? `${snapshotNote}\n\n${answer}` : answer
+      const climateSource: AISource = { ...sources[0], snippet: snapshotNote || sources[0].snippet }
+      additionalClimate = {
+        answer: groundedAnswer,
+        evidence: groundedAnswer,
+        source: climateSource,
+        tags: climateSeries && latestCompleteRecord(climateSeries.records)
+          ? [{ label: isDemoSnapshot ? 'NASA POWER · extrait local daté' : 'NASA POWER · donnée mensuelle modélisée', kind: 'source' }, { label: 'Maille régionale · pas un diagnostic parcellaire', kind: 'limit' }]
+          : [{ label: 'Donnée NASA indisponible', kind: 'missing' }, { label: 'Aucune valeur de remplacement', kind: 'limit' }],
+      }
+    }
     if (files.length) {
       if (files.length !== 1) {
         answer = 'Joignez un seul fichier CSV d’analyse de sol à la fois. Aucune pièce jointe n’a été lue ni transmise.'
@@ -594,6 +626,13 @@ export function AssistantPage() {
       evidenceTags = currentSeries && latestCompleteRecord(currentSeries.records)
         ? [{ label: isDemoSnapshot ? 'NASA POWER · extrait local daté' : 'NASA POWER · donnée mensuelle modélisée', kind: 'source' }, ...(route.asksLayer?.includes('ndvi') ? [{ label: 'Imagerie NASA GIBS', kind: 'source' } as EvidenceTag] : []), { label: 'Maille régionale · pas un diagnostic parcellaire', kind: 'limit' }]
         : [{ label: 'Donnée NASA indisponible', kind: 'missing' }, { label: 'Aucune valeur de remplacement', kind: 'limit' }]
+    }
+    if (additionalClimate && evidence) {
+      answer = `${answer}\n\n${additionalClimate.answer}`
+      evidence = `${evidence}\n\nÉléments climatiques NASA POWER demandés :\n${additionalClimate.evidence}`
+      usedSources = [...usedSources, additionalClimate.source]
+      evidenceTags = [...evidenceTags, ...additionalClimate.tags]
+      traceHeading = `${traceHeading} · sol, ferme ou rotation + NASA POWER`
     }
     if (!files.length && codexStatus === 'ready' && route.intent !== 'unknown' && route.intent !== 'observations' && !unsupportedFarmDecision) {
       try {
