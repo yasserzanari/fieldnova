@@ -12,7 +12,7 @@ FieldNova dispose déjà d’une base utile : carte interactive, couches NASA GI
 
 ### État de réalisation du dépôt
 
-Cette liste reste un portefeuille de 100 idées, pas un engagement à toutes les livrer. Au 14 novembre 2026, les modules suivants ont été intégrés dans `main` :
+Cette liste reste un portefeuille de 100 idées, pas un engagement à toutes les livrer. Au 15 novembre 2026, les modules suivants ont été intégrés dans `main` :
 
 - **Rotation au centre du MVP :** rotation actuelle et deux options éditables sur cinq années; priorité modifiable; métriques sur familles, répétitions, légumineuses et alternance de systèmes racinaires documentés.
 - **Options de rotation exploratoires :** génération locale de deux séquences depuis le catalogue, avec cultures déclarées indisponibles exclues et règles de classement visibles. Les options restent éditables; les séquences incomplètes ne reçoivent ni note ni classement. Le climat, le sol et le calendrier ne sont pas utilisés comme prédicteurs.
@@ -20,11 +20,12 @@ Cette liste reste un portefeuille de 100 idées, pas un engagement à toutes les
 - **Parcelle et preuves :** import GeoJSON WGS84, contour synchronisé sur les cartes, superficie géodésique approximative et export d’une fiche Markdown contenant sources, calculs, valeurs manquantes et limites.
 - **Assistant outillé :** chat à gauche et carte à droite; lectures de NASA POWER, du profil local et des rotations; changements de couche réels; questions hors périmètre sans appel NASA automatique.
 - **Réponses conversationnelles démo :** Codex CLI rédige les réponses à partir des résultats retournés par les outils locaux FieldNova; la connexion est limitée au serveur Vite de développement.
-- **Traits agronomiques sourcés :** la comparaison affiche familles, légumineuses et architectures racinaires à partir de références INRAE et DRAAF; les valeurs inconnues restent exclues du calcul.
+- **Traits agronomiques sourcés :** la fiche « Pourquoi ? » relie par culture la taxonomie et le statut de légumineuse à INPN TAXREF et l’architecture racinaire connue à la publication DRAAF Hauts-de-France; les racines inconnues n’entrent pas dans le calcul. La référence DRAAF est régionale et ne constitue pas un conseil local.
+- **Import local dans l’assistant :** un CSV de sol reçoit un aperçu révocable et n’est enregistré qu’après confirmation; aucun fichier n’est transmis à Codex CLI.
 - **Démo :** [script de 90 secondes et plans vidéo](demo-script-90s-fieldnova.md).
 - **Profil guidé :** cinq étapes locales pour le point confirmé, la rotation actuelle, l’accès à l’eau, les cultures indisponibles et la priorité; l’état du sol existant est consultable dans « Mon terrain ».
 
-Le prototype n’analyse pas les pièces jointes et ne calcule pas de statistiques NASA à l’intérieur d’une limite de parcelle. Le catalogue et les rotations restent illustratifs, et les références racinaires générales ne sont pas validées localement; aucun rendement, besoin en eau, amélioration de sol ou prévision n’est calculé.
+L’assistant lit localement les CSV d’analyse de sol après sélection; les PDF et images ne sont pas pris en charge. FieldNova ne calcule pas de statistiques NASA à l’intérieur d’une limite de parcelle. Le catalogue et les rotations restent illustratifs, et les références racinaires générales ne sont pas validées localement; aucun rendement, besoin en eau, amélioration de sol ou prévision n’est calculé.
 
 ## Les 12 fonctions à privilégier pour la démonstration
 

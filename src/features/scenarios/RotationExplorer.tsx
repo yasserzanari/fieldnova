@@ -554,14 +554,28 @@ export function RotationExplorer() {
           <p className="rotation-evidence-verdict">{detailedUnavailable.length ? `Non retenue : ${detailedUnavailable.map(id => catalog.find(crop => crop.id === id)?.label).join(', ')} est/sont déclaré(s) indisponible(s).` : !detailedMetrics.complete ? 'Séquence incomplète; elle n’entre pas dans le classement.' : detailedPlan.id === 'reference' ? 'Cette rotation sert de référence; elle n’est pas une option candidate générée.' : leaders.includes(detailedPlan.id) ? 'Cette option atteint la meilleure note pondérée parmi les rotations complètes compatibles.' : 'Cette option est compatible avec les exclusions déclarées, mais sa note pondérée est inférieure aux options mises en avant.'}</p>
         </section>
         <section className="rotation-evidence-section"><h3>Traits du catalogue, année par année</h3>
-          <div className="rotation-evidence-table-wrap"><table className="rotation-evidence-table"><thead><tr><th>Année</th><th>Culture</th><th>Famille</th><th>Légumineuse</th><th>Racines documentées</th><th>Origine des traits</th></tr></thead><tbody>{detailedPlan.crops.map((cropId, index) => { const crop = catalog.find(item => item.id === cropId); return <tr key={index}><td>{index + 1}</td><td>{crop?.label ?? 'Non renseignée'}</td><td>{crop?.familyLabel ?? '—'}</td><td>{crop ? crop.isLegume ? 'Oui' : 'Non' : '—'}</td><td>{crop?.rootArchitecture === 'fibrous' ? 'Fasciculées' : crop?.rootArchitecture === 'taproot' ? 'Pivotantes' : 'Inconnues'}</td><td>{crop?.origin === 'local-declaration' ? crop.sourceName ? `Déclaration locale · ${crop.sourceName}` : 'Déclaration locale · non vérifiée' : crop ? 'Catalogue illustratif · références ci-dessous' : 'Inconnue'}</td></tr> })}</tbody></table></div>
-          <p>Ces traits descriptifs alimentent les comptes; ils ne sont pas des rendements, des besoins en eau ou des effets mesurés sur le sol.</p>
-          <div className="rotation-evidence-source-links"><a href={rotationSources.botanicalFamilies.url} target="_blank" rel="noreferrer">Familles botaniques · INPN TAXREF</a><a href={rotationSources.rootArchitecture.url} target="_blank" rel="noreferrer">Racines et successions · DRAAF Hauts-de-France</a><a href={rotationSources.legumes.url} target="_blank" rel="noreferrer">Diversité végétale et légumineuses · INRAE</a>{[...new Set(detailedPlan.crops)].map(id => catalog.find(crop => crop.id === id)).filter((crop): crop is CropDefinition => crop?.origin === 'local-declaration').map(crop => crop.sourceUrl ? <a key={crop.id} href={crop.sourceUrl} target="_blank" rel="noreferrer">{crop.label} · {crop.sourceName ?? 'référence locale déclarée'}</a> : null)}</div>
+          <div className="rotation-evidence-table-wrap"><table className="rotation-evidence-table"><thead><tr><th>Année</th><th>Culture</th><th>Famille</th><th>Légumineuse</th><th>Racines documentées</th><th>Source de chaque trait</th></tr></thead><tbody>{detailedPlan.crops.map((cropId, index) => { const crop = catalog.find(item => item.id === cropId); return <tr key={index}><td>{index + 1}</td><td>{crop?.label ?? 'Non renseignée'}</td><td>{crop?.familyLabel ?? '—'}</td><td>{crop ? crop.isLegume ? 'Oui' : 'Non' : '—'}</td><td>{crop?.rootArchitecture === 'fibrous' ? 'Fasciculées' : crop?.rootArchitecture === 'taproot' ? 'Pivotantes' : 'Inconnues'}</td><td>{crop ? <CropTraitSources crop={crop} /> : '—'}</td></tr> })}</tbody></table></div>
+          <p>INPN TAXREF étaye la classification botanique; le classement des racines est un repère général issu d’une publication DRAAF des Hauts-de-France. Ce repère régional ne valide pas une pratique pour votre parcelle. Les comptes ne sont ni des rendements, ni des besoins en eau, ni des effets mesurés sur le sol.</p>
+          <div className="rotation-evidence-source-links"><a href={rotationSources.legumes.url} target="_blank" rel="noreferrer">Contexte sur la diversité des rotations · INRAE</a></div>
         </section>
         <RotationEvidenceBridge items={decisionEvidenceItems} checks={[...new Set(decisionChecks)]} onNavigate={() => detailsDialogRef.current?.close()} />
       </div>}
     </dialog>
   </section>
+}
+
+function CropTraitSources({ crop }: { crop: CropDefinition }) {
+  if (crop.origin === 'local-declaration') return <div className="rotation-evidence-trait-links">
+    <span>Déclaration locale · non vérifiée{crop.sourceName ? ` · ${crop.sourceName}` : ''}</span>
+    {crop.sourceUrl && <a href={crop.sourceUrl} target="_blank" rel="noreferrer">Source indiquée</a>}
+  </div>
+
+  return <div className="rotation-evidence-trait-links">
+    <a href={rotationSources.botanicalFamilies.url} target="_blank" rel="noreferrer">Famille et légumineuse · TAXREF</a>
+    {crop.rootArchitecture === 'unknown'
+      ? <span>Racines · non documentées</span>
+      : <a href={rotationSources.rootArchitecture.url} target="_blank" rel="noreferrer">Racines · DRAAF HdF</a>}
+  </div>
 }
 
 function RotationCard({ plan, catalog, planIndex, priority, priorityWeights, isLeader, example, unavailableCropIds, onCropChange, onShowDetails }: { plan: RotationPlan; catalog: CropDefinition[]; planIndex: number; priority: RotationPriority; priorityWeights: ReturnType<typeof rotationWeightsFor>; isLeader: boolean; example: boolean; unavailableCropIds: CropId[]; onCropChange: (planId: RotationId, index: number, value: string) => void; onShowDetails: (planId: RotationId) => void }) {
