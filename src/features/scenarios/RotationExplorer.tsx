@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { Activity, ArrowUpRight, ChevronRight, CloudRain, Download, Droplets, LocateFixed, MapPinned, Minus, Plus, RotateCcw, ShieldCheck, Sparkles, Sprout, ThermometerSun, Trash2, Upload, X } from 'lucide-react'
+import { Activity, ArrowUpRight, CalendarDays, ChevronRight, CloudRain, Download, Droplets, LocateFixed, MapPinned, Minus, Plus, RotateCcw, ShieldCheck, Sparkles, Sprout, ThermometerSun, Trash2, Upload, X } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
@@ -14,6 +14,8 @@ import { addCustomCrop, evaluateRotation, exampleRotationWorkspace, generateRota
 import { emptyRotationConstraints, readRotationConstraints, writeRotationConstraints } from './rotation-constraints'
 import { clearSavedParcelBoundary, parseParcelGeoJSON, saveParcelBoundary, useParcelBoundary } from '../../lib/geo/parcel-boundary'
 import { RotationEvidenceBridge, type DecisionEvidenceItem } from './RotationEvidenceBridge'
+import { RotationCalendarEditor } from './RotationCalendarEditor'
+import { formatCropMonthWindow, hasCropCalendarData, readCropCalendar, writeCropCalendar, type CropCalendar } from './crop-calendar'
 import './rotation-explorer.css'
 
 function dayBefore(days: number) {
@@ -66,6 +68,8 @@ export function RotationExplorer() {
   const [soilState, setSoilState] = useState(() => ({ pointKey, value: readSoilProfile(location) }))
   const [workspace, setWorkspace] = useState(() => ({ pointKey, value: readRotationWorkspace(location) }))
   const [constraintState, setConstraintState] = useState(() => ({ pointKey, value: readRotationConstraints(location) }))
+  const [calendarState, setCalendarState] = useState(() => ({ pointKey, value: readCropCalendar(location) }))
+  const [calendarEditorOpen, setCalendarEditorOpen] = useState(false)
   const [catalogVersion, setCatalogVersion] = useState(0)
   const catalog = useMemo(() => readCropCatalog(location), [pointKey, catalogVersion])
   const [customCropDraft, setCustomCropDraft] = useState({ label: '', familyLabel: '', isLegume: '' as '' | boolean, rootArchitecture: 'unknown' as CropDefinition['rootArchitecture'], sourceName: '', sourceUrl: '' })
@@ -87,6 +91,7 @@ export function RotationExplorer() {
     const pointCatalog = readCropCatalog(location)
     setWorkspace({ pointKey, value: readRotationWorkspace(location, pointCatalog) })
     setConstraintState({ pointKey, value: readRotationConstraints(location, pointCatalog) })
+    setCalendarState({ pointKey, value: readCropCalendar(location) })
     setCatalogVersion(version => version + 1)
     setSaveError('')
     setConstraintError('')
@@ -99,6 +104,7 @@ export function RotationExplorer() {
       const pointCatalog = readCropCatalog(location)
       setWorkspace({ pointKey, value: readRotationWorkspace(location, pointCatalog) })
       setConstraintState({ pointKey, value: readRotationConstraints(location, pointCatalog) })
+      setCalendarState({ pointKey, value: readCropCalendar(location) })
       setCatalogVersion(version => version + 1)
     }
     window.addEventListener('fieldnova:demo-mode-change', reloadLocalExampleData)
@@ -143,6 +149,7 @@ export function RotationExplorer() {
 
   const currentWorkspace = workspace.pointKey === pointKey ? workspace.value : readRotationWorkspace(location, catalog)
   const constraints = constraintState.pointKey === pointKey ? constraintState.value : emptyRotationConstraints()
+  const cropCalendar = calendarState.pointKey === pointKey ? calendarState.value : readCropCalendar(location)
   const latest = useMemo(() => currentSeries ? latestCompleteRecord(currentSeries.records) : undefined, [currentSeries])
   const climateReferences = {
     precipitation: sameMonthReference(currentSeries?.records ?? [], latest, 'precipitationMmPerDay', 'mm/j'),
@@ -505,6 +512,7 @@ export function RotationExplorer() {
       </aside>
 
       <aside className={`rotation-context-panel rotation-context-right ${mobileContextPanel === 'criteria' ? 'is-mobile-active' : 'is-mobile-hidden'}`} aria-label="Critère de comparaison et explication">
+        <section className="rotation-calendar-summary-panel"><header><span><CalendarDays size={14} /><strong>Calendrier cultural</strong></span><button type="button" onClick={() => setCalendarEditorOpen(true)}>{Object.values(cropCalendar).filter(hasCropCalendarData).length ? 'Modifier' : 'Renseigner'}</button></header><p>{Object.values(cropCalendar).filter(entry => entry?.sowing || entry?.harvest).length} culture(s) avec des fenêtres déclarées · aucune date par défaut</p></section>
         <fieldset className="rotation-priority-weights"><legend>Critères et poids</legend>{(Object.entries(priorityLabels) as Array<[RotationPriority, string]>).map(([priority, label]) => { const weight = priorityWeights[priority] ?? 0; return <label key={priority}><input type="checkbox" checked={weight > 0} disabled={weight > 0 && selectedPriorities.length === 1} onChange={event => updatePriorityWeight(priority, event.target.checked ? (weight || 1) : 0)} /><span>{label}</span><select aria-label={`Poids de ${label}`} value={weight || 1} disabled={weight === 0} onChange={event => updatePriorityWeight(priority, Number(event.target.value) as 1 | 2 | 3)}><option value={1}>×1</option><option value={2}>×2</option><option value={3}>×3</option></select></label> })}</fieldset>
         <details className="rotation-method-details"><summary>Méthode de comparaison</summary><div><p><strong>Critère détaillé :</strong> {methodPriorityDescription[currentWorkspace.priority]} Les poids actifs sont égaux à 1, 2 ou 3 selon vos choix.</p><p>Chaque indicateur est ramené entre 0 et 1 : familles / 5, répétitions inversées / 4, légumineuses / 5, transitions racinaires documentées / 4. Le score est la moyenne pondérée de ces valeurs, affichée sur 100; il ne représente ni rendement ni bénéfice agricole. Toutes les rotations compatibles à égalité sur la note sont signalées.</p><p><strong>Option A</strong> est la première séquence classée; <strong>Option B</strong> est la suivante. Les égalités sont départagées par familles distinctes, légumineuses, transitions racinaires documentées, moins de répétitions, puis l’ordre du catalogue. Seules les séquences complètes et les exclusions saisies sont prises en compte. Les traits ajoutés localement entrent dans ces comptes tels que déclarés; ils ne sont pas vérifiés.</p><p>Le climat NASA et le profil de sol restent du contexte; ils ne participent pas à la note de rotation.</p></div></details>
         <details className="rotation-exclusions"><summary>Cultures indisponibles · {constraints.unavailableCropIds.length}</summary><p>Ces choix excluent une culture des options générées et de leur classement. La référence actuelle reste visible.</p><div>{catalog.map(crop => <label key={crop.id}><input type="checkbox" checked={constraints.unavailableCropIds.includes(crop.id)} onChange={() => toggleUnavailableCrop(crop.id)} /><span>{crop.label}{crop.origin === 'local-declaration' ? ' · saisie locale' : ''}</span></label>)}</div></details>
@@ -558,9 +566,14 @@ export function RotationExplorer() {
           <p>INPN TAXREF étaye la classification botanique; le classement des racines est un repère général issu d’une publication DRAAF des Hauts-de-France. Ce repère régional ne valide pas une pratique pour votre parcelle. Les comptes ne sont ni des rendements, ni des besoins en eau, ni des effets mesurés sur le sol.</p>
           <div className="rotation-evidence-source-links"><a href={rotationSources.legumes.url} target="_blank" rel="noreferrer">Contexte sur la diversité des rotations · INRAE</a></div>
         </section>
+        <section className="rotation-evidence-section"><h3>Calendrier déclaré pour cette rotation</h3>
+          <div className="rotation-evidence-table-wrap"><table className="rotation-evidence-table"><thead><tr><th>Année</th><th>Culture</th><th>Semis</th><th>Récolte</th><th>Source déclarée</th></tr></thead><tbody>{detailedPlan.crops.map((cropId, index) => { const crop = catalog.find(item => item.id === cropId); const entry = crop ? cropCalendar[crop.id] : undefined; return <tr key={index}><td>{index + 1}</td><td>{crop?.label ?? 'Non renseignée'}</td><td>{formatCropMonthWindow(entry?.sowing)}</td><td>{formatCropMonthWindow(entry?.harvest)}</td><td>{entry?.sourceName ? <span className="rotation-calendar-evidence-source">{entry.sourceName}{entry.sourceUrl && <> · <a href={entry.sourceUrl} target="_blank" rel="noreferrer">ouvrir</a></>}</span> : 'Aucune source renseignée'}</td></tr> })}</tbody></table></div>
+          <p>Ces fenêtres sont des déclarations locales pour le point suivi, pas une validation de faisabilité. Elles sont affichées comme contexte et ne changent ni les options ni leur classement.</p>
+        </section>
         <RotationEvidenceBridge items={decisionEvidenceItems} checks={[...new Set(decisionChecks)]} onNavigate={() => detailsDialogRef.current?.close()} />
       </div>}
     </dialog>
+    <RotationCalendarEditor open={calendarEditorOpen} crops={catalog} value={cropCalendar} onClose={() => setCalendarEditorOpen(false)} onSave={(value: CropCalendar) => { writeCropCalendar(location, value); setCalendarState({ pointKey, value }); setCalendarEditorOpen(false) }} />
   </section>
 }
 
