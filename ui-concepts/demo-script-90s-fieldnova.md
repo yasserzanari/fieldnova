@@ -48,4 +48,4 @@ Lire les valeurs affichées en direct pendant la narration. Ne pas apprendre par
 
 ## Repli si un service ne répond pas
 
-La démo reste honnête : montrer le message d’indisponibilité et passer à l’édition des rotations, au profil de sol local ou à l’export. Ne pas remplacer une réponse absente par une capture ou une valeur qui semblerait en direct.
+La démo reste honnête : montrer le message d’indisponibilité et passer à l’édition des rotations, au profil de sol local ou à l’export. Ne pas remplacer une réponse absente par une capture ou une valeur qui semblerait en direct. Les [captures datées du 15 novembre 2026](demo-captures/README.md) servent uniquement de storyboard ou de support d’interface explicitement archivé; elles ne remplacent aucune réponse ni valeur actuelle.
