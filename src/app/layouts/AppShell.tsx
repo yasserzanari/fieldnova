@@ -1,8 +1,9 @@
-import { Bell, ChevronDown, ChevronLeft, CircleHelp, CloudRain, FlaskConical, Leaf, MapPin, Menu, ThermometerSun, UserRound } from 'lucide-react'
+import { ChevronDown, ChevronLeft, CircleHelp, CloudRain, FlaskConical, Leaf, MapPin, Menu, ThermometerSun, UserRound } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { featureRoutes } from '../navigation'
 import { HelpDialog } from '../HelpDialog'
+import { DataStatusPopover } from '../DataStatusPopover'
 import { isValidGeoPoint, useSelectedLocation } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
@@ -278,7 +279,7 @@ export function AppShell() {
             {demoError && <span className="demo-mode-error" role="alert">{demoError}</span>}
           </div>}
           <div className="topbar-actions">
-            <button className="icon-button" aria-label="Notifications"><Bell size={18} /></button>
+            <DataStatusPopover series={series} latestDate={latest ? formatPowerMonth(latest.date) : undefined} loading={loading} error={error} />
             <button ref={helpButtonRef} className="icon-button" type="button" aria-label="Ouvrir le guide FieldNova" onClick={() => setHelpOpen(true)}><CircleHelp size={18} /></button>
             <details className="profile-preferences"><summary className="profile-button" aria-label="Préférences de l’utilisateur" title="Préférences"><UserRound size={18} /></summary><div className="unit-preference-popover"><label htmlFor="measurement-system">Unités</label><select id="measurement-system" aria-label="Unités de mesure" value={measurementSystem} onChange={event => setMeasurementSystem(event.target.value === 'us-customary' ? 'us-customary' : 'metric')}><option value="metric">Métriques · °C, mm, km</option><option value="us-customary">États-Unis · °F, in, mi</option></select><small>Les exports NASA gardent leurs unités d’origine.</small></div></details>
           </div>

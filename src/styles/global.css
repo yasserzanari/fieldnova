@@ -114,7 +114,7 @@
   .mobile-menu { display: grid; }
   .app-topbar { padding: 0 14px; }
   .topbar-context { flex: 1; gap: 10px; }
-  .context-weather span, .topbar-actions button:nth-child(1) { display: none; }
+  .context-weather span { display: none; }
   .context-source { display: none; }
   .demo-mode-pill { gap:5px; padding:5px; }
   .demo-mode-pill small { display:none; }
