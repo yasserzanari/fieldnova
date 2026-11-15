@@ -3,6 +3,7 @@ import type { GeoPoint } from '../../lib/geo/location'
 export type CropId = 'wheat' | 'maize' | 'oats' | 'pea' | 'faba' | 'rapeseed' | 'sunflower' | 'beet'
 export type RotationId = 'reference' | 'option-a' | 'option-b'
 export type RotationPriority = 'diversity' | 'alternation' | 'legume' | 'root'
+export type RotationPriorityWeights = Partial<Record<RotationPriority, 1 | 2 | 3>>
 
 export type CropDefinition = {
   id: CropId
@@ -23,6 +24,7 @@ export type RotationPlan = {
 export type RotationWorkspace = {
   plans: RotationPlan[]
   priority: RotationPriority
+  priorityWeights?: RotationPriorityWeights
   isExample: boolean
 }
 
@@ -61,6 +63,7 @@ const storagePrefix = 'fieldnova:rotation-workspace:v1:'
 export function exampleRotationWorkspace(): RotationWorkspace {
   return {
     priority: 'diversity',
+    priorityWeights: { diversity: 2 },
     isExample: true,
     plans: [
       { id: 'reference', title: 'Référence actuelle', crops: ['wheat', 'maize', 'wheat', 'maize', 'wheat'] },
@@ -85,14 +88,16 @@ export function readRotationWorkspace(point: GeoPoint): RotationWorkspace {
       }
     })
     const priority = parsed.priority === 'alternation' || parsed.priority === 'legume' || parsed.priority === 'root' ? parsed.priority : 'diversity'
-    return { plans, priority, isExample: parsed.isExample === true }
+    const rawWeights = parsed.priorityWeights && typeof parsed.priorityWeights === 'object' ? parsed.priorityWeights : null
+    const priorityWeights = rawWeights ? cleanPriorityWeights(rawWeights) : { [priority]: 2 }
+    return { plans, priority, priorityWeights, isExample: parsed.isExample === true }
   } catch {
     return exampleRotationWorkspace()
   }
 }
 
 export function writeRotationWorkspace(point: GeoPoint, workspace: RotationWorkspace) {
-  const stored: RotationWorkspace = { ...workspace, isExample: false }
+  const stored: RotationWorkspace = { ...workspace, isExample: workspace.isExample === true }
   localStorage.setItem(rotationStorageKey(point), JSON.stringify(stored))
   return stored
 }
@@ -115,24 +120,39 @@ export function evaluateRotation(plan: RotationPlan) {
   }
 }
 
-export function rotationPriorityValue(metrics: ReturnType<typeof evaluateRotation>, priority: RotationPriority) {
-  return priority === 'diversity'
-    ? metrics.distinctFamilies
-    : priority === 'alternation'
-      ? -metrics.repeatedFamilyTransitions
-      : priority === 'legume'
-        ? metrics.legumeSeasons
-        : metrics.knownRootTransitions
+export function cleanPriorityWeights(value: Partial<Record<RotationPriority, unknown>>): RotationPriorityWeights {
+  const valid = (entry: unknown): entry is 1 | 2 | 3 => entry === 1 || entry === 2 || entry === 3
+  return Object.fromEntries((Object.keys(priorityLabels) as RotationPriority[]).flatMap(priority => valid(value[priority]) ? [[priority, value[priority]]] : [])) as RotationPriorityWeights
 }
 
-export function topRotations(plans: RotationPlan[], priority: RotationPriority, unavailableCropIds: CropId[] = []) {
+export function rotationWeightsFor(workspace: Pick<RotationWorkspace, 'priority' | 'priorityWeights'>): RotationPriorityWeights {
+  const weights = cleanPriorityWeights(workspace.priorityWeights ?? {})
+  return Object.keys(weights).length ? weights : { [workspace.priority]: 2 }
+}
+
+export function rotationCombinedScore(metrics: ReturnType<typeof evaluateRotation>, weights: RotationPriorityWeights) {
+  const active = Object.entries(weights) as Array<[RotationPriority, 1 | 2 | 3]>
+  if (!active.length) return 0
+  const normalized: Record<RotationPriority, number> = {
+    diversity: metrics.distinctFamilies / 5,
+    alternation: (4 - metrics.repeatedFamilyTransitions) / 4,
+    legume: metrics.legumeSeasons / 5,
+    root: metrics.knownRootTransitions / 4,
+  }
+  const totalWeight = active.reduce((sum, [, weight]) => sum + weight, 0)
+  return active.reduce((sum, [priority, weight]) => sum + normalized[priority] * weight, 0) / totalWeight
+}
+
+export function topRotations(plans: RotationPlan[], priority: RotationPriority | RotationPriorityWeights, unavailableCropIds: CropId[] = []) {
+  const weights = typeof priority === 'string' ? { [priority]: 2 } : cleanPriorityWeights(priority)
   const complete = plans.map(plan => ({ plan, metrics: evaluateRotation(plan) })).filter(item => item.metrics.complete && !item.plan.crops.some(id => id && unavailableCropIds.includes(id)))
   if (!complete.length) return []
-  const best = Math.max(...complete.map(item => rotationPriorityValue(item.metrics, priority)))
-  return complete.filter(item => rotationPriorityValue(item.metrics, priority) === best).map(item => item.plan.id)
+  const best = Math.max(...complete.map(item => rotationCombinedScore(item.metrics, weights)))
+  return complete.filter(item => Math.abs(rotationCombinedScore(item.metrics, weights) - best) < 1e-9).map(item => item.plan.id)
 }
 
-export function generateRotationOptions(reference: RotationPlan, priority: RotationPriority, unavailableCropIds: CropId[]): [RotationPlan, RotationPlan] | null {
+export function generateRotationOptions(reference: RotationPlan, priority: RotationPriority | RotationPriorityWeights, unavailableCropIds: CropId[]): [RotationPlan, RotationPlan] | null {
+  const weights = typeof priority === 'string' ? { [priority]: 2 } : cleanPriorityWeights(priority)
   const available = cropCatalog.filter(crop => !unavailableCropIds.includes(crop.id))
   if (available.length < 2) return null
 
@@ -143,7 +163,7 @@ export function generateRotationOptions(reference: RotationPlan, priority: Rotat
       const key = crops.join('|')
       if (key === referenceKey) return
       const metrics = evaluateRotation({ id: 'option-a', title: 'Option A', crops })
-      candidates.push({ crops: [...crops], metrics, score: rotationPriorityValue(metrics, priority), key })
+      candidates.push({ crops: [...crops], metrics, score: rotationCombinedScore(metrics, weights), key })
       return
     }
     for (const crop of available) visit([...crops, crop.id])
@@ -158,14 +178,7 @@ export function generateRotationOptions(reference: RotationPlan, priority: Rotat
     || left.metrics.repeatedFamilyTransitions - right.metrics.repeatedFamilyTransitions
     || compareCatalogOrder(left.crops, right.crops))
   const first = byPriority[0]
-  const secondary = candidates
-    .filter(candidate => candidate.key !== first.key && candidate.score >= first.score - 1)
-    .sort((left, right) => right.metrics.distinctFamilies - left.metrics.distinctFamilies
-      || right.metrics.legumeSeasons - left.metrics.legumeSeasons
-      || right.score - left.score
-      || left.metrics.repeatedFamilyTransitions - right.metrics.repeatedFamilyTransitions
-      || compareCatalogOrder(left.crops, right.crops))[0]
-  const second = secondary ?? byPriority[1]
+  const second = byPriority[1]
   if (!second) return null
 
   return [

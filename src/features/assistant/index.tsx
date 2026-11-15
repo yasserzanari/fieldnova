@@ -12,7 +12,7 @@ import { farmWaterAccessLabels, farmWaterConstraintLabels, readFarmProfile } fro
 import { readSoilProfile, soilSourceLabels } from '../../lib/farm/soil-profile'
 import { readRotationConstraints } from '../scenarios/rotation-constraints'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
-import { cropCatalog, evaluateRotation, priorityLabels, readRotationWorkspace, rotationPriorityValue, rotationSources, type CropId } from '../scenarios/rotation-model'
+import { cropCatalog, evaluateRotation, priorityLabels, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightsFor, type CropId, type RotationPriority } from '../scenarios/rotation-model'
 import './assistant.css'
 
 type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
@@ -133,7 +133,8 @@ function formatFarmProfileAnswer(point: GeoPoint) {
   const crops = reference?.crops.map(id => cropCatalog.find(crop => crop.id === id)?.shortLabel ?? '').filter(Boolean) ?? []
   const knownSoil = Boolean(soil.texture && soil.texture !== 'unknown' || soil.ph !== undefined || soil.organicMatterPercent !== undefined || soil.effectiveDepthCm !== undefined || soil.drainage && soil.drainage !== 'unknown' || soil.horizons?.length)
   const waterNote = farm.waterNotes ? ` Précision déclarée : « ${farm.waterNotes} ».` : ''
-  return `${farm.isExample ? 'Ce profil est un exemple fictif et ne décrit pas une exploitation réelle. ' : ''}Le profil local de ${farm.name} indique : ${farmWaterAccessLabels[farm.waterAccess].toLocaleLowerCase('fr')} et ${farmWaterConstraintLabels[farm.waterConstraint].toLocaleLowerCase('fr')}.${waterNote} ${crops.length ? `La rotation actuelle renseignée contient ${crops.join(' → ')}.` : 'Aucune culture n’est renseignée dans la rotation actuelle.'} Sol local : ${knownSoil ? 'des caractéristiques ont été saisies ou importées dans Mon terrain.' : 'aucune caractéristique renseignée; le sol reste inconnu.'} Priorité de comparaison choisie : ${priorityLabels[workspace.priority]}. ${constraints.unavailableCropIds.length ? `Cultures exclues des options : ${constraints.unavailableCropIds.map(id => cropCatalog.find(crop => crop.id === id)?.shortLabel ?? id).join(', ')}.` : 'Aucune culture exclue des options.'} Ces éléments sont des déclarations locales; ils ne prouvent pas un volume d’eau disponible et ne constituent pas un conseil agronomique.`
+  const prioritySummary = (Object.entries(rotationWeightsFor(workspace)) as Array<[RotationPriority, 1 | 2 | 3]>).map(([priority, weight]) => `${priorityLabels[priority]} ×${weight}`).join(' · ')
+  return `${farm.isExample ? 'Ce profil est un exemple fictif et ne décrit pas une exploitation réelle. ' : ''}Le profil local de ${farm.name} indique : ${farmWaterAccessLabels[farm.waterAccess].toLocaleLowerCase('fr')} et ${farmWaterConstraintLabels[farm.waterConstraint].toLocaleLowerCase('fr')}.${waterNote} ${crops.length ? `La rotation actuelle renseignée contient ${crops.join(' → ')}.` : 'Aucune culture n’est renseignée dans la rotation actuelle.'} Sol local : ${knownSoil ? 'des caractéristiques ont été saisies ou importées dans Mon terrain.' : 'aucune caractéristique renseignée; le sol reste inconnu.'} Critères et poids de rotation : ${prioritySummary}. ${constraints.unavailableCropIds.length ? `Cultures exclues des options : ${constraints.unavailableCropIds.map(id => cropCatalog.find(crop => crop.id === id)?.shortLabel ?? id).join(', ')}.` : 'Aucune culture exclue des options.'} Ces éléments sont des déclarations locales; ils ne prouvent pas un volume d’eau disponible et ne constituent pas un conseil agronomique.`
 }
 
 function formatSoilAnswer(point: GeoPoint) {
@@ -164,6 +165,9 @@ function formatSoilAnswer(point: GeoPoint) {
 
 function formatRotationAnswer(point: GeoPoint) {
   const workspace = readRotationWorkspace(point)
+  const priorityWeights = rotationWeightsFor(workspace)
+  const selectedPriorities = Object.entries(priorityWeights) as Array<[RotationPriority, 1 | 2 | 3]>
+  const prioritySummary = selectedPriorities.map(([priority, weight]) => `${priorityLabels[priority]} ×${weight}`).join(' · ')
   const constraints = readRotationConstraints(point)
   const reference = workspace.plans.find(plan => plan.id === 'reference')
   const referenceMetrics = reference ? evaluateRotation(reference) : undefined
@@ -181,13 +185,12 @@ function formatRotationAnswer(point: GeoPoint) {
     const comparison = plan.id !== 'reference' && metrics.complete && referenceMetrics?.complete
       ? ` Écarts bruts par rapport à la référence : ${metrics.distinctFamilies - referenceMetrics.distinctFamilies} famille(s), ${metrics.repeatedFamilyTransitions - referenceMetrics.repeatedFamilyTransitions} répétition(s), ${metrics.legumeSeasons - referenceMetrics.legumeSeasons} année(s) avec légumineuse, ${metrics.knownRootTransitions - referenceMetrics.knownRootTransitions} transition(s) racinaire(s) documentée(s).`
       : ''
-    const rankingValue = metrics.complete ? rotationPriorityValue(metrics, workspace.priority) : undefined
-    const referenceValue = referenceMetrics?.complete ? rotationPriorityValue(referenceMetrics, workspace.priority) : undefined
-    const priorityEvidence = plan.id !== 'reference' ? ` Valeur du critère « ${priorityLabels[workspace.priority]} » : ${!metrics.complete ? 'non calculée, séquence incomplète' : workspace.priority === 'alternation' ? metrics.repeatedFamilyTransitions + ' répétitions (moins = meilleure valeur pour ce critère)' : rankingValue}; référence : ${referenceValue === undefined ? 'indisponible ou incomplète' : workspace.priority === 'alternation' ? referenceMetrics?.repeatedFamilyTransitions : referenceValue}.` : ''
+    const rankingScore = metrics.complete ? (rotationCombinedScore(metrics, priorityWeights) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 }) : undefined
+    const priorityEvidence = plan.id !== 'reference' ? ` Note de tri pondérée : ${rankingScore === undefined ? 'non calculée, séquence incomplète' : `${rankingScore}/100`} avec ${prioritySummary}.` : ''
     return `${plan.title} (${crops}) : ${metrics.distinctFamilies} familles botaniques distinctes, ${metrics.repeatedFamilyTransitions} répétition(s) de famille, ${metrics.legumeSeasons} année(s) avec légumineuse et ${metrics.knownRootTransitions} transition(s) entre architectures racinaires connues.${comparison}${priorityEvidence}${constraintStatus}`
   })
   const unavailableLabels = constraints.unavailableCropIds.map(id => cropCatalog.find(crop => crop.id === id)?.label ?? id)
-  return `${workspace.isExample ? 'Les scénarios affichés sont des exemples sur cinq années.' : 'Voici les scénarios enregistrés pour ce point.'} Critère sélectionné : ${priorityLabels[workspace.priority]}. ${unavailableLabels.length ? `Cultures déclarées indisponibles pour les options : ${unavailableLabels.join(', ')}. ` : 'Aucune culture déclarée indisponible. '}${plans.join(' ')} Les architectures racinaires absentes de la référence sont laissées inconnues. Ces indicateurs décrivent la séquence; ils ne prédisent ni rendement ni amélioration du sol. La référence racinaire est régionale et doit être confirmée localement. Vous pouvez modifier les cultures et contraintes dans l’onglet Scénarios.`
+  return `${workspace.isExample ? 'Les scénarios affichés sont des exemples sur cinq années.' : 'Voici les scénarios enregistrés pour ce point.'} Critères et poids : ${prioritySummary}. La note normalisée sert uniquement au tri descriptif. ${unavailableLabels.length ? `Cultures déclarées indisponibles pour les options : ${unavailableLabels.join(', ')}. ` : 'Aucune culture déclarée indisponible. '}${plans.join(' ')} Les architectures racinaires absentes de la référence sont laissées inconnues. Ces indicateurs décrivent la séquence; ils ne prédisent ni rendement ni amélioration du sol. La référence racinaire est régionale et doit être confirmée localement. Vous pouvez modifier les cultures et contraintes dans l’onglet Scénarios.`
 }
 
 function traceNode(id: string, toolName: string, label: string, primary: string, secondary: string, status: 'completed' | 'failed' = 'completed'): TraceNode {
@@ -252,7 +255,8 @@ export function AssistantPage() {
       const workspace = readRotationWorkspace(location)
       const constraints = readRotationConstraints(location)
       const completePlans = workspace.plans.filter(plan => evaluateRotation(plan).complete).length
-      trace.push(traceNode(`rotation-${id}`, 'read', 'Scénarios de rotation · navigateur', 'Rotations et contraintes consultées', `${completePlans}/3 scénario(s) complet(s) · priorité ${workspace.priority} · ${constraints.unavailableCropIds.length} culture(s) indisponible(s)`, 'completed'))
+      const weights = Object.entries(rotationWeightsFor(workspace)).map(([priority, weight]) => `${priorityLabels[priority as RotationPriority]} ×${weight}`).join(' · ')
+      trace.push(traceNode(`rotation-${id}`, 'read', 'Scénarios de rotation · navigateur', 'Rotations et contraintes consultées', `${completePlans}/3 scénario(s) complet(s) · critères ${weights} · ${constraints.unavailableCropIds.length} culture(s) indisponible(s)`, 'completed'))
       traceHeading = 'Scénarios de rotation consultés'
       answer = formatRotationAnswer(location)
       evidence = answer
@@ -261,7 +265,8 @@ export function AssistantPage() {
       const profile = readFarmProfile(location)
       const workspace = readRotationWorkspace(location)
       const constraints = readRotationConstraints(location)
-      trace.push(traceNode(`farm-${id}`, 'read', 'Profil de ferme et contraintes locales · navigateur', profile ? `Profil de ${profile.name} consulté` : 'Aucun profil de ferme renseigné', `${farmWaterAccessLabels[profile?.waterAccess ?? 'unknown']} · priorité ${priorityLabels[workspace.priority]} · ${constraints.unavailableCropIds.length} culture(s) exclue(s)`, 'completed'))
+      const weights = Object.entries(rotationWeightsFor(workspace)).map(([priority, weight]) => `${priorityLabels[priority as RotationPriority]} ×${weight}`).join(' · ')
+      trace.push(traceNode(`farm-${id}`, 'read', 'Profil de ferme et contraintes locales · navigateur', profile ? `Profil de ${profile.name} consulté` : 'Aucun profil de ferme renseigné', `${farmWaterAccessLabels[profile?.waterAccess ?? 'unknown']} · critères de rotation ${weights} · ${constraints.unavailableCropIds.length} culture(s) exclue(s)`, 'completed'))
       traceHeading = 'Profil et contraintes de ferme consultés'
       answer = formatFarmProfileAnswer(location)
       evidence = answer
