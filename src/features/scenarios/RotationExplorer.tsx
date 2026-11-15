@@ -204,8 +204,8 @@ export function RotationExplorer() {
       state: latest && currentSeries ? 'ready' : climateLoading ? 'partial' : 'missing',
       summary: latest && currentSeries ? `${formatPowerMonth(latest.date)} · ${latest.precipitationMmPerDay === undefined ? 'pluie indisponible' : formatPrecipitationRate(latest.precipitationMmPerDay, measurementSystem)} · ${latest.temperatureC === undefined ? 'température indisponible' : formatTemperature(latest.temperatureC, measurementSystem)}` : climateLoading ? 'Série mensuelle en cours de chargement' : 'Aucune valeur exploitable pour ce point',
       detail: latest && currentSeries ? `Maille MERRA-2 · centre ${currentSeries.gridPoint.latitude.toFixed(3)}, ${currentSeries.gridPoint.longitude.toFixed(3)}. ${climateReferences.precipitation}. ${climateReferences.temperature}. Ce repère historique ne décrit pas le calendrier d’une culture.` : climateError ? `NASA POWER indisponible : ${climateError}` : 'La série NASA POWER n’est pas encore disponible; aucun chiffre de remplacement n’est affiché.',
-      href: '/app/atlas',
-      action: 'Ouvrir l’Atlas',
+      href: '/app/scenarios?view=climate',
+      action: 'Comparer les périodes NASA',
     },
     {
       key: 'soil',
