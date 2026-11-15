@@ -15,7 +15,7 @@ FieldNova dispose déjà d’une base utile : carte interactive, couches NASA GI
 Cette liste reste un portefeuille de 100 idées, pas un engagement à toutes les livrer. Au 14 novembre 2026, les modules suivants ont été intégrés dans `main` :
 
 - **Rotation au centre du MVP :** rotation actuelle et deux options éditables sur cinq années; priorité modifiable; métriques sur familles, répétitions, légumineuses et alternance de systèmes racinaires documentés.
-- **Options de rotation exploratoires :** génération locale de deux séquences depuis le catalogue, avec cultures déclarées indisponibles exclues et règles de classement visibles. Les options restent éditables; le climat, le sol et le calendrier ne sont pas utilisés comme prédicteurs.
+- **Options de rotation exploratoires :** génération locale de deux séquences depuis le catalogue, avec cultures déclarées indisponibles exclues et règles de classement visibles. Les options restent éditables; les séquences incomplètes ne reçoivent ni note ni classement. Le climat, le sol et le calendrier ne sont pas utilisés comme prédicteurs.
 - **Contexte de décision :** séries NASA POWER mensuelles avec coordonnées de grille et valeurs comparées aux mêmes mois des années précédentes; profil de sol local avec origine, date et référence déclarées; coupe par horizons saisie localement, avec intervalles manquants visibles comme inconnus.
 - **Parcelle et preuves :** import GeoJSON WGS84, contour synchronisé sur les cartes, superficie géodésique approximative et export d’une fiche Markdown contenant sources, calculs, valeurs manquantes et limites.
 - **Assistant outillé :** chat à gauche et carte à droite; lectures de NASA POWER, du profil local et des rotations; changements de couche réels; questions hors périmètre sans appel NASA automatique.
@@ -98,7 +98,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 32. **[P0 · LIVRÉ] Carte d’une rotation sur plusieurs saisons** : trois séquences éditables montrent distinctement les cultures de chaque année.
 33. **[P0 · LIVRÉ] Rotation actuelle comme référence** : la séquence de référence est modifiable et sert de base aux écarts affichés.
 34. **[P0 · À VALIDER LOCALEMENT] Vérification des successions incompatibles** : aucune règle d’incompatibilité n’est appliquée sans source agronomique et validation adaptées à la région pilote.
-35. **[P1] Familles botaniques** : visualiser leur diversité et limiter certaines répétitions selon des règles documentées.
+35. **[P1 · PARTIEL] Familles botaniques** : le détail de rotation affiche les familles sourcées et les cartes comptent les familles distinctes ainsi que les répétitions consécutives. Aucune répétition n’est bloquée sans règle et validation locales.
 36. **[P1] Cultures de couverture** : ajouter une option dédiée, avec ses coûts opérationnels et ses limites locales.
 37. **[P1] Intercultures et mélanges** : représenter deux cultures simultanées et éviter de les traiter comme une rotation simple.
 38. **[P1] Calendrier cultural local** : semis, croissance et récolte selon région, variété et saison, avec source et plage de dates.
@@ -114,7 +114,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 45. **[P1] Simulation de météo historique** : tester un scénario sur des années observées, sans le présenter comme prévision.
 46. **[P1] Scénario de disponibilité en eau** : comparer des hypothèses définies par l’utilisateur et montrer quelles données sont absentes.
 47. **[P1 · LIVRÉ] Sensibilité des résultats** : sur les trois rotations affichées, tester les variations d’un niveau (±1) de chaque poids actif et signaler si le scénario en tête change; l’analyse n’implique aucun rendement ou impact agricole.
-48. **[P1] Avertissement « données insuffisantes »** : ne pas classer une rotation quand les variables minimales manquent.
+48. **[P1 · LIVRÉ] Avertissement « données insuffisantes »** : une séquence qui ne renseigne pas ses cinq années n’obtient ni note ni place de tête; la fiche indique combien d’années compléter et le classement ne retient que les rotations complètes compatibles.
 49. **[P2] Comparaison multi-parcelles** : repérer les rotations communes et les contraintes qui diffèrent selon les parcelles.
 50. **[P2] Historique des versions de scénarios** : retrouver les hypothèses utilisées à chaque comparaison.
 
