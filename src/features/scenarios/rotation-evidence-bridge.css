@@ -1,0 +1,20 @@
+.rotation-evidence-bridge { display:grid; gap:12px; }
+.rotation-evidence-bridge-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+.rotation-evidence-bridge-heading h3 { margin:0; color:#315238; font-size:13px; font-weight:750; }
+.rotation-evidence-bridge-heading p { margin:4px 0 0; color:#706d60; font-size:11px; line-height:1.45; }
+.rotation-evidence-bridge-heading > span { flex:none; padding:5px 8px; border:1px solid #e2e4d8; border-radius:999px; color:#626352; background:#f3f4ec; font-size:10px; font-weight:650; }
+.rotation-evidence-bridge-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+.rotation-evidence-bridge-card { display:grid; align-content:start; gap:7px; min-width:0; padding:11px; border:1px solid #e7e7dc; border-radius:10px; background:#fffefa; }
+.rotation-evidence-bridge-card.is-missing { border-color:#e9d8be; background:#fffaf1; }
+.rotation-evidence-bridge-card-heading { display:flex; align-items:center; gap:7px; min-width:0; }
+.rotation-evidence-bridge-icon { display:grid; width:25px; height:25px; flex:none; place-items:center; border-radius:7px; color:#527342; background:#eef2e6; }
+.rotation-evidence-bridge-card h4 { margin:0; color:#3e5038; font-size:11px; font-weight:750; }
+.rotation-evidence-bridge-state { margin-left:auto; color:#777364; font-size:10px; font-weight:620; white-space:nowrap; }
+.rotation-evidence-bridge-card > strong { color:#3e4036; font-size:12px; font-weight:680; line-height:1.45; }
+.rotation-evidence-bridge-card > p { margin:0; color:#706d61; font-size:11px; line-height:1.5; }
+.rotation-evidence-bridge-card > a { display:inline-flex; align-items:center; gap:4px; width:max-content; color:#386840; font-size:10px; font-weight:700; text-decoration:none; }
+.rotation-evidence-bridge-card > a:hover { text-decoration:underline; }
+.rotation-evidence-bridge-checks { display:grid; gap:7px; padding:11px 12px; border-left:3px solid #d5bc75; border-radius:0 9px 9px 0; background:#f8f6ec; }
+.rotation-evidence-bridge-checks h4 { display:flex; align-items:center; gap:6px; margin:0; color:#58543f; font-size:11px; font-weight:750; }
+.rotation-evidence-bridge-checks ul { display:grid; gap:5px; margin:0; padding-left:18px; color:#625f53; font-size:11px; line-height:1.45; }
+@media(max-width:600px) { .rotation-evidence-bridge-heading { display:grid; }.rotation-evidence-bridge-grid { grid-template-columns:1fr; }.rotation-evidence-bridge-heading > span { width:max-content; } }
