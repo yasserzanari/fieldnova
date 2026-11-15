@@ -3,7 +3,7 @@ import { ArrowUpRight, Check, ChevronRight, CloudSun, Database, Droplets, Extern
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
-import { formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { formatPowerMonth, latestCompleteRecord, powerQualityFlags, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { useSelectedLocation } from '../../lib/geo/location'
 import './data-trust.css'
@@ -67,6 +67,7 @@ export function DataTrustPage() {
   const SourceIcon = selected.icon
   const latest = series ? latestCompleteRecord(series.records) : undefined
   const coverage = selected.id === 'power' && series ? powerCoverage(series) : []
+  const qualityFlags = selected.id === 'power' && series ? powerQualityFlags(series.records) : []
   const filteredSources = useMemo(() => sources.filter(source => (theme === 'Toutes' || source.kind === theme) && (statusFilter === 'Tous les statuts' || source.status === statusFilter) && `${source.name} ${source.provider} ${source.description}`.toLocaleLowerCase('fr').includes(query.toLocaleLowerCase('fr'))), [query, statusFilter, theme])
 
   const imageryDate = (() => {
@@ -145,6 +146,7 @@ export function DataTrustPage() {
             { title: 'Usage dans FieldNova', desc: 'Aucune valeur de cette source n’est affichée comme donnée réelle.', done: false },
           ]).map((item, index) => <li className={item.done ? 'lineage-done' : 'lineage-next'} key={item.title}><span className="lineage-marker">{item.done ? <Check size={11} /> : index + 1}</span><span><strong>{item.title}</strong><small>{item.desc}</small></span></li>)}</ol>
           {selected.id === 'power' && series && <section className="trust-coverage-audit" aria-label="Couverture des périodes mensuelles NASA POWER"><header><strong>Valeurs disponibles par mois</strong><small>Fenêtre demandée · {series.requestedMonths.length} mois clos</small></header><div>{coverage.map(item => <span key={item.field}><strong>{item.label}</strong><small>{item.available}/{series.requestedMonths.length} mois exploitables</small></span>)}</div><details><summary>Mois sans valeur exploitable</summary><ul>{coverage.map(item => <li key={item.field}><strong>{item.label}</strong><small>{item.missing.length ? item.missing.map(formatPowerMonth).join(' · ') : 'Aucun mois manquant'}</small></li>)}</ul></details></section>}
+          {selected.id === 'power' && series && <section className={`trust-quality-audit ${qualityFlags.length ? 'has-flags' : ''}`} aria-label="Contrôle de cohérence des valeurs NASA POWER"><header><strong>{qualityFlags.length ? `${qualityFlags.length} alerte${qualityFlags.length > 1 ? 's' : ''} de cohérence` : 'Aucune contradiction physique détectée'}</strong><small>Valeurs brutes conservées · contrôle indicatif</small></header>{qualityFlags.length > 0 && <details><summary>Voir les valeurs signalées</summary><ul>{qualityFlags.map((flag, index) => <li key={`${flag.date}-${flag.parameter}-${index}`}><strong>{flag.parameter} · {formatPowerMonth(flag.date)}</strong><span>{flag.value} · {flag.rule}</span></li>)}</ul></details>}</section>}
           {selected.id === 'power' && series && <details className="trust-transformation-audit"><summary>Étapes de transformation de cette série</summary><ol>
             <li><strong>Point transmis</strong><small>{series.point.latitude.toFixed(3)}, {series.point.longitude.toFixed(3)} · arrondi à 0,001° pour la requête NASA POWER.</small></li>
             <li><strong>Paramètres et période</strong><small>PRECTOTCORR, T2M, T2M_MAX, T2M_MIN, GWETTOP, GWETROOT · UTC · {series.requestedMonths[0] ? formatPowerMonth(series.requestedMonths[0]) : 'aucun mois'} à {series.requestedMonths[series.requestedMonths.length - 1] ? formatPowerMonth(series.requestedMonths[series.requestedMonths.length - 1]) : 'aucun mois'}.</small></li>
