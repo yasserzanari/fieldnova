@@ -299,6 +299,10 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
 
   return <div className={`field-map-shell ${className}`}>
     <div ref={containerRef} className="field-map" role="application" aria-label={mapLabel} />
+    <button className="field-map-center-action" type="button" onClick={() => {
+      const center = mapRef.current?.getCenter()
+      if (center) onSelectRef.current({ latitude: Number(center.lat.toFixed(5)), longitude: Number(center.lng.toFixed(5)) })
+    }}>Sélectionner le centre de la carte comme point suivi</button>
     <aside className="field-map-layer-legend" aria-label="Légende des couches visibles">
       <strong className="field-map-layer-legend-title">Couches visibles</strong>
       {legendItems.map(item => <div className={`field-map-legend-item legend-${item.id}`} key={item.id}>
