@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Download, FileSpreadsheet, Layers3, Pencil, Save, Trash2, Upload, X } from 'lucide-react'
 import type { GeoPoint } from '../../lib/geo/location'
-import { clearSoilProfile, readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, validateSoilHorizons, type FarmSoilProfile, type SoilFieldKey, type SoilFieldProvenance, type SoilHorizon, writeSoilProfile } from '../../lib/farm/soil-profile'
+import { archiveSoilAnalysis, clearSoilProfile, readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, validateSoilHorizons, type FarmSoilProfile, type SoilAnalysisSnapshot, type SoilFieldKey, type SoilFieldProvenance, type SoilHorizon, writeSoilProfile } from '../../lib/farm/soil-profile'
 import { parseSoilAnalysisCsv, soilAnalysisCsvTemplate, type SoilAnalysisCsvImport } from '../../lib/farm/soil-analysis-csv'
 
 const textureLabels = { sandy: 'Sableux', loamy: 'Limoneux', clayey: 'Argileux', unknown: 'Inconnu' } as const
@@ -20,6 +20,8 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
   const [csvError, setCsvError] = useState('')
   const [csvPreview, setCsvPreview] = useState<SoilCsvPreview>()
   const [appliedImportFile, setAppliedImportFile] = useState('')
+  const [comparisonNewerId, setComparisonNewerId] = useState('')
+  const [comparisonOlderId, setComparisonOlderId] = useState('')
   const dialogRef = useRef<HTMLDialogElement>(null)
   const csvInputRef = useRef<HTMLInputElement>(null)
   const locationKey = `${point.latitude.toFixed(4)},${point.longitude.toFixed(4)}`
@@ -66,6 +68,19 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
     }
   }
 
+  const archiveDraft = () => {
+    const horizonError = validateSoilHorizons(draft.horizons ?? [])
+    if (horizonError) return setError(horizonError)
+    try {
+      const saved = archiveSoilAnalysis(point, draft)
+      setProfile(saved)
+      setError('')
+      setOpen(false)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Archivage local impossible. Vérifiez l’espace de stockage du navigateur.')
+    }
+  }
+
   const remove = () => {
     try {
       clearSoilProfile(point)
@@ -108,6 +123,10 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
     profile.horizons?.length ? `${profile.horizons.length} horizon${profile.horizons.length > 1 ? 's' : ''} · 0–${profile.horizons[profile.horizons.length - 1].bottomCm} cm` : undefined,
     profile.samplingMethod ? `Méthode · ${profile.samplingMethod}` : undefined,
   ].filter(Boolean)
+  const analysisHistory = [...(profile.analysisHistory ?? [])].sort((a, b) => b.sampleDate.localeCompare(a.sampleDate) || b.archivedAt.localeCompare(a.archivedAt))
+  const newerSnapshot = analysisHistory.find(snapshot => snapshot.id === comparisonNewerId) ?? analysisHistory[0]
+  const olderSnapshot = analysisHistory.find(snapshot => snapshot.id === comparisonOlderId && snapshot.id !== newerSnapshot?.id)
+    ?? analysisHistory.find(snapshot => snapshot.id !== newerSnapshot?.id)
 
   const addHorizon = () => {
     const horizons = draft.horizons ?? []
@@ -201,6 +220,7 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
     </details>
     {hasSampleMetadata && <p className="terrain-profile-date">Fiche de prélèvement · point suivi {point.latitude.toFixed(4)}, {point.longitude.toFixed(4)} · {profile.sampleDate ? `date ${profile.sampleDate}` : 'date non renseignée'} · {profile.samplingMethod ? `méthode : ${profile.samplingMethod}` : 'méthode non renseignée'}.</p>}
     {profile.horizons?.length ? <SoilHorizonVisual horizons={profile.horizons} defaultSourceType={profile.sourceType} defaultSourceName={profile.sourceName} defaultSampleDate={profile.sampleDate} defaultSamplingMethod={profile.samplingMethod} /> : null}
+    {analysisHistory.length > 0 && <SoilAnalysisHistory history={analysisHistory} newer={newerSnapshot} older={olderSnapshot} onNewerChange={setComparisonNewerId} onOlderChange={setComparisonOlderId} />}
     {profile.updatedAt && <p className="terrain-profile-date">Enregistré localement · {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(profile.updatedAt))} · Origine déclarée : {soilSourceLabels[profile.sourceType ?? 'farmer-reported']} (non vérifiée)</p>}
 
     <dialog ref={dialogRef} className="terrain-soil-dialog" aria-labelledby="soil-profile-title" onClose={() => setOpen(false)} onClick={event => { if (event.target === dialogRef.current) setOpen(false) }}>
@@ -245,14 +265,42 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
           <label>Origine des données<select value={draft.sourceType ?? 'farmer-reported'} onChange={event => setDraft(value => ({ ...value, sourceType: event.target.value as FarmSoilProfile['sourceType'] }))}><option value="farmer-reported">Déclarée par l’exploitation</option><option value="lab-analysis">Analyse de laboratoire</option><option value="other-source">Autre source</option></select></label>
           <label>Date de l’échantillon<input type="date" value={draft.sampleDate ?? ''} onChange={event => setDraft(value => ({ ...value, sampleDate: event.target.value || undefined }))} /></label>
           <label className="terrain-soil-field-wide">Laboratoire ou référence de source <span className="terrain-soil-optional">Facultatif</span><input type="text" maxLength={120} placeholder="Ex. laboratoire, numéro d’analyse ou organisme" value={draft.sourceName ?? ''} onChange={event => setDraft(value => ({ ...value, sourceName: event.target.value || undefined }))} /></label>
-          <label className="terrain-soil-field-wide">Méthode de prélèvement <span className="terrain-soil-optional">Facultatif</span><input type="text" maxLength={120} placeholder="Ex. tarière · composite 0–20 cm" value={draft.samplingMethod ?? ''} onChange={event => setDraft(value => ({ ...value, samplingMethod: event.target.value || undefined }))} /></label>
+      <label className="terrain-soil-field-wide">Méthode de prélèvement <span className="terrain-soil-optional">Facultatif</span><input type="text" maxLength={120} placeholder="Ex. tarière · composite 0–20 cm" value={draft.samplingMethod ?? ''} onChange={event => setDraft(value => ({ ...value, samplingMethod: event.target.value || undefined }))} /><small>Une méthode renseignée est requise pour archiver et comparer des échantillons.</small></label>
         </div>
         {error && <p className="terrain-soil-form-error" role="alert">{error}</p>}
-        <footer className="terrain-soil-form-actions">{hasProfile && <button className="terrain-soil-delete" type="button" onClick={remove}><Trash2 size={14} />Effacer ce profil</button>}<button className="terrain-soil-save" type="submit"><Save size={14} />Enregistrer</button></footer>
+        <footer className="terrain-soil-form-actions">{hasProfile && <button className="terrain-soil-delete" type="button" onClick={remove}><Trash2 size={14} />Effacer ce profil</button>}<button className="terrain-soil-save" type="submit"><Save size={14} />Enregistrer</button><button className="terrain-soil-archive" type="button" onClick={archiveDraft} disabled={draft.sourceType !== 'lab-analysis' || !draft.sampleDate || !draft.samplingMethod?.trim() || !draft.horizons?.some(horizon => horizon.ph !== undefined || horizon.organicMatterPercent !== undefined || (horizon.texture && horizon.texture !== 'unknown'))}>Archiver cet échantillon</button></footer>
         <p className="terrain-soil-privacy">Le point, l’origine, la date et la méthode sont déclarés par vous et non vérifiés par FieldNova. Ces informations restent sur cet appareil; elles ne sont envoyées à aucun service.</p>
       </form>
     </dialog>
   </>
+}
+
+function SoilAnalysisHistory({ history, newer, older, onNewerChange, onOlderChange }: { history: SoilAnalysisSnapshot[]; newer?: SoilAnalysisSnapshot; older?: SoilAnalysisSnapshot; onNewerChange: (id: string) => void; onOlderChange: (id: string) => void }) {
+  const formatDate = (date: string) => new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`))
+  const sameMethod = Boolean(newer?.samplingMethod && older?.samplingMethod && newer.samplingMethod.trim() === older.samplingMethod.trim())
+  const intervals = [...new Map([...(newer?.horizons ?? []), ...(older?.horizons ?? [])].map(horizon => [`${horizon.topCm}-${horizon.bottomCm}`, horizon])).values()].sort((a, b) => a.topCm - b.topCm || a.bottomCm - b.bottomCm)
+  const horizonAt = (snapshot: SoilAnalysisSnapshot | undefined, interval: SoilHorizon) => snapshot?.horizons.find(horizon => horizon.topCm === interval.topCm && horizon.bottomCm === interval.bottomCm)
+  const showNumber = (value: number | undefined, suffix = '') => value === undefined ? '—' : `${decimal(value)}${suffix}`
+  return <section className="terrain-soil-history" aria-label="Historique des analyses de sol">
+    <header><strong>Historique des analyses</strong><small>{history.length} échantillon{history.length > 1 ? 's' : ''} archivé{history.length > 1 ? 's' : ''} sur cet appareil</small></header>
+    {history.length > 1 && <div className="terrain-soil-history-pickers">
+      <label>Échantillon A<select value={newer?.id ?? ''} onChange={event => onNewerChange(event.target.value)}>{history.map(snapshot => <option key={snapshot.id} value={snapshot.id}>{formatDate(snapshot.sampleDate)}{snapshot.sourceName ? ` · ${snapshot.sourceName}` : ''}</option>)}</select></label>
+      <label>Échantillon B<select value={older?.id ?? ''} onChange={event => onOlderChange(event.target.value)}>{history.filter(snapshot => snapshot.id !== newer?.id).map(snapshot => <option key={snapshot.id} value={snapshot.id}>{formatDate(snapshot.sampleDate)}{snapshot.sourceName ? ` · ${snapshot.sourceName}` : ''}</option>)}</select></label>
+    </div>}
+    {newer && older ? <>
+      <p className={`terrain-soil-history-warning ${sameMethod ? 'is-comparable' : ''}`}>{sameMethod ? `Méthode identique : ${newer.samplingMethod}. Les écarts numériques ci-dessous sont descriptifs.` : 'Méthodes différentes : les valeurs restent visibles, aucun écart n’est calculé.'}</p>
+      <div className="terrain-soil-history-table-wrap"><table><thead><tr><th>Profondeur</th><th>{formatDate(older.sampleDate)}</th><th>{formatDate(newer.sampleDate)}</th><th>Écart</th></tr></thead><tbody>{intervals.map(interval => {
+        const oldHorizon = horizonAt(older, interval)
+        const newHorizon = horizonAt(newer, interval)
+        const matchingDepth = Boolean(oldHorizon && newHorizon)
+        const delta = (oldValue?: number, newValue?: number, suffix = '') => matchingDepth && sameMethod && oldValue !== undefined && newValue !== undefined ? `${newValue - oldValue > 0 ? '+' : ''}${decimal(newValue - oldValue)}${suffix}` : '—'
+        const display = (horizon: SoilHorizon | undefined) => horizon ? `${horizon.texture && horizon.texture !== 'unknown' ? textureLabels[horizon.texture] : 'Texture —'} · pH ${showNumber(horizon.ph)} · MO ${showNumber(horizon.organicMatterPercent, ' %')}` : 'Pas de mesure à cet intervalle'
+        const textureChange = oldHorizon?.texture && newHorizon?.texture && oldHorizon.texture !== 'unknown' && newHorizon.texture !== 'unknown' ? oldHorizon.texture === newHorizon.texture ? 'identique' : 'différente' : '—'
+        return <tr key={`${interval.topCm}-${interval.bottomCm}`}><th scope="row">{interval.topCm}–{interval.bottomCm} cm</th><td>{display(oldHorizon)}</td><td>{display(newHorizon)}</td><td>{matchingDepth ? `Texture ${textureChange} · pH ${delta(oldHorizon?.ph, newHorizon?.ph)} · MO ${delta(oldHorizon?.organicMatterPercent, newHorizon?.organicMatterPercent, ' pt')}` : 'Profondeurs différentes'}</td></tr>
+      })}</tbody></table></div>
+      <small className="terrain-soil-history-note">Comparaison à intervalle exact uniquement. Une valeur manquante ou une méthode différente empêche le calcul. Les écarts ne constituent pas une interprétation agronomique.</small>
+    </> : newer ? <div className="terrain-soil-history-single"><span>{formatDate(newer.sampleDate)} · {newer.sourceName ?? 'Laboratoire non précisé'}</span><small>{newer.horizons.length} intervalle{newer.horizons.length > 1 ? 's' : ''} archivé{newer.horizons.length > 1 ? 's' : ''} · méthode : {newer.samplingMethod}</small><small>Archivez un second échantillon pour afficher une comparaison.</small></div> : null}
+  </section>
 }
 
 function SoilFieldOriginEditor({ field, profile, onChange }: { field: SoilFieldKey; profile: FarmSoilProfile; onChange: (field: SoilFieldKey, update: Partial<SoilFieldProvenance>) => void }) {

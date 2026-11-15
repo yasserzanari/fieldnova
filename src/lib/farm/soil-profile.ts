@@ -31,6 +31,14 @@ export type SoilHorizon = {
   sampleDate?: string
   samplingMethod?: string
 }
+export type SoilAnalysisSnapshot = {
+  id: string
+  sampleDate: string
+  sourceName?: string
+  samplingMethod: string
+  horizons: SoilHorizon[]
+  archivedAt: string
+}
 export const soilSourceLabels: Record<SoilSourceType, string> = {
   'farmer-reported': 'déclaration de l’exploitation',
   'lab-analysis': 'analyse de laboratoire déclarée',
@@ -49,6 +57,7 @@ export type FarmSoilProfile = {
   sampleDate?: string
   samplingMethod?: string
   fieldProvenance?: SoilFieldProvenanceMap
+  analysisHistory?: SoilAnalysisSnapshot[]
   updatedAt?: string
 }
 
@@ -75,6 +84,7 @@ export function readSoilProfile(point: GeoPoint): FarmSoilProfile {
       sampleDate: isIsoDate(parsed.sampleDate) ? parsed.sampleDate : undefined,
       samplingMethod: typeof parsed.samplingMethod === 'string' ? parsed.samplingMethod.slice(0, 120) : undefined,
       fieldProvenance: readFieldProvenance(parsed.fieldProvenance),
+      analysisHistory: readAnalysisHistory(parsed.analysisHistory),
       updatedAt: typeof parsed.updatedAt === 'string' && Number.isFinite(Date.parse(parsed.updatedAt)) ? parsed.updatedAt : undefined,
     }
   } catch {
@@ -122,10 +132,50 @@ export function writeSoilProfile(point: GeoPoint, profile: FarmSoilProfile) {
     sampleDate: isIsoDate(profile.sampleDate) ? profile.sampleDate : undefined,
     samplingMethod: typeof profile.samplingMethod === 'string' ? profile.samplingMethod.trim().slice(0, 120) || undefined : undefined,
     fieldProvenance: cleanFieldProvenance(profile.fieldProvenance),
+    analysisHistory: cleanAnalysisHistory(profile.analysisHistory),
     updatedAt: new Date().toISOString(),
   }
   localStorage.setItem(soilProfileStorageKey(point), JSON.stringify(clean))
   return clean
+}
+
+export function archiveSoilAnalysis(point: GeoPoint, profile: FarmSoilProfile) {
+  const method = profile.samplingMethod?.trim()
+  if (profile.sourceType !== 'lab-analysis') throw new Error('Sélectionnez « Analyse de laboratoire » comme origine.')
+  if (!isIsoDate(profile.sampleDate)) throw new Error('Renseignez la date de l’échantillon avant de l’archiver.')
+  if (!method) throw new Error('Renseignez la méthode de prélèvement pour rendre les comparaisons possibles.')
+  const horizons = profile.horizons ?? []
+  if (validateSoilHorizons(horizons)) throw new Error(validateSoilHorizons(horizons))
+  if (!horizons.some(horizon => horizon.ph !== undefined || horizon.organicMatterPercent !== undefined || (horizon.texture && horizon.texture !== 'unknown'))) {
+    throw new Error('Renseignez au moins une mesure ou texture connue dans un horizon.')
+  }
+  const current = readSoilProfile(point)
+  const snapshot: SoilAnalysisSnapshot = {
+    id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    sampleDate: profile.sampleDate,
+    sourceName: profile.sourceName?.trim().slice(0, 120) || undefined,
+    samplingMethod: method.slice(0, 120),
+    horizons: horizons.map(horizon => ({ ...horizon, sourceType: 'lab-analysis', sourceName: profile.sourceName?.trim().slice(0, 120) || undefined, sampleDate: profile.sampleDate, samplingMethod: method.slice(0, 120) })),
+    archivedAt: new Date().toISOString(),
+  }
+  const history = [snapshot, ...(current.analysisHistory ?? [])].slice(0, 20)
+  return writeSoilProfile(point, { ...profile, analysisHistory: history })
+}
+
+function readAnalysisHistory(value: unknown): SoilAnalysisSnapshot[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const entries = value.slice(0, 20).flatMap(item => {
+    if (!item || typeof item !== 'object') return []
+    const source = item as Partial<SoilAnalysisSnapshot>
+    const horizons = readHorizons(source.horizons)
+    if (typeof source.id !== 'string' || !isIsoDate(source.sampleDate) || typeof source.samplingMethod !== 'string' || !source.samplingMethod.trim() || !horizons?.some(horizon => horizon.ph !== undefined || horizon.organicMatterPercent !== undefined || (horizon.texture && horizon.texture !== 'unknown'))) return []
+    return [{ id: source.id.slice(0, 100), sampleDate: source.sampleDate, sourceName: typeof source.sourceName === 'string' ? source.sourceName.slice(0, 120) : undefined, samplingMethod: source.samplingMethod.slice(0, 120), horizons, archivedAt: typeof source.archivedAt === 'string' && Number.isFinite(Date.parse(source.archivedAt)) ? source.archivedAt : new Date(0).toISOString() }]
+  })
+  return entries.length ? entries : undefined
+}
+
+function cleanAnalysisHistory(value: SoilAnalysisSnapshot[] | undefined) {
+  return readAnalysisHistory(value)
 }
 
 function readFieldProvenance(value: unknown): SoilFieldProvenanceMap | undefined {
@@ -218,6 +268,7 @@ function readHorizons(value: unknown): SoilHorizon[] | undefined {
       sourceType: isOneOf(source.sourceType, ['farmer-reported', 'lab-analysis', 'other-source']) ? source.sourceType : undefined,
       sourceName: typeof source.sourceName === 'string' ? source.sourceName.slice(0, 120) : undefined,
       sampleDate: isIsoDate(source.sampleDate) ? source.sampleDate : undefined,
+      samplingMethod: typeof source.samplingMethod === 'string' ? source.samplingMethod.slice(0, 120) : undefined,
     }]
   })
   return horizons.length && !validateSoilHorizons(horizons) ? horizons : undefined
