@@ -90,7 +90,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 27. **[P1 · LIVRÉ · SAISIE LOCALE] Fiche de prélèvement** : Mon terrain associe une note de prélèvement au point suivi et enregistre la date, la méthode déclarée, le laboratoire/la référence et les profondeurs décrites; l’import CSV de laboratoire conserve aussi ces métadonnées par horizon. Elles peuvent être notées même si les propriétés mesurées restent inconnues. Rien n’est envoyé au serveur et FieldNova ne valide pas le protocole.
 28. **[P2] Photos de terrain annotées** : lier des observations visuelles à une parcelle sans les traiter comme une mesure scientifique.
 29. **[P2] Import d’une carte pédologique locale** : afficher l’organisme, l’échelle cartographique et la légende d’origine.
-30. **[P2] Plan d’acquisition de données manquantes** : indiquer quelles mesures de sol réduiraient le plus l’incertitude du scénario.
+30. **[P2 · PARTIELLEMENT LIVRÉ] Plan d’acquisition de données manquantes** : Mon terrain liste les propriétés du sol manquantes ou déclarées et ouvre le formulaire local pour les saisir. La liste ne prétend pas classer les analyses par valeur d’information; le sol n’entre pas dans le classement descriptif actuel des rotations.
 
 ### D. Cultures et rotations — 31 à 40
 

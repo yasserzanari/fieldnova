@@ -19,7 +19,7 @@
 .terrain-map-click-hint { position:absolute; z-index:4; bottom:11px; left:50%; max-width:calc(100% - 24px); padding:6px 9px; border:1px solid rgb(255 255 255 / 70%); border-radius:7px; background:rgb(255 254 249 / 90%); color:#545245; box-shadow:0 2px 8px rgb(14 27 16 / 9%); font-size:7px; text-align:center; transform:translateX(-50%); pointer-events:none; }
 .terrain-panel { position:absolute; z-index:4; bottom:12px; display:flex; min-height:0; flex-direction:column; padding:11px; border:1px solid rgb(255 255 255 / 80%); border-radius:13px; background:rgb(255 254 249 / 96%); box-shadow:0 5px 20px rgb(19 31 17 / 17%); backdrop-filter:blur(12px); }
 .terrain-layers-panel { top:62px; left:11px; width:250px; }
-.terrain-soil-panel { top:86px; right:11px; width:292px; }
+.terrain-soil-panel { top:86px; right:11px; width:292px; overflow-y:auto; overscroll-behavior:contain; scrollbar-color:#d7d5ca transparent; scrollbar-width:thin; }
 .terrain-panel-heading,.terrain-soil-heading { display:flex; flex:none; align-items:center; justify-content:space-between; gap:8px; padding-bottom:8px; border-bottom:1px solid #eae7dd; }
 .terrain-panel-heading > div,.terrain-soil-heading > div { display:flex; min-width:0; align-items:center; gap:8px; }
 .terrain-heading-icon { display:grid; width:29px; height:29px; flex:none; place-items:center; border-radius:8px; background:#e7efd9; color:var(--color-forest-800); }
@@ -65,6 +65,16 @@
 .terrain-field-provenance dd span { flex:none; padding:2px 4px; border-radius:999px; background:#efeee8; color:#777465; font-size:5px; }
 .terrain-field-provenance dd span.is-known { background:#e7f0df; color:#4f7447; }
 .terrain-field-source { margin-top:1px; }
+.terrain-acquisition-plan { display:grid; gap:7px; margin:7px 0 0 37px; padding:7px; border:1px solid #e2e5d9; border-radius:8px; background:#f8f9f4; }
+.terrain-acquisition-plan > summary { color:#506b46; font-size:7px; font-weight:720; cursor:pointer; }
+.terrain-acquisition-plan > p,.terrain-acquisition-plan > small { margin:0; color:#777465; font-size:7px; line-height:1.4; }
+.terrain-acquisition-plan ul { display:grid; gap:3px; margin:0; padding:0; list-style:none; }
+.terrain-acquisition-plan li { display:flex; align-items:center; justify-content:space-between; gap:6px; padding:4px 5px; border-radius:5px; background:#fffefa; }
+.terrain-acquisition-plan li span { color:#5a594d; font-size:7px; }
+.terrain-acquisition-plan li strong { color:#8b6943; font-size:6px; font-weight:650; text-align:right; }
+.terrain-acquisition-plan li strong.is-known { color:#53764a; }
+.terrain-acquisition-plan > button { min-height:29px; justify-self:start; padding:0 8px; border:1px solid #d8e4ce; border-radius:7px; background:#fffefa; color:#416b3b; font-size:7px; font-weight:680; cursor:pointer; }
+.terrain-acquisition-plan > button:hover { background:#eef4e7; }
 .terrain-horizon-visual { display:grid; gap:5px; margin:7px 0 0 37px; }.terrain-horizon-visual > div:first-child { display:grid; gap:2px; }.terrain-horizon-visual > div:first-child strong { color:#5a594c; font-size:7px; }.terrain-horizon-visual > div:first-child small,.terrain-horizon-beyond { color:#898575; font-size:6px; }
 .terrain-horizon-stack { display:grid; gap:2px; overflow:hidden; border:1px solid #ded8c9; border-radius:6px; background:#f2eee3; }.terrain-horizon-layer { display:flex; min-height:19px; align-items:center; gap:7px; padding:3px 6px; border-left:3px solid #a47a4d; background:#eee4d4; color:#554c3c; }.terrain-horizon-layer > span { width:56px; flex:none; font-size:6px; font-weight:700; }.terrain-horizon-layer > strong { overflow:hidden; min-width:0; font-size:7px; font-weight:650; text-overflow:ellipsis; white-space:nowrap; }.terrain-horizon-layer > small { margin-left:auto; color:#776b57; font-size:6px; white-space:nowrap; }.terrain-horizon-layer.texture-sandy { border-color:#c39a54; background:#f3e7c8; }.terrain-horizon-layer.texture-loamy { border-color:#906f4e; background:#e9decb; }.terrain-horizon-layer.texture-clayey { border-color:#8c5540; background:#e8d3c9; }.terrain-horizon-layer.texture-unknown,.terrain-horizon-layer.is-gap { border-color:#aaa89e; background:repeating-linear-gradient(135deg,#f1f0ea,#f1f0ea 5px,#e9e8e1 5px,#e9e8e1 10px); color:#767468; }
 .terrain-horizon-beyond { line-height:1.35; }

@@ -88,6 +88,14 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
     { label: 'Profondeur utile', value: profile.effectiveDepthCm === undefined ? undefined : `${decimal(profile.effectiveDepthCm)} cm` },
     { label: 'Drainage', value: profile.drainage && profile.drainage !== 'unknown' ? drainageLabels[profile.drainage] : undefined },
   ]
+  const acquisitionRows = [
+    { label: 'Texture', known: Boolean(profile.texture && profile.texture !== 'unknown' || profile.horizons?.some(horizon => horizon.texture && horizon.texture !== 'unknown')) },
+    { label: 'pH', known: profile.ph !== undefined || Boolean(profile.horizons?.some(horizon => horizon.ph !== undefined)) },
+    { label: 'Matière organique', known: profile.organicMatterPercent !== undefined || Boolean(profile.horizons?.some(horizon => horizon.organicMatterPercent !== undefined)) },
+    { label: 'Profondeur utile', known: profile.effectiveDepthCm !== undefined },
+    { label: 'Drainage observé', known: Boolean(profile.drainage && profile.drainage !== 'unknown') },
+  ]
+  const missingAcquisitionCount = acquisitionRows.filter(row => !row.known).length
   const hasDraftValue = draft.texture !== undefined || draft.ph !== undefined || draft.organicMatterPercent !== undefined || draft.effectiveDepthCm !== undefined || draft.drainage !== undefined
     || Boolean(draft.horizons?.length || draft.sampleDate || draft.samplingMethod?.trim() || draft.sourceName?.trim())
   const soilSummary = [
@@ -170,6 +178,13 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
       {hasGeneralProfile && <small className="terrain-field-source">Origine appliquée aux valeurs renseignées : {fieldSource}. Aucun niveau de fiabilité indépendant n’est calculé.</small>}
       {!hasGeneralProfile && <small className="terrain-field-source">Aucun champ général saisi. La provenance des horizons est affichée avec leur composition.</small>}
     </section>}
+    <details className="terrain-acquisition-plan">
+      <summary>Plan de collecte du sol · {missingAcquisitionCount} champ{missingAcquisitionCount > 1 ? 's' : ''} à documenter</summary>
+      <p>Rassemblez les résultats d’une analyse ou vos observations locales; ne remplissez que les valeurs connues. Les données NASA de la carte ne remplacent pas ces informations.</p>
+      <ul>{acquisitionRows.map(row => <li key={row.label}><span>{row.label}</span><strong className={row.known ? 'is-known' : ''}>{row.known ? 'Renseigné · origine non vérifiée' : 'À recueillir si disponible'}</strong></li>)}</ul>
+      <small>Cette liste ne classe pas les analyses par valeur scientifique. Les propriétés du sol ne modifient pas le classement descriptif des rotations dans cette version.</small>
+      <button type="button" onClick={edit}>{hasProfile ? 'Compléter le profil' : 'Saisir les données connues'}</button>
+    </details>
     {hasSampleMetadata && <p className="terrain-profile-date">Fiche de prélèvement · point suivi {point.latitude.toFixed(4)}, {point.longitude.toFixed(4)} · {profile.sampleDate ? `date ${profile.sampleDate}` : 'date non renseignée'} · {profile.samplingMethod ? `méthode : ${profile.samplingMethod}` : 'méthode non renseignée'}.</p>}
     {profile.horizons?.length ? <SoilHorizonVisual horizons={profile.horizons} defaultSourceType={profile.sourceType} defaultSourceName={profile.sourceName} defaultSampleDate={profile.sampleDate} defaultSamplingMethod={profile.samplingMethod} /> : null}
     {profile.updatedAt && <p className="terrain-profile-date">Enregistré localement · {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(profile.updatedAt))} · Origine déclarée : {soilSourceLabels[profile.sourceType ?? 'farmer-reported']} (non vérifiée)</p>}
