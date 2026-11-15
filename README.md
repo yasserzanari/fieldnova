@@ -53,3 +53,5 @@ Les valeurs d’exemple sont étiquetées dans l’interface et séparées des o
 Le code FieldNova est publié sous licence MIT. Voir [LICENSE](LICENSE). Cette licence couvre le code du projet; elle ne remplace pas les conditions et attributions propres aux jeux de données, fonds de carte, bibliothèques et autres contenus tiers référencés dans [`ui-concepts/references-and-data-sources.md`](ui-concepts/references-and-data-sources.md).
 
 La page publique [Méthode & données](/methode) résume les données utilisées, les calculs du prototype et les limites avant toute interprétation.
+
+Pour préparer une démonstration, consulter la [fiche de réponses au jury](ui-concepts/judge-brief-fieldnova.md), qui distingue les preuves présentes des validations de terrain encore à réaliser.
