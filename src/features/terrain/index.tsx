@@ -39,6 +39,10 @@ export function TerrainPage() {
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
   const gridPoint = series?.gridPoint
   const latestDate = latest ? formatPowerMonth(latest.date) : 'aucune période valide'
+  const powerStatus = loading ? 'chargement' : error ? 'indisponible' : series?.deliveryMode === 'network' ? 'en ligne' : series?.deliveryMode === 'fresh-cache' ? 'cache récent' : series?.deliveryMode === 'stale-cache' ? 'cache ancien' : series?.deliveryMode === 'demo-fixture' ? 'extrait démo hors ligne' : 'inconnu'
+  const powerStatusClass = loading ? 'loading' : error ? 'error' : series?.deliveryMode === 'stale-cache' ? 'stale' : 'ready'
+  const gibsStatus = gibsDateError ? 'catalogue indisponible' : gibsAvailability ? 'dates récupérées' : 'interrogation en cours'
+  const gibsStatusClass = gibsDateError ? 'error' : gibsAvailability ? 'ready' : 'loading'
 
   const selectPoint = (point: GeoPoint) => selectLocation(point)
   const locateMe = () => {
@@ -53,7 +57,7 @@ export function TerrainPage() {
   }
 
   return <section className="terrain-page" aria-label="Sol et humidité au point sélectionné">
-    <header className="terrain-heading"><div><h1>Mon terrain</h1><p>Humidité de surface, zone racinaire et données de sol pour le point choisi</p></div><span className="terrain-data-live"><i />Sources NASA connectées</span></header>
+    <header className="terrain-heading"><div><h1>Mon terrain</h1><p>Humidité de surface, zone racinaire et données de sol pour le point choisi</p></div><div className="terrain-source-statuses" aria-label="État des sources NASA" aria-live="polite"><span className={`terrain-source-status ${powerStatusClass}`}><i />POWER · {powerStatus}</span><span className={`terrain-source-status ${gibsStatusClass}`}><i />Disponibilité GIBS · {gibsStatus}</span></div></header>
 
     <div className="terrain-map-stage">
       <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={false} showSurfaceSoil={soilLayer === 'surface'} showRootSoil={soilLayer === 'root'} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA GIBS avec humidité des sols SMAP" />
