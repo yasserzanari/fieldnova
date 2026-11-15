@@ -24,6 +24,7 @@ export function AppShell() {
   const { series, loading, error } = usePowerMonthly(location)
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
   const unavailable = Boolean(error)
+  const usingDemoSnapshot = series?.deliveryMode === 'demo-fixture'
 
   useEffect(() => {
     const refreshDemo = () => setDemoWorkspace(readDemoWorkspace())
@@ -114,12 +115,12 @@ export function AppShell() {
               {loading ? <strong>NASA POWER…</strong> : unavailable ? <strong>Données indisponibles</strong> : latest?.temperatureC !== undefined ? <strong>{latest.temperatureC.toFixed(1).replace('.', ',')} °C · {formatPowerMonth(latest.date)}</strong> : <strong>Température non disponible</strong>}
               <span><CloudRain size={14} />{latest?.precipitationMmPerDay !== undefined ? `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j · moyenne mensuelle` : 'Précipitations non disponibles'}</span>
             </span>
-            <span className={`context-source ${series?.deliveryMode === 'stale-cache' ? 'is-stale' : ''}`} title={series?.deliveryMode === 'stale-cache' ? 'Copie locale utilisée après échec de la mise à jour; date de collecte indiquée dans les vues de données.' : series?.deliveryMode === 'fresh-cache' ? 'Copie locale récente; chargée en moins de 15 minutes.' : series ? 'Série reçue lors de cette session depuis NASA POWER.' : 'État de la série NASA POWER mensuelle.'}>
-              NASA POWER · {loading ? 'chargement' : unavailable ? 'indisponible' : series?.deliveryMode === 'stale-cache' ? 'copie locale ancienne' : series?.deliveryMode === 'fresh-cache' ? 'cache récent' : 'en ligne'}
+            <span className={`context-source ${series?.deliveryMode === 'stale-cache' ? 'is-stale' : ''} ${usingDemoSnapshot ? 'is-snapshot' : ''}`} title={usingDemoSnapshot ? `Extrait NASA POWER de démonstration hors ligne · récupéré le ${series?.fetchedAt.slice(0, 10)} · dernier mois exploitable ${latest?.date ?? 'inconnu'}.` : series?.deliveryMode === 'stale-cache' ? 'Copie locale utilisée après échec de la mise à jour; date de collecte indiquée dans les vues de données.' : series?.deliveryMode === 'fresh-cache' ? 'Copie locale récente; chargée en moins de 15 minutes.' : series ? 'Série reçue lors de cette session depuis NASA POWER.' : 'État de la série NASA POWER mensuelle.'}>
+              NASA POWER · {loading ? 'chargement' : unavailable ? 'indisponible' : usingDemoSnapshot ? 'extrait démo hors ligne' : series?.deliveryMode === 'stale-cache' ? 'copie locale ancienne' : series?.deliveryMode === 'fresh-cache' ? 'cache récent' : 'en ligne'}
             </span>
           </div>
           {demoWorkspace && <div className="demo-mode-pill" aria-label="Mode démo : ferme fictive">
-            <FlaskConical size={14} /><span role="status"><strong>MODE DÉMO</strong><small>Profil fictif · NASA POWER réelle</small></span>
+            <FlaskConical size={14} /><span role="status"><strong>MODE DÉMO</strong><small>{usingDemoSnapshot ? 'Profil fictif · extrait NASA POWER daté' : 'Profil fictif · NASA POWER réelle'}</small></span>
             <button ref={quitDemoButton} type="button" onClick={() => setQuitPromptOpen(true)} title="Restaurer les données antérieures à la démo">Quitter</button>
             {demoError && <span className="demo-mode-error" role="alert">{demoError}</span>}
           </div>}

@@ -1,5 +1,6 @@
 import type { GeoPoint } from '../geo/location'
 import type { Feature, MultiPolygon, Polygon } from 'geojson'
+import { demoPowerSnapshot } from './demo-power-snapshot'
 
 export type PowerGridCellProperties = {
   center: GeoPoint
@@ -28,7 +29,7 @@ export type PowerMonthlySeries = {
   source: string[]
   timeStandard: string
   fetchedAt: string
-  deliveryMode: 'network' | 'fresh-cache' | 'stale-cache'
+  deliveryMode: 'network' | 'fresh-cache' | 'stale-cache' | 'demo-fixture'
   parameters: Record<string, { units: string; longname: string }>
   records: PowerMonthlyRecord[]
 }
@@ -132,7 +133,10 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5, signal?: Abo
     }
     // The monthly endpoint may already return the in-progress month. Keep only closed
     // calendar months so every consumer can call its latest record "complete" safely.
-    const keys = Object.keys(values.PRECTOTCORR ?? values.T2M ?? {}).filter(date => date < currentMonth).sort()
+    const keys = Object.keys(values.PRECTOTCORR ?? values.T2M ?? {}).filter(date => {
+      const month = Number(date.slice(4, 6))
+      return /^\d{6}$/.test(date) && month >= 1 && month <= 12 && date < currentMonth
+    }).sort()
     const fill = body.header?.fill_value ?? -999
     const valueAt = (parameter: string, date: string) => {
       const value = values[parameter]?.[date]
@@ -171,6 +175,26 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5, signal?: Abo
       return { ...stale, deliveryMode: 'stale-cache' }
     }
     throw error
+  }
+}
+
+/** Returns the dated, real NASA POWER fixture only for its matching fictitious demo point. */
+export function offlineDemoPowerSeries(point: GeoPoint, years = 5): PowerMonthlySeries | null {
+  if (years !== 5
+    || Number(point.latitude.toFixed(3)) !== demoPowerSnapshot.metadata.requestPoint.latitude
+    || Number(point.longitude.toFixed(3)) !== demoPowerSnapshot.metadata.requestPoint.longitude) return null
+  const gridCell = merra2GridCellAt(point)
+  return {
+    point,
+    gridPoint: gridCell.properties.center,
+    gridCell,
+    requestedMonths: [...demoPowerSnapshot.requestedMonths],
+    source: [...demoPowerSnapshot.metadata.source],
+    timeStandard: 'UTC',
+    fetchedAt: demoPowerSnapshot.metadata.retrievedAt,
+    deliveryMode: 'demo-fixture',
+    parameters: demoPowerSnapshot.metadata.parameters,
+    records: demoPowerSnapshot.records.map(record => ({ ...record })),
   }
 }
 

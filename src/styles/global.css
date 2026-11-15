@@ -45,6 +45,7 @@
 .context-weather span { display: inline-flex; align-items: center; gap: 5px; }
 .context-source { padding: 6px 9px; border: 1px solid #dce7d1; border-radius: 999px; background: #f1f5eb; color: #527046; font-size: 10px; font-weight: 650; white-space: nowrap; }
 .context-source.is-stale { border-color:#e6c9aa; background:#fbf1e5; color:#8a542c; }
+.context-source.is-snapshot { border-color:#dfcda6; background:#fbf4e3; color:#796033; }
 .demo-mode-pill { position:relative; display:flex; min-width:0; flex:none; align-items:center; gap:8px; padding:5px 7px 5px 9px; border:1px solid #e5d9b5; border-radius:10px; background:#fbf5e5; color:#75633a; }
 .demo-mode-pill > span:not(.demo-mode-error) { display:grid; gap:1px; white-space:nowrap; }
 .demo-mode-pill strong { font-size:9px; letter-spacing:.04em; }

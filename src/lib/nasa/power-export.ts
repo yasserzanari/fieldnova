@@ -28,6 +28,7 @@ export function powerMonthlyCsv(series: PowerMonthlySeries) {
     'source',
     'retrieved_at_utc',
     'delivery_mode',
+    'data_context',
   ]
   const rows = series.requestedMonths.map(month => {
     const record = records.get(month)
@@ -42,6 +43,7 @@ export function powerMonthlyCsv(series: PowerMonthlySeries) {
       series.source.join(', '),
       series.fetchedAt,
       series.deliveryMode,
+      series.deliveryMode === 'demo-fixture' ? 'Archived NASA POWER demo snapshot; not current live data' : 'NASA POWER monthly series',
     ]
   })
   return `\uFEFF${[headers, ...rows].map(row => row.map(cell).join(';')).join('\r\n')}\r\n`
