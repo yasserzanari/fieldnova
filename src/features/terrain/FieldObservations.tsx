@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { CalendarDays, ClipboardList, Plus, Trash2 } from 'lucide-react'
+import { CalendarDays, ClipboardList, Download, Plus, Trash2 } from 'lucide-react'
 import type { GeoPoint } from '../../lib/geo/location'
 import { FIELD_OBSERVATION_LIMIT, fieldObservationKindLabel, fieldObservationsStorageKey, readFieldObservations, writeFieldObservations, type FieldObservation, type ObservationKind } from '../../lib/farm/field-observations'
+import { downloadFieldObservationsCsv } from '../../lib/farm/field-observations-export'
 
 function today() {
   const date = new Date()
@@ -68,7 +69,7 @@ export function FieldObservations({ point }: { point: GeoPoint }) {
       {error && <p className="terrain-observation-error" role="alert">{error}</p>}
       <button className="terrain-observation-submit" type="submit"><Plus size={14} />Enregistrer l’observation</button>
     </form>
-    <div className="terrain-observation-list-heading"><strong>Historique de ce point</strong><span>{items.length} / {FIELD_OBSERVATION_LIMIT}</span></div>
+    <div className="terrain-observation-list-heading"><strong>Historique de ce point</strong><span>{items.length} / {FIELD_OBSERVATION_LIMIT}</span><button type="button" onClick={() => downloadFieldObservationsCsv(items)} disabled={!items.length}><Download size={12} />Exporter CSV</button></div>
     {items.length === 0 ? <p className="terrain-observations-empty">Aucune observation enregistrée pour ce point. Vos notes resteront séparées des données NASA.</p> : <ol className="terrain-observation-list">{items.map(item => <li key={item.id}>
       <div className="terrain-observation-meta"><span className={`terrain-observation-kind kind-${item.kind}`}>{fieldObservationKindLabel(item.kind)}</span><span><CalendarDays size={11} />{formatDate(item.date)}</span>{item.author && <span>· {item.author}</span>}<button type="button" aria-label={`Supprimer la note du ${formatDate(item.date)}`} onClick={() => deleteObservation(item.id)}><Trash2 size={13} /></button></div>
       {item.crop && <strong className="terrain-observation-crop">{item.crop}</strong>}
