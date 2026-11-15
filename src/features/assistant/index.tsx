@@ -14,6 +14,7 @@ import { farmWaterAccessLabels, farmWaterConstraintLabels, readFarmProfile } fro
 import { archiveSoilAnalysis, readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, writeSoilProfile, type SoilFieldKey } from '../../lib/farm/soil-profile'
 import { parseSoilAnalysisCsv } from '../../lib/farm/soil-analysis-csv'
 import { readRotationConstraints } from '../scenarios/rotation-constraints'
+import { formatCropMonthWindow, readCropCalendar } from '../scenarios/crop-calendar'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { evaluateRotation, priorityLabels, readCropCatalog, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightsFor, type CropDefinition, type CropId, type RotationPriority } from '../scenarios/rotation-model'
 import { AssistantSoilImportCard, type AssistantSoilImport } from './AssistantSoilImportCard'
@@ -35,6 +36,17 @@ const rotationReferences: AISource[] = [
   { id: 'inrae-rotation', title: rotationSources.legumes.label, url: rotationSources.legumes.url, snippet: 'INRAE explique la diversification végétale, les successions pluriannuelles et le rôle des légumineuses.' },
 ]
 const rotationWorkspaceSource: AISource = { id: 'fieldnova-rotations', title: 'FieldNova · scénarios enregistrés', url: '/app/scenarios', snippet: 'Cultures, critères et contraintes enregistrés localement pour le point sélectionné.' }
+
+function cropCalendarSources(point: GeoPoint): AISource[] {
+  const catalog = readCropCatalog(point)
+  const calendar = readCropCalendar(point)
+  const declaredSources = catalog.flatMap(crop => {
+    const entry = calendar[crop.id]
+    if (!entry?.sourceUrl) return []
+    return [{ id: `crop-calendar-${crop.id}`, title: `${crop.label} · source de calendrier déclarée`, url: entry.sourceUrl, snippet: `${entry.sourceName || 'Référence'} saisie par l’utilisateur pour le calendrier de ${crop.label}; non vérifiée indépendamment par FieldNova.` }]
+  })
+  return [{ id: 'fieldnova-crop-calendar', title: 'FieldNova · calendrier cultural local', url: '/app/scenarios', snippet: 'Fenêtres de semis et de récolte saisies localement pour le point suivi; aucune date par défaut ni validation agronomique.' }, ...declaredSources]
+}
 
 function soilProfileSource(point: GeoPoint): AISource {
   const profile = readSoilProfile(point)
@@ -144,11 +156,12 @@ function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, 
 function classifyQuestion(question: string) {
   const lower = question.toLocaleLowerCase('fr')
   const asksSoilProfile = /profil de (?:mon |la )?sol|texture|\bph\b|matière organique|drainage|profondeur|horizon|couche|analyse de sol/.test(lower)
+  const asksCalendar = /calendrier.{0,18}(?:cultural|culture|semis|récolte)|\bsemis\b|\bsemer\b|\brécolter\b|\bplanter\b|\b(?:date|période|fenêtre|quand).{0,20}récolte\b|\brécolte.{0,15}(?:date|période|fenêtre)\b/.test(lower)
   const asksRotation = /rotation|succession|famille botanique|légumineuse|alternance|cultures?/.test(lower)
   const asksFarmProfile = /ma ferme|mon exploitation|accès.{0,3}eau|eau disponible|ressource en eau|approvisionnement en eau|restriction.{0,12}eau|contrainte.{0,12}eau|profil (?:de (?:ma |la )?ferme|d'exploitation|agricole)/.test(lower)
   const asksClimate = /pluie|précip|température|\bchaud\b|\bfroid\b|humidité|climat|météo|nasa|ndvi|vigueur|satellite|imagerie|irrig/.test(lower)
   const asksLayer: LayerId | undefined = /ndvi|vigueur/.test(lower) ? 'ndvi' : /humidité de surface|smap surface/.test(lower) ? 'surface' : /humidité racinaire|humidité du sol|racine/.test(lower) ? 'root' : undefined
-  const intent = asksSoilProfile ? 'soil' : asksRotation ? 'rotation' : asksFarmProfile ? 'farm' : asksClimate ? 'climate' : 'unknown'
+  const intent = asksSoilProfile ? 'soil' : asksCalendar ? 'calendar' : asksRotation ? 'rotation' : asksFarmProfile ? 'farm' : asksClimate ? 'climate' : 'unknown'
   return { intent, asksLayer }
 }
 
@@ -245,6 +258,26 @@ function formatRotationAnswer(point: GeoPoint) {
   })
   const unavailableLabels = constraints.unavailableCropIds.map(id => catalog.find(crop => crop.id === id)?.label ?? id)
   return `${workspace.isExample ? 'Les scénarios affichés sont des exemples sur cinq années.' : 'Voici les scénarios enregistrés pour ce point.'} Critères et poids : ${prioritySummary}. La note normalisée sert uniquement au tri descriptif. ${unavailableLabels.length ? `Cultures déclarées indisponibles pour les options : ${unavailableLabels.join(', ')}. ` : 'Aucune culture déclarée indisponible. '}${plans.join(' ')} Les architectures racinaires absentes de la référence sont laissées inconnues. Ces indicateurs décrivent la séquence; ils ne prédisent ni rendement ni amélioration du sol. La référence racinaire est régionale et doit être confirmée localement. Vous pouvez modifier les cultures et contraintes dans l’onglet Scénarios.`
+}
+
+function formatCropCalendarAnswer(question: string, point: GeoPoint) {
+  const catalog = readCropCatalog(point)
+  const calendar = readCropCalendar(point)
+  const lower = question.toLocaleLowerCase('fr')
+  const requestedCrop = catalog.find(crop => lower.includes(crop.label.toLocaleLowerCase('fr')) || lower.includes(crop.shortLabel.toLocaleLowerCase('fr')))
+  const describe = (crop: CropDefinition) => {
+    const entry = calendar[crop.id]
+    if (!entry?.sowing && !entry?.harvest) return `${crop.label} : aucune fenêtre de semis ou de récolte saisie.`
+    const windows = [`semis ${formatCropMonthWindow(entry.sowing)}`, `récolte ${formatCropMonthWindow(entry.harvest)}`].join(' · ')
+    const source = entry.sourceName ? ` Source déclarée : ${entry.sourceName}${entry.sourceUrl ? ` (${entry.sourceUrl})` : ''}; elle n’est pas vérifiée par FieldNova.` : ' Aucune source n’est associée à ces dates.'
+    return `${crop.label} : ${windows}.${source}`
+  }
+  if (requestedCrop) return `${describe(requestedCrop)} Ces fenêtres sont des déclarations locales pour le point suivi, pas une validation de faisabilité ni une recommandation de date. Elles sont consultables dans Scénarios > Rotations culturales.`
+  const declared = catalog.filter(crop => calendar[crop.id]?.sowing || calendar[crop.id]?.harvest)
+  if (!declared.length) return 'Aucun calendrier cultural n’est renseigné pour ce point. Les fenêtres de semis et de récolte restent inconnues; aucune date n’est déduite du climat ou d’une région. Vous pouvez saisir vos fenêtres et leur source dans Scénarios > Rotations culturales > Calendrier cultural.'
+  const entries = declared.map(describe).join(' ')
+  const unknownCount = catalog.length - declared.length
+  return `Calendriers déclarés pour ${declared.length} culture(s) au point suivi : ${entries}${unknownCount ? ` Pour ${unknownCount} autre(s) culture(s), aucune fenêtre n’est renseignée.` : ''} Ces dates viennent des déclarations locales; elles ne valident pas la faisabilité agronomique et ne constituent pas un conseil. Pour une culture précise, indiquez son nom.`
 }
 
 function traceNode(id: string, toolName: string, label: string, primary: string, secondary: string, status: 'completed' | 'failed' = 'completed'): TraceNode {
@@ -348,6 +381,18 @@ export function AssistantPage() {
       evidence = answer
       usedSources = [soilProfileSource(location)]
       evidenceTags = [{ label: 'Déclaration locale', kind: 'local' }, { label: 'Mesure non vérifiée', kind: 'limit' }]
+    } else if (route.intent === 'calendar') {
+      const catalog = readCropCatalog(location)
+      const calendar = readCropCalendar(location)
+      const declaredCount = catalog.filter(crop => calendar[crop.id]?.sowing || calendar[crop.id]?.harvest).length
+      trace.push(traceNode(`calendar-${id}`, 'read', 'Calendrier cultural local · navigateur', 'Calendriers déclarés consultés', declaredCount ? `${declaredCount} culture(s) avec une fenêtre renseignée · stockage local par point` : 'Aucune fenêtre renseignée · les dates restent inconnues', 'completed'))
+      traceHeading = 'Calendrier cultural local consulté'
+      answer = formatCropCalendarAnswer(question, location)
+      evidence = answer
+      usedSources = cropCalendarSources(location)
+      evidenceTags = declaredCount
+        ? [{ label: 'Déclaration locale', kind: 'local' }, { label: 'Référence facultative', kind: 'source' }, { label: 'Non vérifiée · pas un conseil', kind: 'limit' }]
+        : [{ label: 'Aucune date renseignée', kind: 'missing' }, { label: 'Aucune date déduite', kind: 'limit' }]
     } else if (route.intent === 'rotation') {
       const catalog = readCropCatalog(location)
       const workspace = readRotationWorkspace(location, catalog)
@@ -500,6 +545,7 @@ export function AssistantPage() {
     [{ label: layer === 'ndvi' ? 'Limites du NDVI' : 'Voir le NDVI', question: layer === 'ndvi' ? 'Explique les limites du NDVI affiché.' : 'Affiche le NDVI et explique ses limites.' }],
     { label: 'Profil de sol', question: 'Lis mon profil de sol pour ce point.' },
     { label: 'Profil de ferme', question: 'Résume mon profil de ferme et mes contraintes d’eau.' },
+    { label: 'Calendrier cultural', question: 'Quelles fenêtres de semis et de récolte sont renseignées ?' },
     { label: 'Mes rotations', question: 'Compare mes rotations pour ce point.' },
   ].flat()
 
