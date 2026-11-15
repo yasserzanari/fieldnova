@@ -139,7 +139,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 64. **[P1 · PARTIEL] Connexion lente tolérante** : les requêtes NASA POWER ont un délai maximal de 20 secondes, sont annulées si le point change et exposent un bouton de nouvel essai en cas d’échec. Une copie locale récente ou âgée de moins de six mois sert de repli hors ligne et son statut est visible; aucune série périmée n’est montrée sans ce libellé.
 65. **[P1] Unités préférées** : choisir unités métriques et formats locaux, tout en conservant l’unité d’origine en provenance.
 66. **[P1] Contraste de carte et daltonisme** : ne jamais faire dépendre une alerte d’une seule couleur.
-67. **[P1] Navigation au clavier** : parcourir panneaux, formulaire, graphique et contrôles de la carte sans souris.
+67. **[P1 · PARTIELLEMENT LIVRÉ] Navigation au clavier** : le shell permet de passer directement au contenu principal et affiche un focus visible sur commandes, champs, sélecteurs et résumés repliables; le redimensionnement de la barre répond aussi aux flèches. Un audit complet des formulaires, panneaux, graphiques et interactions de carte reste à faire.
 68. **[P2] Notifications configurables** : choisir les alertes et leur fréquence au lieu de notifier automatiquement tout utilisateur.
 69. **[P2] Journal d’observations de terrain** : consigner semis, récolte, irrigation et notes avec date et auteur.
 70. **[P2 · PARTIEL] Partage privé de la fiche** : l’export Markdown propose par défaut d’omettre les coordonnées précises et un choix distinct pour les inclure; le centre approximatif de la maille NASA reste dans les deux versions. Lien partageable et PDF restent à faire.
