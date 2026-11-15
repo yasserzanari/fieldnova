@@ -142,7 +142,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 67. **[P1] Navigation au clavier** : parcourir panneaux, formulaire, graphique et contrôles de la carte sans souris.
 68. **[P2] Notifications configurables** : choisir les alertes et leur fréquence au lieu de notifier automatiquement tout utilisateur.
 69. **[P2] Journal d’observations de terrain** : consigner semis, récolte, irrigation et notes avec date et auteur.
-70. **[P2] Partage par lien ou PDF** : exporter un scénario sans exposer les coordonnées privées par défaut.
+70. **[P2 · PARTIEL] Partage privé de la fiche** : l’export Markdown propose par défaut d’omettre les coordonnées précises et un choix distinct pour les inclure; le centre approximatif de la maille NASA reste dans les deux versions. Lien partageable et PDF restent à faire.
 
 ### H. Validité, confiance et qualité des données — 71 à 80
 

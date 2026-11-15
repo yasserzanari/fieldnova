@@ -265,7 +265,7 @@ export function RotationExplorer() {
     clearSavedParcelBoundary()
     setParcelError('')
   }
-  const exportDecisionBrief = () => {
+  const exportDecisionBrief = (includePreciseCoordinates = false) => {
     const leaderIds = new Set(leaders)
     const baseline = currentWorkspace.plans.find(plan => plan.id === 'reference')
     const baselineMetrics = baseline ? evaluateRotation(baseline) : undefined
@@ -313,7 +313,9 @@ export function RotationExplorer() {
       '# Fiche de comparaison FieldNova',
       '',
       `Exportée le ${generatedAt}.`,
-      `Point suivi : ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}.`,
+      includePreciseCoordinates
+        ? `Point suivi : ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}.`
+        : 'Coordonnées précises du point suivi omises de cette exportation.',
       `Données du scénario : ${currentWorkspace.isExample ? 'exemple illustratif' : 'scénario enregistré localement'}.`,
       `Critères et poids : ${prioritySummary}. Note de tri pondérée = moyenne des indicateurs normalisés (familles / 5, répétitions inversées / 4, légumineuses / 5, transitions racinaires / 4), pondérée selon ces choix. Cette note sert uniquement à classer les séquences du catalogue.`,
       `Cultures exclues des options candidates : ${constraints.unavailableCropIds.length ? constraints.unavailableCropIds.map(id => cropCatalog.find(crop => crop.id === id)?.label ?? id).join(', ') : 'aucune exclusion renseignée'}.`,
@@ -344,13 +346,15 @@ export function RotationExplorer() {
     const url = URL.createObjectURL(new Blob([content], { type: 'text/markdown;charset=utf-8' }))
     const link = document.createElement('a')
     link.href = url
-    link.download = `fieldnova-comparaison-${location.latitude.toFixed(4)}-${location.longitude.toFixed(4)}.md`
+    link.download = includePreciseCoordinates
+      ? `fieldnova-comparaison-${location.latitude.toFixed(4)}-${location.longitude.toFixed(4)}.md`
+      : 'fieldnova-comparaison.md'
     link.click()
     URL.revokeObjectURL(url)
   }
 
   return <section className="rotation-explorer" aria-label="Explorateur de rotations culturales">
-    <header className="rotation-heading"><div><h1>Explorer les rotations</h1><p>Comparez des successions de cultures selon des critères visibles et modifiables.</p></div><div className="rotation-heading-actions"><span className="rotation-example-badge">{currentWorkspace.isExample ? 'Exemple illustratif' : 'Scénario local'}</span><button type="button" className="rotation-generate" onClick={generateOptions}><Sparkles size={13} />Générer 2 options</button><button type="button" className="rotation-export" onClick={exportDecisionBrief}><Download size={13} />Exporter la fiche</button><button type="button" className="rotation-reset" onClick={resetExample}><RotateCcw size={13} />Charger l’exemple</button></div></header>
+    <header className="rotation-heading"><div><h1>Explorer les rotations</h1><p>Comparez des successions de cultures selon des critères visibles et modifiables.</p></div><div className="rotation-heading-actions"><span className="rotation-example-badge">{currentWorkspace.isExample ? 'Exemple illustratif' : 'Scénario local'}</span><button type="button" className="rotation-generate" onClick={generateOptions}><Sparkles size={13} />Générer 2 options</button><details className="rotation-export-menu"><summary className="rotation-export"><Download size={13} />Exporter la fiche</summary><div className="rotation-export-options"><button type="button" onClick={event => { exportDecisionBrief(false); event.currentTarget.closest('details')?.removeAttribute('open') }}>Sans coordonnées précises <small>(conseillé)</small></button><button type="button" onClick={event => { exportDecisionBrief(true); event.currentTarget.closest('details')?.removeAttribute('open') }}>Avec coordonnées précises…</button><p>Le centre de maille NASA reste indiqué; il donne un contexte géographique approximatif.</p></div></details><button type="button" className="rotation-reset" onClick={resetExample}><RotateCcw size={13} />Charger l’exemple</button></div></header>
 
     <div className="rotation-map-stage">
       <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} powerGridCell={currentSeries?.gridCell} draftParcelPoints={draftParcelPoints} drawingParcel={drawingParcel} imageryDate={dayBefore(11)} onPointSelect={moveToPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA et position de l’exploitation pour comparer les rotations" />

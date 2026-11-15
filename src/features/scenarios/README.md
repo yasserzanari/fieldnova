@@ -24,3 +24,4 @@
 - **Comparaisons :** les trois cas sont calculés depuis NASA POWER mensuel au point choisi : 12 dernières valeurs disponibles, fenêtre consécutive de 3 mois la plus sèche, fenêtre consécutive de 3 mois la plus chaude.
 - **Indicateurs :** moyenne mensuelle des précipitations quotidiennes (`PRECTOTCORR`, mm/j), température moyenne (`T2M`, °C) et humidité racinaire modélisée (`GWETROOT`, fraction convertie en %).
 - **Limite :** il s’agit de résumés de périodes historiques observées dans le service. Aucun rendement, effet de rotation, scénario futur ou conseil d’irrigation n’est prédit.
+- **Export privé :** la fiche Markdown omet les coordonnées précises par défaut, avec un choix explicite pour les inclure dans le contenu et le nom du fichier. Le centre approximatif de la maille climatique NASA reste visible dans les deux versions.
