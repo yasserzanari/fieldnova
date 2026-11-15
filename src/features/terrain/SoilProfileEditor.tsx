@@ -3,6 +3,7 @@ import { Download, FileSpreadsheet, Layers3, Pencil, Save, Trash2, Upload, X } f
 import type { GeoPoint } from '../../lib/geo/location'
 import { archiveSoilAnalysis, clearSoilProfile, readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, validateSoilHorizons, type FarmSoilProfile, type SoilAnalysisSnapshot, type SoilFieldKey, type SoilFieldProvenance, type SoilHorizon, writeSoilProfile } from '../../lib/farm/soil-profile'
 import { parseSoilAnalysisCsv, soilAnalysisCsvTemplate, type SoilAnalysisCsvImport } from '../../lib/farm/soil-analysis-csv'
+import { formatLength, useMeasurementSystem } from '../../lib/units/measurement-units'
 
 const textureLabels = { sandy: 'Sableux', loamy: 'Limoneux', clayey: 'Argileux', unknown: 'Inconnu' } as const
 const drainageLabels = { poor: 'Lent', moderate: 'Modéré', good: 'Rapide', unknown: 'Inconnu' } as const
@@ -13,6 +14,7 @@ function decimal(value: number) {
 }
 
 export function SoilProfileEditor({ point }: { point: GeoPoint }) {
+  const measurementSystem = useMeasurementSystem()
   const [profile, setProfile] = useState<FarmSoilProfile>(() => readSoilProfile(point))
   const [draft, setDraft] = useState<FarmSoilProfile>({})
   const [open, setOpen] = useState(false)
@@ -101,7 +103,7 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
     { key: 'texture' as const, label: soilFieldLabels.texture, value: profile.texture && profile.texture !== 'unknown' ? textureLabels[profile.texture] : undefined },
     { key: 'ph' as const, label: soilFieldLabels.ph, value: profile.ph === undefined ? undefined : decimal(profile.ph) },
     { key: 'organicMatterPercent' as const, label: soilFieldLabels.organicMatterPercent, value: profile.organicMatterPercent === undefined ? undefined : `${decimal(profile.organicMatterPercent)} %` },
-    { key: 'effectiveDepthCm' as const, label: soilFieldLabels.effectiveDepthCm, value: profile.effectiveDepthCm === undefined ? undefined : `${decimal(profile.effectiveDepthCm)} cm` },
+    { key: 'effectiveDepthCm' as const, label: soilFieldLabels.effectiveDepthCm, value: profile.effectiveDepthCm === undefined ? undefined : formatLength(profile.effectiveDepthCm, measurementSystem) },
     { key: 'drainage' as const, label: soilFieldLabels.drainage, value: profile.drainage && profile.drainage !== 'unknown' ? drainageLabels[profile.drainage] : undefined },
   ]
   const acquisitionRows = [
@@ -118,7 +120,7 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
     profile.texture && profile.texture !== 'unknown' ? textureLabels[profile.texture] : undefined,
     profile.ph !== undefined ? `pH ${decimal(profile.ph)}` : undefined,
     profile.organicMatterPercent !== undefined ? `${decimal(profile.organicMatterPercent)} % MO` : undefined,
-    profile.effectiveDepthCm !== undefined ? `${decimal(profile.effectiveDepthCm)} cm` : undefined,
+    profile.effectiveDepthCm !== undefined ? formatLength(profile.effectiveDepthCm, measurementSystem) : undefined,
     profile.drainage && profile.drainage !== 'unknown' ? `Drainage ${drainageLabels[profile.drainage].toLowerCase()}` : undefined,
     profile.horizons?.length ? `${profile.horizons.length} horizon${profile.horizons.length > 1 ? 's' : ''} · 0–${profile.horizons[profile.horizons.length - 1].bottomCm} cm` : undefined,
     profile.samplingMethod ? `Méthode · ${profile.samplingMethod}` : undefined,
@@ -288,6 +290,7 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
 }
 
 function SoilAnalysisHistory({ history, newer, older, onNewerChange, onOlderChange }: { history: SoilAnalysisSnapshot[]; newer?: SoilAnalysisSnapshot; older?: SoilAnalysisSnapshot; onNewerChange: (id: string) => void; onOlderChange: (id: string) => void }) {
+  const measurementSystem = useMeasurementSystem()
   const formatDate = (date: string) => new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`))
   const sameMethod = Boolean(newer?.samplingMethod && older?.samplingMethod && newer.samplingMethod.trim() === older.samplingMethod.trim())
   const intervals = [...new Map([...(newer?.horizons ?? []), ...(older?.horizons ?? [])].map(horizon => [`${horizon.topCm}-${horizon.bottomCm}`, horizon])).values()].sort((a, b) => a.topCm - b.topCm || a.bottomCm - b.bottomCm)
@@ -308,7 +311,7 @@ function SoilAnalysisHistory({ history, newer, older, onNewerChange, onOlderChan
         const delta = (oldValue?: number, newValue?: number, suffix = '') => matchingDepth && sameMethod && oldValue !== undefined && newValue !== undefined ? `${newValue - oldValue > 0 ? '+' : ''}${decimal(newValue - oldValue)}${suffix}` : '—'
         const display = (horizon: SoilHorizon | undefined) => horizon ? `${horizon.texture && horizon.texture !== 'unknown' ? textureLabels[horizon.texture] : 'Texture —'} · pH ${showNumber(horizon.ph)} · MO ${showNumber(horizon.organicMatterPercent, ' %')}` : 'Pas de mesure à cet intervalle'
         const textureChange = oldHorizon?.texture && newHorizon?.texture && oldHorizon.texture !== 'unknown' && newHorizon.texture !== 'unknown' ? oldHorizon.texture === newHorizon.texture ? 'identique' : 'différente' : '—'
-        return <tr key={`${interval.topCm}-${interval.bottomCm}`}><th scope="row">{interval.topCm}–{interval.bottomCm} cm</th><td>{display(oldHorizon)}</td><td>{display(newHorizon)}</td><td>{matchingDepth ? `Texture ${textureChange} · pH ${delta(oldHorizon?.ph, newHorizon?.ph)} · MO ${delta(oldHorizon?.organicMatterPercent, newHorizon?.organicMatterPercent, ' pt')}` : 'Profondeurs différentes'}</td></tr>
+        return <tr key={`${interval.topCm}-${interval.bottomCm}`}><th scope="row">{formatLength(interval.topCm, measurementSystem)}–{formatLength(interval.bottomCm, measurementSystem)}</th><td>{display(oldHorizon)}</td><td>{display(newHorizon)}</td><td>{matchingDepth ? `Texture ${textureChange} · pH ${delta(oldHorizon?.ph, newHorizon?.ph)} · MO ${delta(oldHorizon?.organicMatterPercent, newHorizon?.organicMatterPercent, ' pt')}` : 'Profondeurs différentes'}</td></tr>
       })}</tbody></table></div>
       <small className="terrain-soil-history-note">Comparaison à intervalle exact uniquement. Une valeur manquante ou une méthode différente empêche le calcul. Les écarts ne constituent pas une interprétation agronomique.</small>
     </> : newer ? <div className="terrain-soil-history-single"><span>{formatDate(newer.sampleDate)} · {newer.sourceName ?? 'Laboratoire non précisé'}</span><small>{newer.horizons.length} intervalle{newer.horizons.length > 1 ? 's' : ''} archivé{newer.horizons.length > 1 ? 's' : ''} · méthode : {newer.samplingMethod}</small><small>Archivez un second échantillon pour afficher une comparaison.</small></div> : null}
@@ -337,6 +340,7 @@ function SoilFieldOriginEditor({ field, profile, onChange }: { field: SoilFieldK
 }
 
 function SoilHorizonVisual({ horizons, defaultSourceType, defaultSourceName, defaultSampleDate, defaultSamplingMethod }: { horizons: SoilHorizon[]; defaultSourceType?: FarmSoilProfile['sourceType']; defaultSourceName?: string; defaultSampleDate?: string; defaultSamplingMethod?: string }) {
+  const measurementSystem = useMeasurementSystem()
   const layers: Array<SoilHorizon & { gap: boolean }> = horizons.flatMap((horizon, index) => {
     const previousBottom = horizons[index - 1]?.bottomCm ?? 0
     const gap = horizon.topCm > previousBottom ? [{ topCm: previousBottom, bottomCm: horizon.topCm, texture: 'unknown' as const, gap: true }] : []
@@ -344,15 +348,15 @@ function SoilHorizonVisual({ horizons, defaultSourceType, defaultSourceName, def
   })
   const depth = horizons[horizons.length - 1]?.bottomCm ?? 0
   const sources = [...new Set(horizons.map(horizon => horizonSourceSummary(horizon, defaultSourceType, defaultSourceName, defaultSampleDate, defaultSamplingMethod)))]
-  return <div className="terrain-horizon-visual" aria-label={`Profil de sol déclaré de 0 à ${depth} centimètres`}>
+  return <div className="terrain-horizon-visual" aria-label={`Profil de sol déclaré de 0 à ${formatLength(depth, measurementSystem)}`}>
     <div><strong>Horizons saisis</strong><small>Profondeurs déclarées · intervalles manquants inconnus</small><small className="terrain-horizon-source">Origine déclarée (non vérifiée) : {sources.join(' · ')}</small></div>
     <div className="terrain-horizon-stack" role="list">{layers.map((layer, index) => {
       const texture = layer.texture && layer.texture !== 'unknown' ? textureLabels[layer.texture].toLocaleLowerCase('fr') : 'texture inconnue'
       const values = [layer.ph !== undefined ? `pH ${decimal(layer.ph)}` : '', layer.organicMatterPercent !== undefined ? `${decimal(layer.organicMatterPercent)} % MO` : ''].filter(Boolean).join(' · ')
       const source = layer.gap ? '' : horizonSourceSummary(layer, defaultSourceType, defaultSourceName, defaultSampleDate, defaultSamplingMethod)
-      return <div key={`${layer.topCm}-${layer.bottomCm}-${index}`} className={`terrain-horizon-layer ${layer.gap ? 'is-gap' : `texture-${layer.texture ?? 'unknown'}`}`} role="listitem" aria-label={`${layer.topCm} à ${layer.bottomCm} cm · ${texture}${values ? ` · ${values}` : ''}${source ? ` · Origine déclarée : ${source}` : ''}`} title={`${layer.topCm}–${layer.bottomCm} cm · ${texture}${values ? ` · ${values}` : ''}${source ? ` · ${source}` : ''}`}><span>{layer.topCm}–{layer.bottomCm} cm</span><strong>{layer.gap ? 'Non décrit' : texture}</strong>{values && <small>{values}</small>}</div>
+      return <div key={`${layer.topCm}-${layer.bottomCm}-${index}`} className={`terrain-horizon-layer ${layer.gap ? 'is-gap' : `texture-${layer.texture ?? 'unknown'}`}`} role="listitem" aria-label={`${formatLength(layer.topCm, measurementSystem)} à ${formatLength(layer.bottomCm, measurementSystem)} · ${texture}${values ? ` · ${values}` : ''}${source ? ` · Origine déclarée : ${source}` : ''}`} title={`${formatLength(layer.topCm, measurementSystem)}–${formatLength(layer.bottomCm, measurementSystem)} · ${texture}${values ? ` · ${values}` : ''}${source ? ` · ${source}` : ''}`}><span>{formatLength(layer.topCm, measurementSystem)}–{formatLength(layer.bottomCm, measurementSystem)}</span><strong>{layer.gap ? 'Non décrit' : texture}</strong>{values && <small>{values}</small>}</div>
     })}</div>
-    <small className="terrain-horizon-beyond">Au-delà de {depth} cm : non documenté.</small>
+    <small className="terrain-horizon-beyond">Au-delà de {formatLength(depth, measurementSystem)} : non documenté.</small>
   </div>
 }
 

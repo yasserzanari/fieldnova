@@ -5,6 +5,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
+import { formatArea, formatLength, formatPrecipitationRate, formatTemperature, useMeasurementSystem } from '../../lib/units/measurement-units'
 import { formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { recordRotationComparison } from '../../lib/impact/rotation-comparison-counter'
@@ -30,16 +31,16 @@ function coordinate(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(3).replace('.', ',')}° ${value < 0 ? negative : positive}`
 }
 
-function soilSummary(profile: FarmSoilProfile) {
+function soilSummary(profile: FarmSoilProfile, measurementSystem: ReturnType<typeof useMeasurementSystem>) {
   const labels: string[] = []
   const texture = { sandy: 'Sableux', loamy: 'Limoneux', clayey: 'Argileux', unknown: 'Texture inconnue' } as const
   const drainage = { poor: 'Drainage lent', moderate: 'Drainage modéré', good: 'Drainage rapide', unknown: 'Drainage inconnu' } as const
   if (profile.texture) labels.push(texture[profile.texture])
   if (profile.ph !== undefined) labels.push(`pH ${profile.ph.toLocaleString('fr-FR')}`)
   if (profile.organicMatterPercent !== undefined) labels.push(`${profile.organicMatterPercent.toLocaleString('fr-FR')} % MO`)
-  if (profile.effectiveDepthCm !== undefined) labels.push(`${profile.effectiveDepthCm} cm`)
+  if (profile.effectiveDepthCm !== undefined) labels.push(formatLength(profile.effectiveDepthCm, measurementSystem))
   if (profile.drainage) labels.push(drainage[profile.drainage])
-  if (profile.horizons?.length) labels.push(`${profile.horizons.length} horizon${profile.horizons.length > 1 ? 's' : ''} · 0–${profile.horizons[profile.horizons.length - 1].bottomCm} cm`)
+  if (profile.horizons?.length) labels.push(`${profile.horizons.length} horizon${profile.horizons.length > 1 ? 's' : ''} · 0–${formatLength(profile.horizons[profile.horizons.length - 1].bottomCm, measurementSystem)}`)
   return labels
 }
 
@@ -47,21 +48,24 @@ function hasGeneralSoilValues(profile: FarmSoilProfile) {
   return profile.texture !== undefined || profile.ph !== undefined || profile.organicMatterPercent !== undefined || profile.effectiveDepthCm !== undefined || profile.drainage !== undefined
 }
 
-function sameMonthReference(records: PowerMonthlyRecord[], current: PowerMonthlyRecord | undefined, field: 'precipitationMmPerDay' | 'temperatureC' | 'rootZoneWetness', unit: string) {
+function sameMonthReference(records: PowerMonthlyRecord[], current: PowerMonthlyRecord | undefined, field: 'precipitationMmPerDay' | 'temperatureC' | 'rootZoneWetness', measurementSystem: ReturnType<typeof useMeasurementSystem>) {
   if (!current) return 'Repère indisponible'
   const month = current.date.slice(-2)
   const values = records.filter(record => record.date < current.date && record.date.slice(-2) === month).map(record => record[field]).filter((value): value is number => typeof value === 'number')
   if (!values.length) return 'Pas de mois comparable'
-  const average = values.reduce((sum, value) => sum + value, 0) / values.length
-  const minimum = Math.min(...values)
-  const maximum = Math.max(...values)
+  const convert = (value: number) => field === 'temperatureC' ? measurementSystem === 'us-customary' ? value * 9 / 5 + 32 : value : field === 'precipitationMmPerDay' ? measurementSystem === 'us-customary' ? value / 25.4 : value : value * 100
+  const converted = values.map(convert)
+  const average = converted.reduce((sum, value) => sum + value, 0) / converted.length
+  const minimum = Math.min(...converted)
+  const maximum = Math.max(...converted)
   const format = (value: number) => value.toLocaleString('fr-FR', { maximumFractionDigits: field === 'rootZoneWetness' ? 0 : 1 })
-  const rootValues = field === 'rootZoneWetness' ? [average, minimum, maximum].map(value => value * 100) : [average, minimum, maximum]
-  return `Années précédentes · n=${values.length} · moy. ${format(rootValues[0])} · ${format(rootValues[1])}–${format(rootValues[2])} ${unit}`
+  const unit = field === 'rootZoneWetness' ? '%' : field === 'temperatureC' ? measurementSystem === 'us-customary' ? '°F' : '°C' : measurementSystem === 'us-customary' ? 'in/j' : 'mm/j'
+  return `Années précédentes · n=${values.length} · moy. ${format(average)} · ${format(minimum)}–${format(maximum)} ${unit}`
 }
 
 export function RotationExplorer() {
   const { location, selectLocation } = useSelectedLocation()
+  const measurementSystem = useMeasurementSystem()
   const pointKey = `${location.latitude.toFixed(4)},${location.longitude.toFixed(4)}`
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
   const [showNdvi, setShowNdvi] = useState(true)
@@ -163,9 +167,9 @@ export function RotationExplorer() {
   const operationProfile = operationState.pointKey === pointKey ? operationState.value : readFarmOperationProfile(location)
   const latest = useMemo(() => currentSeries ? latestCompleteRecord(currentSeries.records) : undefined, [currentSeries])
   const climateReferences = {
-    precipitation: sameMonthReference(currentSeries?.records ?? [], latest, 'precipitationMmPerDay', 'mm/j'),
-    temperature: sameMonthReference(currentSeries?.records ?? [], latest, 'temperatureC', '°C'),
-    roots: sameMonthReference(currentSeries?.records ?? [], latest, 'rootZoneWetness', '%'),
+    precipitation: sameMonthReference(currentSeries?.records ?? [], latest, 'precipitationMmPerDay', measurementSystem),
+    temperature: sameMonthReference(currentSeries?.records ?? [], latest, 'temperatureC', measurementSystem),
+    roots: sameMonthReference(currentSeries?.records ?? [], latest, 'rootZoneWetness', measurementSystem),
   }
   const priorityWeights = rotationWeightsFor(currentWorkspace)
   const selectedPriorities = Object.entries(priorityWeights) as Array<[RotationPriority, 1 | 2 | 3]>
@@ -186,7 +190,7 @@ export function RotationExplorer() {
     : []
   const soil = soilState.pointKey === pointKey ? soilState.value : readSoilProfile(location)
   const farmProfile = readFarmProfile(location)
-  const soilValues = soilSummary(soil)
+  const soilValues = soilSummary(soil, measurementSystem)
   const soilHasGeneralValues = hasGeneralSoilValues(soil)
   const detailedCrops = detailedPlan?.crops.map(cropId => cropId ? catalog.find(crop => crop.id === cropId) : undefined) ?? []
   const detailedKnownFamilies = detailedCrops.filter(crop => crop?.familyLabel).length
@@ -198,7 +202,7 @@ export function RotationExplorer() {
       key: 'climate',
       title: 'Contexte climatique NASA',
       state: latest && currentSeries ? 'ready' : climateLoading ? 'partial' : 'missing',
-      summary: latest && currentSeries ? `${formatPowerMonth(latest.date)} · ${latest.precipitationMmPerDay === undefined ? 'pluie indisponible' : `${latest.precipitationMmPerDay.toLocaleString('fr-FR')} mm/j`} · ${latest.temperatureC === undefined ? 'température indisponible' : `${latest.temperatureC.toLocaleString('fr-FR')} °C`}` : climateLoading ? 'Série mensuelle en cours de chargement' : 'Aucune valeur exploitable pour ce point',
+      summary: latest && currentSeries ? `${formatPowerMonth(latest.date)} · ${latest.precipitationMmPerDay === undefined ? 'pluie indisponible' : formatPrecipitationRate(latest.precipitationMmPerDay, measurementSystem)} · ${latest.temperatureC === undefined ? 'température indisponible' : formatTemperature(latest.temperatureC, measurementSystem)}` : climateLoading ? 'Série mensuelle en cours de chargement' : 'Aucune valeur exploitable pour ce point',
       detail: latest && currentSeries ? `Maille MERRA-2 · centre ${currentSeries.gridPoint.latitude.toFixed(3)}, ${currentSeries.gridPoint.longitude.toFixed(3)}. ${climateReferences.precipitation}. ${climateReferences.temperature}. Ce repère historique ne décrit pas le calendrier d’une culture.` : climateError ? `NASA POWER indisponible : ${climateError}` : 'La série NASA POWER n’est pas encore disponible; aucun chiffre de remplacement n’est affiché.',
       href: '/app/atlas',
       action: 'Ouvrir l’Atlas',
@@ -399,8 +403,8 @@ export function RotationExplorer() {
     const climate = latest
       ? [
           `- Période mensuelle complète la plus récente : ${formatPowerMonth(latest.date)} (${latest.date}).`,
-          `- Précipitations moyennes : ${latest.precipitationMmPerDay === undefined ? 'indisponibles' : `${latest.precipitationMmPerDay.toLocaleString('fr-FR')} mm/j`}.`,
-          `- Température moyenne : ${latest.temperatureC === undefined ? 'indisponible' : `${latest.temperatureC.toLocaleString('fr-FR')} °C`}.`,
+          `- Précipitations moyennes : ${latest.precipitationMmPerDay === undefined ? 'indisponibles' : formatPrecipitationRate(latest.precipitationMmPerDay, measurementSystem)}.`,
+          `- Température moyenne : ${latest.temperatureC === undefined ? 'indisponible' : formatTemperature(latest.temperatureC, measurementSystem)}.`,
           `- Humidité racinaire modélisée : ${latest.rootZoneWetness === undefined ? 'indisponible' : `${(latest.rootZoneWetness * 100).toLocaleString('fr-FR')} %`}.`,
           `- Centre de maille NASA POWER / MERRA-2 (0,5° × 0,625°) : ${currentSeries?.gridPoint.latitude.toFixed(3)}, ${currentSeries?.gridPoint.longitude.toFixed(3)} · ${currentSeries?.source.join(', ')}.`,
         ]
@@ -409,14 +413,14 @@ export function RotationExplorer() {
       `- Texture déclarée : ${soil.texture && soil.texture !== 'unknown' ? ({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[soil.texture] : 'inconnue'}.`,
       `- pH déclaré : ${soil.ph === undefined ? 'inconnu' : soil.ph.toLocaleString('fr-FR')}.`,
       `- Matière organique déclarée : ${soil.organicMatterPercent === undefined ? 'inconnue' : `${soil.organicMatterPercent.toLocaleString('fr-FR')} %`}.`,
-      `- Profondeur utile déclarée : ${soil.effectiveDepthCm === undefined ? 'inconnue' : `${soil.effectiveDepthCm} cm`}.`,
+      `- Profondeur utile déclarée : ${soil.effectiveDepthCm === undefined ? 'inconnue' : formatLength(soil.effectiveDepthCm, measurementSystem)}.`,
       `- Drainage déclaré : ${soil.drainage && soil.drainage !== 'unknown' ? ({ poor: 'lent', moderate: 'modéré', good: 'rapide' } as const)[soil.drainage] : 'inconnu'}.`,
       `- Provenance des champs généraux : ${soilHasGeneralValues ? (['texture', 'ph', 'organicMatterPercent', 'effectiveDepthCm', 'drainage'] as SoilFieldKey[]).filter(field => soil[field] !== undefined).map(field => { const origin = resolveSoilFieldProvenance(soil, field); return `${soilFieldLabels[field]} · ${soilSourceLabels[origin.sourceType]}${origin.sourceName ? ` · ${origin.sourceName}` : ''} · ${origin.sampleDate || 'date non précisée'}${origin.samplingMethod ? ` · méthode ${origin.samplingMethod}` : ''} (non vérifiée)` }).join(' ; ') : 'aucune caractéristique générale renseignée'}.`,
       `- Enregistré localement le : ${soil.updatedAt ? new Date(soil.updatedAt).toLocaleDateString('fr-FR') : 'aucune date enregistrée'}.`,
       ...(soil.horizons?.length ? soil.horizons.map((horizon, index) => {
         const texture = horizon.texture && horizon.texture !== 'unknown' ? ({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[horizon.texture] : 'inconnue'
         const { sourceType, sourceName, sampleDate, samplingMethod } = resolveSoilHorizonProvenance(horizon, soil)
-        return `- Horizon ${index + 1} · ${horizon.topCm}–${horizon.bottomCm} cm : texture ${texture}; pH ${horizon.ph === undefined ? 'inconnu' : horizon.ph.toLocaleString('fr-FR')}; matière organique ${horizon.organicMatterPercent === undefined ? 'inconnue' : `${horizon.organicMatterPercent.toLocaleString('fr-FR')} %`}; origine déclarée ${soilSourceLabels[sourceType]}${sourceName ? ` · ${sourceName}` : ''}; date ${sampleDate || 'non précisée'}${samplingMethod ? `; méthode ${samplingMethod}` : ''} (non vérifiée).`
+        return `- Horizon ${index + 1} · ${formatLength(horizon.topCm, measurementSystem)}–${formatLength(horizon.bottomCm, measurementSystem)} : texture ${texture}; pH ${horizon.ph === undefined ? 'inconnu' : horizon.ph.toLocaleString('fr-FR')}; matière organique ${horizon.organicMatterPercent === undefined ? 'inconnue' : `${horizon.organicMatterPercent.toLocaleString('fr-FR')} %`}; origine déclarée ${soilSourceLabels[sourceType]}${sourceName ? ` · ${sourceName}` : ''}; date ${sampleDate || 'non précisée'}${samplingMethod ? `; méthode ${samplingMethod}` : ''} (non vérifiée).`
       }) : ['- Aucun horizon local détaillé n’est renseigné.']),
       '- Les profondeurs non couvertes par les horizons déclarés restent inconnues.',
     ]
@@ -542,7 +546,7 @@ export function RotationExplorer() {
         {soilValues.length ? <ul className="rotation-soil-list">{soilValues.map(value => <li key={value}>{value}</li>)}</ul> : <p className="rotation-context-empty">Aucune caractéristique de sol n’est renseignée pour ce point.</p>}
         <Link to="/app/terrain" className="rotation-context-link">Renseigner le profil du sol <ArrowUpRight size={12} /></Link>
         <div className="rotation-parcel-card">
-          <div><strong>Limite de parcelle</strong><small>{parcel ? `${parcel.feature.properties?.name ?? 'Parcelle'} · ≈ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} ha` : 'Importez ou dessinez une limite WGS84'}</small></div>
+          <div><strong>Limite de parcelle</strong><small>{parcel ? `${parcel.feature.properties?.name ?? 'Parcelle'} · ≈ ${formatArea(parcel.areaHectares, measurementSystem)}` : 'Importez ou dessinez une limite WGS84'}</small></div>
           <div className="rotation-parcel-actions">
             {drawingParcel ? <><button type="button" className="rotation-parcel-cancel" onClick={cancelParcelDrawing}>Annuler</button><button type="button" className="rotation-parcel-undo" onClick={undoParcelVertex} disabled={!draftParcelPoints.length}>Retour</button><button type="button" className="rotation-parcel-finish" onClick={finishParcelDrawing} disabled={draftParcelPoints.length < 3}>Terminer · {draftParcelPoints.length}</button></> : <>
               <label className="rotation-parcel-import"><Upload size={12} />Importer<input type="file" accept=".geojson,.json,application/geo+json,application/json" aria-label="Importer une limite GeoJSON" onChange={importParcel} /></label>
@@ -556,7 +560,7 @@ export function RotationExplorer() {
         {parcel && <small className="rotation-parcel-note">Contour dessiné/importé localement · surface géodésique approximative. Aucune statistique NASA zonale calculée.</small>}
         <div className="rotation-context-divider" />
         <header className="rotation-panel-heading"><span className="rotation-panel-icon climate"><Activity size={15} /></span><span><strong>Contexte NASA POWER</strong><small>{climateLoading ? 'Chargement des données…' : latest ? `${formatPowerMonth(latest.date)} · valeur mensuelle` : 'Données non disponibles'}</small></span></header>
-        {climateLoading ? <div className="rotation-context-empty" role="status">Récupération de la série climatique…</div> : climateError ? <div className="rotation-context-error" role="alert">{climateError}<button type="button" onClick={retryClimate}>Réessayer</button></div> : <><div className="rotation-climate-metrics"><span><CloudRain size={13} /><div><small>Pluie moyenne</small><small className="rotation-climate-reference">{climateReferences.precipitation}</small></div><strong>{latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j`}</strong></span><span><ThermometerSun size={13} /><div><small>Température</small><small className="rotation-climate-reference">{climateReferences.temperature}</small></div><strong>{latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`}</strong></span><span><Droplets size={13} /><div><small>Humidité racinaire</small><small className="rotation-climate-reference">{climateReferences.roots}</small></div><strong>{latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0).replace('.', ',')} %`}</strong></span></div><small className="rotation-climate-footnote">Repère historique du même mois · pas une prévision</small></>}
+        {climateLoading ? <div className="rotation-context-empty" role="status">Récupération de la série climatique…</div> : climateError ? <div className="rotation-context-error" role="alert">{climateError}<button type="button" onClick={retryClimate}>Réessayer</button></div> : <><div className="rotation-climate-metrics"><span><CloudRain size={13} /><div><small>Pluie moyenne</small><small className="rotation-climate-reference">{climateReferences.precipitation}</small></div><strong>{latest?.precipitationMmPerDay === undefined ? '—' : formatPrecipitationRate(latest.precipitationMmPerDay, measurementSystem)}</strong></span><span><ThermometerSun size={13} /><div><small>Température</small><small className="rotation-climate-reference">{climateReferences.temperature}</small></div><strong>{latest?.temperatureC === undefined ? '—' : formatTemperature(latest.temperatureC, measurementSystem)}</strong></span><span><Droplets size={13} /><div><small>Humidité racinaire</small><small className="rotation-climate-reference">{climateReferences.roots}</small></div><strong>{latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0).replace('.', ',')} %`}</strong></span></div><small className="rotation-climate-footnote">Repère historique du même mois · pas une prévision</small></>}
         <p className="rotation-context-source">Centre de maille MERRA-2 {currentSeries?.gridPoint.latitude.toFixed(3)}, {currentSeries?.gridPoint.longitude.toFixed(3)} · 0,5° × 0,625° · {currentSeries?.source.join(' + ') ?? 'source en attente'}</p>
       </aside>
 

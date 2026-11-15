@@ -5,6 +5,7 @@ import type { FeatureCollection } from 'geojson'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoPoint } from '../../lib/geo/location'
 import type { PowerGridCell } from '../../lib/nasa/power'
+import { formatArea, formatDistance, useMeasurementSystem } from '../../lib/units/measurement-units'
 import { formatGibsDate, resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { useParcelBoundary } from '../../lib/geo/parcel-boundary'
 import './field-map.css'
@@ -38,6 +39,7 @@ function gibsTileUrl(layer: string, date: string, format: 'jpg' | 'png', matrixS
 }
 
 export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, powerGridCell, draftParcelPoints = [], drawingParcel = false, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
+  const measurementSystem = useMeasurementSystem()
   const { availability, error: availabilityError } = useGibsAvailability()
   const trueColorDate = resolveGibsDate(imageryDate, availability?.trueColor)
   const ndviDate = resolveGibsDate(imageryDate, availability?.ndvi)
@@ -47,22 +49,23 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
   const dateLoading = !availability && !availabilityError
   const parcel = useParcelBoundary()
   const parcelBoundary = parcel?.feature ?? null
-  const parcelLabel = parcel ? ` Limite affichée : ${parcel.feature.properties?.name ?? 'parcelle importée'}, environ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} hectares.` : ''
+  const parcelLabel = parcel ? ` Limite affichée : ${parcel.feature.properties?.name ?? 'parcelle importée'}, environ ${formatArea(parcel.areaHectares, measurementSystem)}.` : ''
   const draftParcelLabel = drawingParcel ? ` Tracé de parcelle en cours : ${draftParcelPoints.length} sommet(s); les sommets ne sont pas encore enregistrés.` : ''
-  const gridCellLabel = powerGridCell ? ` Maille météo NASA POWER indiquée par un contour vert discontinu, environ ${Math.round(powerGridCell.properties.widthKm)} par ${Math.round(powerGridCell.properties.heightKm)} km.` : ''
+  const gridCellLabel = powerGridCell ? ` Maille météo NASA POWER indiquée par un contour vert discontinu, environ ${formatDistance(powerGridCell.properties.widthKm, measurementSystem)} par ${formatDistance(powerGridCell.properties.heightKm, measurementSystem)}.` : ''
   const mapLabel = `${ariaLabel}.${parcelLabel}${draftParcelLabel}${gridCellLabel}`
   const legendItems = [
     ...(baseLayer === 'nasa' ? [{ id: 'truecolor', label: `MODIS Terra · composition couleur · ${trueColorDate ? formatGibsDate(trueColorDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'}`, detail: trueColorDate && trueColorDate !== imageryDate ? `Date demandée : ${imageryDate}; date NASA la plus proche utilisée. ${dateStatus} Image composite, pas une mesure unique.` : dateStatus }] : []),
     ...(showNdvi ? [{ id: 'ndvi', label: `NDVI MODIS Terra · composite 8 jours · ${ndviDate ? formatGibsDate(ndviDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'}`, detail: ndviDate && ndviDate !== imageryDate ? `Date demandée : ${imageryDate}; date NASA la plus proche utilisée. ${dateStatus}` : dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/MODIS_NDVI_H.svg' }] : []),
-    ...(showSurfaceSoil ? [{ id: 'surface', label: `SMAP L4 · humidité de surface · ${surfaceSoilDate ? formatGibsDate(surfaceSoilDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'} · ~9 km`, detail: dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
-    ...(showRootSoil ? [{ id: 'root', label: `SMAP L4 · humidité zone racinaire · ${rootSoilDate ? formatGibsDate(rootSoilDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'} · ~9 km`, detail: dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
-    ...(powerGridCell ? [{ id: 'power', label: 'Maille NASA POWER', detail: `≈ ${Math.round(powerGridCell.properties.widthKm)} × ${Math.round(powerGridCell.properties.heightKm)} km · contour vert discontinu; pas une parcelle.` }] : []),
-    ...(parcel ? [{ id: 'parcel', label: parcel.feature.properties?.name ?? 'Parcelle importée', detail: `Contour saisi/importé · ≈ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} ha.` }] : []),
+    ...(showSurfaceSoil ? [{ id: 'surface', label: `SMAP L4 · humidité de surface · ${surfaceSoilDate ? formatGibsDate(surfaceSoilDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'} · ~${formatDistance(9, measurementSystem)} `, detail: dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
+    ...(showRootSoil ? [{ id: 'root', label: `SMAP L4 · humidité zone racinaire · ${rootSoilDate ? formatGibsDate(rootSoilDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'} · ~${formatDistance(9, measurementSystem)}`, detail: dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
+    ...(powerGridCell ? [{ id: 'power', label: 'Maille NASA POWER', detail: `≈ ${formatDistance(powerGridCell.properties.widthKm, measurementSystem)} × ${formatDistance(powerGridCell.properties.heightKm, measurementSystem)} · contour vert discontinu; pas une parcelle.` }] : []),
+    ...(parcel ? [{ id: 'parcel', label: parcel.feature.properties?.name ?? 'Parcelle importée', detail: `Contour saisi/importé · ≈ ${formatArea(parcel.areaHectares, measurementSystem)}.` }] : []),
     ...(baseLayer === 'streets' && !showNdvi && !showSurfaceSoil && !showRootSoil ? [{ id: 'osm', label: 'Fond de rues · OpenStreetMap', detail: '© OpenStreetMap contributors.' }] : []),
   ]
   const hasNasaLayers = legendItems.some(item => item.id === 'truecolor' || item.id === 'ndvi' || item.id === 'surface' || item.id === 'root')
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
+  const scaleRef = useRef<ScaleControl | null>(null)
   const onSelectRef = useRef(onPointSelect)
   const onReadyRef = useRef(onMapReady)
   onSelectRef.current = onPointSelect
@@ -165,7 +168,9 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
     })
     mapRef.current = map
     onReadyRef.current?.(map)
-    map.addControl(new ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-right')
+    const scale = new ScaleControl({ maxWidth: 110, unit: measurementSystem === 'us-customary' ? 'imperial' : 'metric' })
+    scaleRef.current = scale
+    map.addControl(scale, 'bottom-right')
     map.on('click', (event: MapMouseEvent) => onSelectRef.current({ latitude: Number(event.lngLat.lat.toFixed(5)), longitude: Number(event.lngLat.lng.toFixed(5)) }))
     map.on('error', event => {
       if (event.error) console.warn('FieldNova map tile error:', event.error.message)
@@ -174,10 +179,15 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
     return () => {
       map.remove()
       mapRef.current = null
+      scaleRef.current = null
     }
     // The map is initialized once; source, marker, and visibility changes are applied below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    scaleRef.current?.setUnit(measurementSystem === 'us-customary' ? 'imperial' : 'metric')
+  }, [measurementSystem])
 
   useEffect(() => {
     const map = mapRef.current

@@ -6,6 +6,7 @@ import { useSelectedLocation } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { exitDemoWorkspace, readDemoWorkspace, type DemoWorkspace } from '../../lib/demo/demo-workspace'
+import { formatPrecipitationRate, formatTemperature, setMeasurementSystem, useMeasurementSystem } from '../../lib/units/measurement-units'
 
 function coordinate(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(2).replace('.', ',')}° ${value < 0 ? negative : positive}`
@@ -41,6 +42,7 @@ export function AppShell() {
   const keepDemoButton = useRef<HTMLButtonElement>(null)
   const quitDemoButton = useRef<HTMLButtonElement>(null)
   const { location } = useSelectedLocation()
+  const measurementSystem = useMeasurementSystem()
   const { series, loading, error } = usePowerMonthly(location)
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
   const unavailable = Boolean(error)
@@ -191,8 +193,8 @@ export function AppShell() {
             <span className="context-control"><MapPin size={17} /> Point suivi · {coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</span>
             <span className="context-weather" aria-live="polite">
               <ThermometerSun size={16} />
-              {loading ? <strong>NASA POWER…</strong> : unavailable ? <strong>Données indisponibles</strong> : latest?.temperatureC !== undefined ? <strong>{latest.temperatureC.toFixed(1).replace('.', ',')} °C · {formatPowerMonth(latest.date)}</strong> : <strong>Température non disponible</strong>}
-              <span><CloudRain size={14} />{latest?.precipitationMmPerDay !== undefined ? `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j · moyenne mensuelle` : 'Précipitations non disponibles'}</span>
+              {loading ? <strong>NASA POWER…</strong> : unavailable ? <strong>Données indisponibles</strong> : latest?.temperatureC !== undefined ? <strong>{formatTemperature(latest.temperatureC, measurementSystem)} · {formatPowerMonth(latest.date)}</strong> : <strong>Température non disponible</strong>}
+              <span><CloudRain size={14} />{latest?.precipitationMmPerDay !== undefined ? `${formatPrecipitationRate(latest.precipitationMmPerDay, measurementSystem, 1)} · moyenne mensuelle` : 'Précipitations non disponibles'}</span>
             </span>
             <span className={`context-source ${series?.deliveryMode === 'stale-cache' ? 'is-stale' : ''} ${usingDemoSnapshot ? 'is-snapshot' : ''}`} title={usingDemoSnapshot ? `Extrait NASA POWER de démonstration hors ligne · récupéré le ${series?.fetchedAt.slice(0, 10)} · dernier mois exploitable ${latest?.date ?? 'inconnu'}.` : series?.deliveryMode === 'stale-cache' ? 'Copie locale utilisée après échec de la mise à jour; date de collecte indiquée dans les vues de données.' : series?.deliveryMode === 'fresh-cache' ? 'Copie locale récente; chargée en moins de 15 minutes.' : series ? 'Série reçue lors de cette session depuis NASA POWER.' : 'État de la série NASA POWER mensuelle.'}>
               NASA POWER · {loading ? 'chargement' : unavailable ? 'indisponible' : usingDemoSnapshot ? 'extrait démo hors ligne' : series?.deliveryMode === 'stale-cache' ? 'copie locale ancienne' : series?.deliveryMode === 'fresh-cache' ? 'cache récent' : 'en ligne'}
@@ -206,7 +208,7 @@ export function AppShell() {
           <div className="topbar-actions">
             <button className="icon-button" aria-label="Notifications"><Bell size={18} /></button>
             <button className="icon-button" aria-label="Aide"><CircleHelp size={18} /></button>
-            <button className="profile-button" aria-label="Profil de l’utilisateur"><UserRound size={18} /></button>
+            <details className="profile-preferences"><summary className="profile-button" aria-label="Préférences de l’utilisateur" title="Préférences"><UserRound size={18} /></summary><div className="unit-preference-popover"><label htmlFor="measurement-system">Unités</label><select id="measurement-system" aria-label="Unités de mesure" value={measurementSystem} onChange={event => setMeasurementSystem(event.target.value === 'us-customary' ? 'us-customary' : 'metric')}><option value="metric">Métriques · °C, mm, km</option><option value="us-customary">États-Unis · °F, in, mi</option></select><small>Les exports NASA gardent leurs unités d’origine.</small></div></details>
           </div>
         </header>
         <main className="app-main" id="main-content" tabIndex={-1}><Suspense fallback={<div className="route-loading" role="status">Ouverture de la vue…</div>}><Outlet /></Suspense></main>
