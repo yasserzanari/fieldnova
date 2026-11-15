@@ -90,7 +90,7 @@ export function TerrainPage() {
 
     <section className="terrain-soil-chart" aria-label="Évolution mensuelle de l’humidité du sol">
       <div className="terrain-chart-heading"><div><span className="terrain-heading-icon soil"><Droplets size={17} /></span><span><strong>Évolution de l’humidité du sol</strong><small>NASA POWER · point suivi · valeurs mensuelles modélisées</small></span></div></div>
-      <PowerClimateChart records={series?.records ?? []} source={series?.source.join(' + ') ?? 'en attente'} mode="soil" title="Humidité de surface et zone racinaire · NASA POWER" />
+      <PowerClimateChart records={series?.records ?? []} requestedMonths={series?.requestedMonths} source={series?.source.join(' + ') ?? 'en attente'} mode="soil" title="Humidité de surface et zone racinaire · NASA POWER" />
     </section>
   </section>
 }
