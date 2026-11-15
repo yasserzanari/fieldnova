@@ -16,3 +16,5 @@ Sentinel-2 and SoilGrids remain catalog references; local station records and fa
 - [OpenStreetMap copyright and attribution](https://www.openstreetmap.org/copyright) — attribution is shown on the map when its street-map base is active.
 
 The full, dated source register and its current limitations are in [`ui-concepts/references-and-data-sources.md`](../../../ui-concepts/references-and-data-sources.md).
+
+On mobile, the catalogue, map and source sheet are separate tabs that share the available viewport. Selecting a source opens its details; the map is resized when reopened. Long catalog and metadata lists scroll inside their own panel rather than extending the page.
