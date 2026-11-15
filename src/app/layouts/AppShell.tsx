@@ -114,7 +114,9 @@ export function AppShell() {
               {loading ? <strong>NASA POWER…</strong> : unavailable ? <strong>Données indisponibles</strong> : latest?.temperatureC !== undefined ? <strong>{latest.temperatureC.toFixed(1).replace('.', ',')} °C · {formatPowerMonth(latest.date)}</strong> : <strong>Température non disponible</strong>}
               <span><CloudRain size={14} />{latest?.precipitationMmPerDay !== undefined ? `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j · moyenne mensuelle` : 'Précipitations non disponibles'}</span>
             </span>
-            <span className="context-source">NASA POWER · mensuel</span>
+            <span className={`context-source ${series?.deliveryMode === 'stale-cache' ? 'is-stale' : ''}`} title={series?.deliveryMode === 'stale-cache' ? 'Copie locale utilisée après échec de la mise à jour; date de collecte indiquée dans les vues de données.' : series?.deliveryMode === 'fresh-cache' ? 'Copie locale récente; chargée en moins de 15 minutes.' : series ? 'Série reçue lors de cette session depuis NASA POWER.' : 'État de la série NASA POWER mensuelle.'}>
+              NASA POWER · {loading ? 'chargement' : unavailable ? 'indisponible' : series?.deliveryMode === 'stale-cache' ? 'copie locale ancienne' : series?.deliveryMode === 'fresh-cache' ? 'cache récent' : 'en ligne'}
+            </span>
           </div>
           {demoWorkspace && <div className="demo-mode-pill" aria-label="Mode démo : ferme fictive">
             <FlaskConical size={14} /><span role="status"><strong>MODE DÉMO</strong><small>Profil fictif · NASA POWER réelle</small></span>
