@@ -17,6 +17,7 @@ import { readRotationConstraints } from '../scenarios/rotation-constraints'
 import { formatCropMonthWindow, monthWindowsOverlap, readCropCalendar, readFarmWorkWindows } from '../scenarios/crop-calendar'
 import { declaredFarmOperationCount, farmOperations, operationAvailabilityLabels, readFarmOperationProfile } from '../../lib/farm/operation-availability'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
+import { formatLength, formatPrecipitationRate, formatTemperature, useMeasurementSystem } from '../../lib/units/measurement-units'
 import { evaluateRotation, priorityLabels, readCropCatalog, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightsFor, type CropDefinition, type CropId, type RotationPriority } from '../scenarios/rotation-model'
 import { AssistantSoilImportCard, type AssistantSoilImport } from './AssistantSoilImportCard'
 import './assistant.css'
@@ -127,7 +128,7 @@ function detailedFieldAnswer(answer: string) {
   return answer.replace(/^\s*En bref\s*:\s*[^\n]+\n(?:\s*\n)?/i, '').trim()
 }
 
-function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, layer: LayerId, selectedPoint: GeoPoint) {
+function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, layer: LayerId, selectedPoint: GeoPoint, measurementSystem: ReturnType<typeof useMeasurementSystem>) {
   if (!series) return 'Je n’ai pas pu charger NASA POWER pour le point sélectionné. Vérifiez la connexion puis réessayez ; aucune valeur de démonstration n’est substituée aux données manquantes.'
   const records = series.records
   const record = latestCompleteRecord(records)
@@ -152,14 +153,14 @@ function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, 
   }
   if (lower.includes('pluie') || lower.includes('précip')) {
     const value = record.precipitationMmPerDay
-    return `${prefix}${value !== undefined ? ` Les précipitations NASA POWER sont de ${value.toFixed(1).replace('.', ',')} mm/j en moyenne sur le mois (PRECTOTCORR).` : ' Aucune valeur de précipitation exploitable n’est disponible pour ce mois.'} C’est une moyenne mensuelle au point de grille, pas un cumul des sept derniers jours ni une prévision.`
+    return `${prefix}${value !== undefined ? ` Les précipitations NASA POWER sont de ${formatPrecipitationRate(value, measurementSystem)} en moyenne sur le mois (PRECTOTCORR).` : ' Aucune valeur de précipitation exploitable n’est disponible pour ce mois.'} C’est une moyenne mensuelle au point de grille, pas un cumul des sept derniers jours ni une prévision.`
   }
   if (lower.includes('temp') || lower.includes('chaud') || lower.includes('froid')) {
-    return `${prefix}${record.temperatureC !== undefined ? ` La température moyenne NASA POWER est de ${record.temperatureC.toFixed(1).replace('.', ',')} °C` : ' La température moyenne n’est pas disponible'}${record.temperatureMinC !== undefined && record.temperatureMaxC !== undefined ? ` (min. ${record.temperatureMinC.toFixed(1).replace('.', ',')} °C ; max. ${record.temperatureMaxC.toFixed(1).replace('.', ',')} °C)` : ''}. Il s’agit d’une moyenne mensuelle modélisée, pas d’une prévision locale.`
+    return `${prefix}${record.temperatureC !== undefined ? ` La température moyenne NASA POWER est de ${formatTemperature(record.temperatureC, measurementSystem)}` : ' La température moyenne n’est pas disponible'}${record.temperatureMinC !== undefined && record.temperatureMaxC !== undefined ? ` (min. ${formatTemperature(record.temperatureMinC, measurementSystem)} ; max. ${formatTemperature(record.temperatureMaxC, measurementSystem)})` : ''}. Il s’agit d’une moyenne mensuelle modélisée, pas d’une prévision locale.`
   }
   const summary = [
-    record.temperatureC !== undefined ? `température moyenne ${record.temperatureC.toFixed(1).replace('.', ',')} °C` : '',
-    record.precipitationMmPerDay !== undefined ? `pluie ${record.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j en moyenne mensuelle` : '',
+    record.temperatureC !== undefined ? `température moyenne ${formatTemperature(record.temperatureC, measurementSystem)}` : '',
+    record.precipitationMmPerDay !== undefined ? `pluie ${formatPrecipitationRate(record.precipitationMmPerDay, measurementSystem)} en moyenne mensuelle` : '',
     record.rootZoneWetness !== undefined ? `humidité racinaire modélisée ${Math.round(record.rootZoneWetness * 100)} %` : '',
   ].filter(Boolean).join(' · ')
   return `${prefix}${summary ? ` NASA POWER indique ${summary}.` : ' Aucune mesure climatique exploitable n’est disponible pour ce mois.'} La carte montre ${requestedLayer}. Dites-moi si vous voulez examiner la pluie, la température, l’humidité du sol ou le NDVI. Les séries POWER sont mensuelles et ne constituent ni une prévision ni un diagnostic parcellaire.`
@@ -223,13 +224,13 @@ function localCropReferences(point: GeoPoint): AISource[] {
     }))
 }
 
-function formatSoilAnswer(point: GeoPoint) {
+function formatSoilAnswer(point: GeoPoint, measurementSystem: ReturnType<typeof useMeasurementSystem>) {
   const profile = readSoilProfile(point)
   const fields: Array<{ key: SoilFieldKey; value: string }> = [
     ...(profile.texture && profile.texture !== 'unknown' ? [{ key: 'texture' as const, value: `texture ${({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[profile.texture]}` }] : []),
     ...(profile.ph !== undefined ? [{ key: 'ph' as const, value: `pH ${profile.ph.toLocaleString('fr-FR')}` }] : []),
     ...(profile.organicMatterPercent !== undefined ? [{ key: 'organicMatterPercent' as const, value: `${profile.organicMatterPercent.toLocaleString('fr-FR')} % de matière organique` }] : []),
-    ...(profile.effectiveDepthCm !== undefined ? [{ key: 'effectiveDepthCm' as const, value: `${profile.effectiveDepthCm} cm de profondeur utile` }] : []),
+    ...(profile.effectiveDepthCm !== undefined ? [{ key: 'effectiveDepthCm' as const, value: `${formatLength(profile.effectiveDepthCm, measurementSystem)} de profondeur utile` }] : []),
     ...(profile.drainage && profile.drainage !== 'unknown' ? [{ key: 'drainage' as const, value: `drainage ${({ poor: 'lent', moderate: 'modéré', good: 'rapide' } as const)[profile.drainage]}` }] : []),
   ]
   const entries = fields.map(field => field.value)
@@ -239,7 +240,7 @@ function formatSoilAnswer(point: GeoPoint) {
     const organicMatter = horizon.organicMatterPercent === undefined ? 'matière organique inconnue' : `${horizon.organicMatterPercent.toLocaleString('fr-FR')} % de matière organique`
     const { sourceType, sampleDate, sourceName: reference, samplingMethod } = resolveSoilHorizonProvenance(horizon, profile)
     const sample = sampleDate ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${sampleDate}T12:00:00Z`)) : 'date non précisée'
-    return `Horizon ${index + 1} (${horizon.topCm}–${horizon.bottomCm} cm) : texture ${texture}, ${ph}, ${organicMatter}. Origine déclarée : ${soilSourceLabels[sourceType]}${reference ? ` · ${reference}` : ''} · ${sample}${samplingMethod ? ` · méthode : ${samplingMethod}` : ''} (non vérifiée).`
+    return `Horizon ${index + 1} (${formatLength(horizon.topCm, measurementSystem)}–${formatLength(horizon.bottomCm, measurementSystem)}) : texture ${texture}, ${ph}, ${organicMatter}. Origine déclarée : ${soilSourceLabels[sourceType]}${reference ? ` · ${reference}` : ''} · ${sample}${samplingMethod ? ` · méthode : ${samplingMethod}` : ''} (non vérifiée).`
   }) ?? []
   if (!entries.length && !horizons.length) {
     if (profile.sampleDate || profile.samplingMethod || profile.sourceName) return `Une fiche de prélèvement est enregistrée au point suivi ${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}${profile.sampleDate ? ` · date ${profile.sampleDate}` : ''}${profile.samplingMethod ? ` · méthode déclarée : ${profile.samplingMethod}` : ''}${profile.sourceName ? ` · référence : ${profile.sourceName}` : ''}. Aucune caractéristique de sol mesurée n’est renseignée. Ces données restent déclaratives et locales.`
@@ -314,6 +315,7 @@ function traceNode(id: string, toolName: string, label: string, primary: string,
 
 export function AssistantPage() {
   const { location, selectLocation } = useSelectedLocation()
+  const measurementSystem = useMeasurementSystem()
   const [layer, setLayer] = useState<LayerId>('truecolor')
   const { series, loading: loadingData, error: dataError } = usePowerMonthly(location)
   const { availability: gibsAvailability, error: gibsDateError } = useGibsAvailability()
@@ -404,7 +406,7 @@ export function AssistantPage() {
       const knownFields = Object.values(profile).filter(value => value !== undefined).length
       trace.push(traceNode(`soil-${id}`, 'read', 'Profil de sol local · navigateur', 'Profil local consulté', knownFields ? `${knownFields} champ(s) renseigné(s) pour le point suivi` : 'Aucun champ de sol renseigné', 'completed'))
       traceHeading = 'Profil de sol local consulté'
-      answer = formatSoilAnswer(location)
+      answer = formatSoilAnswer(location, measurementSystem)
       evidence = answer
       usedSources = [soilProfileSource(location)]
       evidenceTags = [{ label: 'Déclaration locale', kind: 'local' }, { label: 'Mesure non vérifiée', kind: 'limit' }]
@@ -483,7 +485,7 @@ export function AssistantPage() {
         trace.push({ id: `map-${id}`, type: 'step', primary: 'Couche affichée sur la carte', secondary: label, status: 'completed' })
       }
       traceHeading = isDemoSnapshot ? 'Extrait NASA POWER consulté · mode démo' : route.asksLayer ? 'NASA POWER consulté · carte mise à jour' : 'NASA POWER consulté'
-      answer = makeClimateAnswer(question, currentSeries, requestedLayer, location)
+      answer = makeClimateAnswer(question, currentSeries, requestedLayer, location, measurementSystem)
       if (demoSnapshotNote) answer = `${demoSnapshotNote}\n\n${answer}`
       evidence = [demoSnapshotNote, answer].filter(Boolean).join('\n\n')
       usedSources = [{ ...sources[0], snippet: demoSnapshotNote || sources[0].snippet }, ...(route.asksLayer ? [sources[1]] : [])]
@@ -637,7 +639,7 @@ export function AssistantPage() {
           <div className="assistant-map-legend"><span><i className={`legend-gradient legend-${layer}`} />Couche NASA active</span><small>Pixel satellite ≠ contour de parcelle</small></div>
           <div className="assistant-scale"><span />Échelle indiquée sur la carte</div>
         </div>
-        <footer className="assistant-map-footer"><div className="assistant-footer-title"><Sprout size={16} /><span><strong>Point NASA suivi</strong><small>{series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? `Centre maille POWER · ${coordinate(series.gridPoint.latitude, 'N', 'S')} · ${coordinate(series.gridPoint.longitude, 'E', 'O')} · 0,5° × 0,625°` : 'Coordonnée choisie sur la carte'}</small></span></div><div className="assistant-soil-stat"><span className="soil-stat-icon moisture"><Droplets size={14} /></span><span><small>Humidité racinaire · POWER</small><strong>{soilValue !== undefined ? `${Math.round(soilValue * 100)} %` : 'Non disponible'} <em>{latest ? formatPowerMonth(latest.date) : ''}</em></strong></span></div><div className="assistant-soil-stat"><span className="soil-stat-icon weather"><ThermometerSun size={14} /></span><span><small>Température · POWER</small><strong>{latest?.temperatureC !== undefined ? `${latest.temperatureC.toFixed(1).replace('.', ',')} °C` : 'Non disponible'} <em>{latest ? formatPowerMonth(latest.date) : ''}</em></strong></span></div><div className="assistant-soil-stat"><span className="soil-stat-icon organic"><CloudRain size={14} /></span><span><small>Pluie moyenne · POWER</small><strong>{latest?.precipitationMmPerDay !== undefined ? `${latest.precipitationMmPerDay.toFixed(1).replace('.', ',')} mm/j` : 'Non disponible'} <em>{latest ? formatPowerMonth(latest.date) : ''}</em></strong></span></div><button type="button" className="assistant-map-details" onClick={() => handleSend('Explique les données NASA POWER pour ce point.', [])}>Analyser les données <Send size={13} /></button></footer>
+        <footer className="assistant-map-footer"><div className="assistant-footer-title"><Sprout size={16} /><span><strong>Point NASA suivi</strong><small>{series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? `Centre maille POWER · ${coordinate(series.gridPoint.latitude, 'N', 'S')} · ${coordinate(series.gridPoint.longitude, 'E', 'O')} · 0,5° × 0,625°` : 'Coordonnée choisie sur la carte'}</small></span></div><div className="assistant-soil-stat"><span className="soil-stat-icon moisture"><Droplets size={14} /></span><span><small>Humidité racinaire · POWER</small><strong>{soilValue !== undefined ? `${Math.round(soilValue * 100)} %` : 'Non disponible'} <em>{latest ? formatPowerMonth(latest.date) : ''}</em></strong></span></div><div className="assistant-soil-stat"><span className="soil-stat-icon weather"><ThermometerSun size={14} /></span><span><small>Température · POWER</small><strong>{latest?.temperatureC !== undefined ? formatTemperature(latest.temperatureC, measurementSystem) : 'Non disponible'} <em>{latest ? formatPowerMonth(latest.date) : ''}</em></strong></span></div><div className="assistant-soil-stat"><span className="soil-stat-icon organic"><CloudRain size={14} /></span><span><small>Pluie moyenne · POWER</small><strong>{latest?.precipitationMmPerDay !== undefined ? formatPrecipitationRate(latest.precipitationMmPerDay, measurementSystem) : 'Non disponible'} <em>{latest ? formatPowerMonth(latest.date) : ''}</em></strong></span></div><button type="button" className="assistant-map-details" onClick={() => handleSend('Explique les données NASA POWER pour ce point.', [])}>Analyser les données <Send size={13} /></button></footer>
       </div>
     </section>
   )

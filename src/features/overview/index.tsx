@@ -6,6 +6,7 @@ import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
+import { formatPrecipitationRate, formatTemperature, useMeasurementSystem } from '../../lib/units/measurement-units'
 import { readRotationComparisonCount, ROTATION_COMPARISON_RECORDED_EVENT, rotationComparisonStorageKey } from '../../lib/impact/rotation-comparison-counter'
 import { readFarmProfile, type FarmProfile } from '../../lib/farm/farm-profile'
 import { readSoilProfile } from '../../lib/farm/soil-profile'
@@ -25,6 +26,7 @@ function formatCoord(value: number, suffix: string) {
 }
 
 export function OverviewPage() {
+  const measurementSystem = useMeasurementSystem()
   const { location, selectLocation } = useSelectedLocation()
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('streets')
   const [showNdvi, setShowNdvi] = useState(false)
@@ -171,8 +173,8 @@ export function OverviewPage() {
           <header className="overview-panel-heading"><div><h2>Climat & eau · NASA POWER</h2><p>{loading ? 'Chargement de la série mensuelle…' : `Dernière période disponible · ${latestDate}`}</p></div><span className="panel-icon climate-icon"><CloudRain size={18} /></span></header>
           {loading ? <div className="overview-loading"><span className="overview-spinner" />Récupération de données NASA…</div> : error ? <div className="overview-api-error" role="alert"><span>{error}</span><button type="button" onClick={retry}><RefreshCw size={13} />Réessayer</button></div> : <>
             <div className="climate-indicators">
-              <Metric icon={<CloudRain size={17} />} tone="rain" label="Pluie moyenne mensuelle" value={latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(2).replace('.', ',')} mm/j`} detail="NASA POWER · PRECTOTCORR" />
-              <Metric icon={<ThermometerSun size={17} />} tone="temp" label="Température moyenne" value={latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`} detail="NASA POWER · T2M" />
+              <Metric icon={<CloudRain size={17} />} tone="rain" label="Pluie moyenne mensuelle" value={latest?.precipitationMmPerDay === undefined ? '—' : formatPrecipitationRate(latest.precipitationMmPerDay, measurementSystem)} detail="NASA POWER · PRECTOTCORR" />
+              <Metric icon={<ThermometerSun size={17} />} tone="temp" label="Température moyenne" value={latest?.temperatureC === undefined ? '—' : formatTemperature(latest.temperatureC, measurementSystem)} detail="NASA POWER · T2M" />
               <Metric icon={<Droplets size={17} />} tone="water" label="Humidité racinaire modélisée" value={latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`} detail="NASA POWER · GWETROOT" />
             </div>
             {series && <div className="overview-data-footnote">Mois de {latestDate} · NASA POWER · {series.source.join(' + ')} · UTC</div>}

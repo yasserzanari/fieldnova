@@ -1,5 +1,6 @@
 import { CloudRain, Droplets } from 'lucide-react'
 import { formatPowerMonth, type PowerMonthlyRecord } from '../../lib/nasa/power'
+import { climatePrecipitationRateUnit, climateTemperatureUnit, formatPrecipitationRate, formatTemperature, useMeasurementSystem } from '../../lib/units/measurement-units'
 import './power-climate-chart.css'
 
 type Props = { records: PowerMonthlyRecord[]; requestedMonths?: string[]; source: string; mode?: 'climate' | 'soil'; title?: string; months?: number; compact?: boolean }
@@ -29,13 +30,14 @@ function finite(values: Array<number | undefined>) {
 }
 
 export function PowerClimateChart({ records, requestedMonths, source, mode = 'climate', title, months = 12, compact = false }: Props) {
+  const measurementSystem = useMeasurementSystem()
   const monthSlots = (requestedMonths?.length ? requestedMonths : records.map(record => record.date)).slice(-months)
   const recordByMonth = new Map(records.map(record => [record.date, record]))
   const visible = monthSlots.map(date => ({ ...(recordByMonth.get(date) ?? { date }), month: formatPowerMonth(date) }))
   const isSoil = mode === 'soil'
-  const allValues = finite(visible.map(row => isSoil ? row.rootZoneWetness : row.precipitationMmPerDay))
+  const allValues = finite(visible.map(row => isSoil ? row.rootZoneWetness : row.precipitationMmPerDay === undefined ? undefined : measurementSystem === 'us-customary' ? row.precipitationMmPerDay / 25.4 : row.precipitationMmPerDay))
   const surfaceValues = finite(visible.map(row => row.surfaceSoilWetness))
-  const tempValues = finite(visible.map(row => row.temperatureC))
+  const tempValues = finite(visible.map(row => row.temperatureC === undefined ? undefined : measurementSystem === 'us-customary' ? row.temperatureC * 9 / 5 + 32 : row.temperatureC))
   const hasData = isSoil ? allValues.length > 0 || surfaceValues.length > 0 : allValues.length > 0 || tempValues.length > 0
   const latest = [...visible].reverse().find(row => isSoil ? row.rootZoneWetness !== undefined || row.surfaceSoilWetness !== undefined : row.precipitationMmPerDay !== undefined || row.temperatureC !== undefined)
   const valueMax = isSoil ? 100 : Math.max(1, Math.ceil((Math.max(...allValues, 0) * 1.15) * 2) / 2)
@@ -46,14 +48,14 @@ export function PowerClimateChart({ records, requestedMonths, source, mode = 'cl
   const valuePoints = visible.flatMap((row, index) => {
     const raw = isSoil ? row.rootZoneWetness : row.precipitationMmPerDay
     if (raw === undefined || !Number.isFinite(raw)) return []
-    const value = isSoil ? raw * 100 : raw
+    const value = isSoil ? raw * 100 : measurementSystem === 'us-customary' ? raw / 25.4 : raw
     return [{ x: xAt(index), y: BOTTOM - (value / valueMax) * (BOTTOM - TOP), value, month: row.month, date: row.date, index }]
   })
   const surfacePoints: PlotPoint[] = isSoil ? visible.flatMap((row, index) => row.surfaceSoilWetness === undefined || !Number.isFinite(row.surfaceSoilWetness) ? [] : [{
     x: xAt(index), y: BOTTOM - (row.surfaceSoilWetness * 100 / 100) * (BOTTOM - TOP), value: row.surfaceSoilWetness, month: row.month, date: row.date, index,
   }]) : []
   const tempPoints: PlotPoint[] = isSoil ? [] : visible.flatMap((row, index) => row.temperatureC === undefined || !Number.isFinite(row.temperatureC) ? [] : [{
-    x: xAt(index), y: BOTTOM - ((row.temperatureC - tempMin) / (tempMax - tempMin)) * (BOTTOM - TOP), value: row.temperatureC, month: row.month, date: row.date, index,
+    x: xAt(index), y: BOTTOM - (((measurementSystem === 'us-customary' ? row.temperatureC * 9 / 5 + 32 : row.temperatureC) - tempMin) / (tempMax - tempMin)) * (BOTTOM - TOP), value: measurementSystem === 'us-customary' ? row.temperatureC * 9 / 5 + 32 : row.temperatureC, month: row.month, date: row.date, index,
   }])
   const valueSegments = continuousSegments(valuePoints)
   const surfaceSegments = continuousSegments(surfacePoints)
@@ -64,8 +66,8 @@ export function PowerClimateChart({ records, requestedMonths, source, mode = 'cl
   const labelIndexes = visible.map((_, index) => index).filter(index => index === 0 || index === visible.length - 1 || index % Math.max(1, Math.ceil(visible.length / 6)) === 0)
 
   return <section className={`power-chart-panel ${isSoil ? 'is-soil-chart' : ''} ${compact ? 'is-compact' : ''}`} aria-label={title ?? (isSoil ? 'Humidité racinaire mensuelle' : 'Précipitations et température mensuelles')}>
-    <header className="power-chart-heading"><div><span className={`power-chart-icon ${isSoil ? 'soil-icon' : 'climate-icon'}`}>{isSoil ? <Droplets size={16} /> : <CloudRain size={16} />}</span><div><h2>{title ?? (isSoil ? 'Humidité racinaire · NASA POWER' : 'Climat mensuel · NASA POWER')}</h2><p>{isSoil ? 'GWETTOP · surface   ·   GWETROOT · zone racinaire' : 'PRECTOTCORR · mm/j moyen mensuel   ·   T2M · °C'}</p></div></div><span className="power-chart-source">NASA · {source}</span></header>
-    <div className="power-chart-summary">{latest ? `Dernière valeur exploitable · ${latest.month}` : 'Aucune valeur NASA valide sur la période affichée'}{!isSoil && latest?.precipitationMmPerDay !== undefined ? ` · ${latest.precipitationMmPerDay.toFixed(2).replace('.', ',')} mm/j` : ''}{!isSoil && latest?.temperatureC !== undefined ? ` · ${latest.temperatureC.toFixed(1).replace('.', ',')} °C` : ''}{isSoil && latest?.surfaceSoilWetness !== undefined ? ` · surface ${(latest.surfaceSoilWetness * 100).toFixed(0)} %` : ''}{isSoil && latest?.rootZoneWetness !== undefined ? ` · racines ${(latest.rootZoneWetness * 100).toFixed(0)} %` : ''}</div>
+    <header className="power-chart-heading"><div><span className={`power-chart-icon ${isSoil ? 'soil-icon' : 'climate-icon'}`}>{isSoil ? <Droplets size={16} /> : <CloudRain size={16} />}</span><div><h2>{title ?? (isSoil ? 'Humidité racinaire · NASA POWER' : 'Climat mensuel · NASA POWER')}</h2><p>{isSoil ? 'GWETTOP · surface   ·   GWETROOT · zone racinaire' : `PRECTOTCORR · ${climatePrecipitationRateUnit(measurementSystem)} moyen mensuel   ·   T2M · ${climateTemperatureUnit(measurementSystem)}`}</p></div></div><span className="power-chart-source">NASA · {source}</span></header>
+    <div className="power-chart-summary">{latest ? `Dernière valeur exploitable · ${latest.month}` : 'Aucune valeur NASA valide sur la période affichée'}{!isSoil && latest?.precipitationMmPerDay !== undefined ? ` · ${formatPrecipitationRate(latest.precipitationMmPerDay, measurementSystem)}` : ''}{!isSoil && latest?.temperatureC !== undefined ? ` · ${formatTemperature(latest.temperatureC, measurementSystem)}` : ''}{isSoil && latest?.surfaceSoilWetness !== undefined ? ` · surface ${(latest.surfaceSoilWetness * 100).toFixed(0)} %` : ''}{isSoil && latest?.rootZoneWetness !== undefined ? ` · racines ${(latest.rootZoneWetness * 100).toFixed(0)} %` : ''}</div>
     {hasData ? <svg className="power-climate-chart" viewBox="0 0 720 110" preserveAspectRatio={compact ? 'none' : undefined} role="img" aria-label={isSoil ? 'Humidité racinaire modélisée par mois, donnée NASA POWER' : 'Précipitations moyennes quotidiennes par mois et température moyenne, données NASA POWER'}>
       <title>{isSoil ? 'Humidité racinaire NASA POWER' : 'Climat mensuel NASA POWER'}</title>
       {[0, .5, 1].map((fraction, index) => {
@@ -81,12 +83,12 @@ export function PowerClimateChart({ records, requestedMonths, source, mode = 'cl
         {surfaceSegments.map(segment => <path key={`surface-${segment[0].date}`} d={linePath(segment)} className="power-chart-surface-line" />)}
         {surfacePoints.map(point => <circle key={point.date} cx={point.x} cy={point.y} r="2.4" className="power-chart-surface-dot"><title>{point.month} · GWETTOP {(point.value * 100).toFixed(1)} % (modélisé)</title></circle>)}
       </> : <>
-        {valuePoints.map(point => <rect key={point.date} x={point.x - Math.min(12, Math.max(4, stepX * .24)) / 2} y={point.y} width={Math.min(12, Math.max(4, stepX * .24))} height={Math.max(1, BOTTOM - point.y)} rx="2" className="power-chart-rain-bar"><title>{point.month} · PRECTOTCORR {point.value.toFixed(2)} mm/j (moyenne mensuelle)</title></rect>)}
+      {valuePoints.map(point => <rect key={point.date} x={point.x - Math.min(12, Math.max(4, stepX * .24)) / 2} y={point.y} width={Math.min(12, Math.max(4, stepX * .24))} height={Math.max(1, BOTTOM - point.y)} rx="2" className="power-chart-rain-bar"><title>{point.month} · PRECTOTCORR {point.value.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} {climatePrecipitationRateUnit(measurementSystem)} (moyenne mensuelle)</title></rect>)}
         {tempSegments.map(segment => <path key={`temperature-${segment[0].date}`} d={linePath(segment)} className="power-chart-temp-line" />)}
-        {tempPoints.map(point => <circle key={point.date} cx={point.x} cy={point.y} r="2.7" className="power-chart-temp-dot"><title>{point.month} · T2M {point.value.toFixed(1)} °C</title></circle>)}
+        {tempPoints.map(point => <circle key={point.date} cx={point.x} cy={point.y} r="2.7" className="power-chart-temp-dot"><title>{point.month} · T2M {point.value.toLocaleString('fr-FR', { maximumFractionDigits: 1 })} {climateTemperatureUnit(measurementSystem)}</title></circle>)}
       </>}
       {labelIndexes.map(index => <text key={visible[index].date} x={xAt(index)} y="101" className="power-chart-month" textAnchor="middle">{visible[index].month}</text>)}
     </svg> : <div className="power-chart-empty" role="status">{records.length ? 'NASA POWER n’a pas de valeur exploitable pour cet indicateur.' : 'Chargement des données NASA POWER…'}</div>}
-    <footer className="power-chart-legend">{isSoil ? <><span><i className="legend-wetness" />GWETROOT · racines</span><span><i className="legend-surface-wetness" />GWETTOP · surface</span></> : <><span><i className="legend-precip" />PRECTOTCORR · mm/j</span><span><i className="legend-temperature" />T2M · °C</span></>}{missingIndexes.length > 0 && <span><i className="legend-gap" />Mois sans valeur</span>}</footer>
+    <footer className="power-chart-legend">{isSoil ? <><span><i className="legend-wetness" />GWETROOT · racines</span><span><i className="legend-surface-wetness" />GWETTOP · surface</span></> : <><span><i className="legend-precip" />PRECTOTCORR · {climatePrecipitationRateUnit(measurementSystem)}</span><span><i className="legend-temperature" />T2M · {climateTemperatureUnit(measurementSystem)}</span></>}{missingIndexes.length > 0 && <span><i className="legend-gap" />Mois sans valeur</span>}</footer>
   </section>
 }

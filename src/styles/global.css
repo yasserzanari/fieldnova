@@ -75,6 +75,13 @@
 .icon-button, .profile-button { display: grid; width: 36px; height: 36px; flex: none; place-items: center; border: 0; border-radius: 50%; background: transparent; color: #565448; cursor: pointer; }
 .icon-button:hover, .profile-button:hover { background: #ebeade; }
 .profile-button { background: #e6ebdc; color: var(--color-forest-900); }
+.profile-preferences { position:relative; flex:none; }
+.profile-preferences > summary { list-style:none; }
+.profile-preferences > summary::-webkit-details-marker { display:none; }
+.unit-preference-popover { position:absolute; z-index:40; top:calc(100% + 9px); right:0; display:grid; width:230px; gap:7px; padding:12px; border:1px solid var(--color-border); border-radius:11px; background:#fffefa; box-shadow:var(--shadow-panel); }
+.unit-preference-popover label { color:var(--color-soil-700); font-size:11px; font-weight:700; }
+.unit-preference-popover select { width:100%; min-height:34px; padding:0 8px; border:1px solid var(--color-border); border-radius:7px; background:#fff; color:var(--color-soil-900); font-size:10px; }
+.unit-preference-popover small { color:var(--color-soil-600); font-size:9px; line-height:1.4; }
 .app-main { position: relative; min-width: 0; min-height: 0; flex: 1; overflow: auto; }
 .route-loading { display: grid; min-height: 100%; place-content: center; color: var(--color-soil-600); font-size: 13px; }
 .feature-placeholder { display: flex; min-height: 100%; flex-direction: column; padding: 30px; }

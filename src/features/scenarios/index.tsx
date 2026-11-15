@@ -7,6 +7,7 @@ import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, type PowerMonthlyRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
+import { climatePrecipitationRateUnit, climateTemperatureUnit, formatPrecipitationRate, formatTemperature, useMeasurementSystem } from '../../lib/units/measurement-units'
 import { RotationExplorer } from './RotationExplorer'
 import './scenarios.css'
 
@@ -108,6 +109,7 @@ export function ScenariosPage() {
 
 function ClimateScenariosPage() {
   const { location, selectLocation } = useSelectedLocation()
+  const measurementSystem = useMeasurementSystem()
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
   const [showNdvi, setShowNdvi] = useState(false)
   const [imageryDate, setImageryDate] = useState(daysAgo(11))
@@ -171,9 +173,9 @@ function ClimateScenariosPage() {
         <header className="scenario-panel-heading results-heading"><div><span className="scenario-icon results-icon"><Droplets size={16} /></span><span><h2>Mesures par période</h2><small>NASA POWER · maille MERRA-2 (0,5° × 0,625°)</small></span></div></header>
         {loading ? <div className="scenario-data-state" role="status">Récupération de NASA POWER…</div> : error ? <div className="scenario-data-error" role="alert">Données indisponibles pour ce point.</div> : displayedCases.length ? <>
           <div className="scenario-results-table" style={{ '--scenario-count': Math.max(1, displayedCases.length) } as CSSProperties} role="table" aria-label="Moyennes NASA POWER des périodes historiques"><div className="scenario-table-row table-header" role="row"><span role="columnheader">Indicateur moyen</span>{displayedCases.map(item => <span key={item.id} className={`scenario-cell-${item.id}`} role="columnheader">{item.title}</span>)}</div>
-            <MetricRow icon={<CloudRain size={14} />} label="Pluie · mm/j" metric="rain" records={displayedCases} />
-            <MetricRow icon={<ThermometerSun size={14} />} label="Température · °C" metric="temperature" records={displayedCases} />
-            <MetricRow icon={<Droplets size={14} />} label="Humidité racinaire · %" metric="wetness" records={displayedCases} />
+            <MetricRow icon={<CloudRain size={14} />} label={`Pluie · ${climatePrecipitationRateUnit(measurementSystem)}`} metric="rain" records={displayedCases} measurementSystem={measurementSystem} />
+            <MetricRow icon={<ThermometerSun size={14} />} label={`Température · ${climateTemperatureUnit(measurementSystem)}`} metric="temperature" records={displayedCases} measurementSystem={measurementSystem} />
+            <MetricRow icon={<Droplets size={14} />} label="Humidité racinaire · %" metric="wetness" records={displayedCases} measurementSystem={measurementSystem} />
           </div>
           {recommended ? <div className="scenario-recommendation"><span className="recommendation-mark"><ShieldCheck size={17} /></span><div><small>Période à examiner · critère {priorityCopy[priority].title.toLocaleLowerCase('fr')}</small><strong>{recommended.title} · {recommended.period}</strong><p>Cette période historique présente la valeur la plus défavorable parmi celles sélectionnées, selon le critère choisi.</p></div></div> : <p className="scenario-no-comparison">Aucune valeur disponible pour ce critère dans les périodes sélectionnées. Les cellules sans mesure restent vides.</p>}
         </> : <div className="scenario-empty-state"><Activity size={22} /><strong>Sélectionnez une période</strong><span>Activez au moins une période historique.</span></div>}
@@ -188,6 +190,6 @@ function ClimateScenariosPage() {
   </section>
 }
 
-function MetricRow({ icon, label, metric, records }: { icon: React.ReactNode; label: string; metric: 'rain' | 'temperature' | 'wetness'; records: ClimateCase[] }) {
-  return <div className="scenario-table-row metric-row" role="row"><span role="rowheader">{icon}{label}</span>{records.map(item => { const value = metric === 'rain' ? formatMetric(item.rain, 'mm/j', 2) : metric === 'temperature' ? formatMetric(item.temperature, '°C') : formatMetric(item.wetness === undefined ? undefined : item.wetness * 100, '%', 0); return <span key={item.id} className={`scenario-cell-${item.id}`} role="cell" title={`${item.period} · ${value}`}>{value}</span> })}</div>
+function MetricRow({ icon, label, metric, records, measurementSystem }: { icon: React.ReactNode; label: string; metric: 'rain' | 'temperature' | 'wetness'; records: ClimateCase[]; measurementSystem: ReturnType<typeof useMeasurementSystem> }) {
+  return <div className="scenario-table-row metric-row" role="row"><span role="rowheader">{icon}{label}</span>{records.map(item => { const value = metric === 'rain' ? item.rain === undefined ? '—' : formatPrecipitationRate(item.rain, measurementSystem) : metric === 'temperature' ? item.temperature === undefined ? '—' : formatTemperature(item.temperature, measurementSystem) : formatMetric(item.wetness === undefined ? undefined : item.wetness * 100, '%', 0); return <span key={item.id} className={`scenario-cell-${item.id}`} role="cell" title={`${item.period} · ${value}`}>{value}</span> })}</div>
 }

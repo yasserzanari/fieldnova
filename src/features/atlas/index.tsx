@@ -9,6 +9,7 @@ import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { downloadPowerMonthlyCsv } from '../../lib/nasa/power-export'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
+import { formatPrecipitationRate, formatPrecipitationTotal, formatTemperature, useMeasurementSystem } from '../../lib/units/measurement-units'
 import './atlas.css'
 
 function daysAgo(days: number) {
@@ -31,6 +32,7 @@ const climateRanges = [
 
 export function AtlasPage() {
   const { location, selectLocation } = useSelectedLocation()
+  const measurementSystem = useMeasurementSystem()
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
   const [showNdvi, setShowNdvi] = useState(true)
   const [imageryDate, setImageryDate] = useState(daysAgo(11))
@@ -139,18 +141,18 @@ export function AtlasPage() {
         <div className="atlas-selection-content"><p className="atlas-grid-point">{gridPoint ? `Centre maille NASA POWER · ${gridPoint.latitude.toFixed(3)}, ${gridPoint.longitude.toFixed(3)} · 0,5° × 0,625°` : 'Cellule de grille NASA en attente'}</p>
         {loading ? <div className="atlas-data-state" role="status">Chargement de NASA POWER…</div> : error ? <div className="atlas-data-error" role="alert"><span>{error}</span><button type="button" onClick={retry}>Réessayer</button></div> : <>
           <div className="atlas-live-metrics">
-            <AtlasMetric icon={<CloudRain size={14} />} label="Pluie moyenne" value={latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(2).replace('.', ',')} mm/j`} source="PRECTOTCORR" />
-            <AtlasMetric icon={<ThermometerSun size={14} />} label="Température moyenne" value={latest?.temperatureC === undefined ? '—' : `${latest.temperatureC.toFixed(1).replace('.', ',')} °C`} source="T2M" />
-            <AtlasMetric icon={<Sun size={14} />} label="Température maximale" value={latest?.temperatureMaxC === undefined ? '—' : `${latest.temperatureMaxC.toFixed(1).replace('.', ',')} °C`} source="T2M_MAX" />
-            <AtlasMetric icon={<ThermometerSun size={14} />} label="Température minimale" value={latest?.temperatureMinC === undefined ? '—' : `${latest.temperatureMinC.toFixed(1).replace('.', ',')} °C`} source="T2M_MIN" />
+            <AtlasMetric icon={<CloudRain size={14} />} label="Pluie moyenne" value={latest?.precipitationMmPerDay === undefined ? '—' : formatPrecipitationRate(latest.precipitationMmPerDay, measurementSystem)} source="PRECTOTCORR" />
+            <AtlasMetric icon={<ThermometerSun size={14} />} label="Température moyenne" value={latest?.temperatureC === undefined ? '—' : formatTemperature(latest.temperatureC, measurementSystem)} source="T2M" />
+            <AtlasMetric icon={<Sun size={14} />} label="Température maximale" value={latest?.temperatureMaxC === undefined ? '—' : formatTemperature(latest.temperatureMaxC, measurementSystem)} source="T2M_MAX" />
+            <AtlasMetric icon={<ThermometerSun size={14} />} label="Température minimale" value={latest?.temperatureMinC === undefined ? '—' : formatTemperature(latest.temperatureMinC, measurementSystem)} source="T2M_MIN" />
             <AtlasMetric icon={<Droplets size={14} />} label="Humidité de surface modélisée" value={latest?.surfaceSoilWetness === undefined ? '—' : `${(latest.surfaceSoilWetness * 100).toFixed(0)} %`} source="GWETTOP" />
             <AtlasMetric icon={<Droplets size={14} />} label="Humidité racinaire modélisée" value={latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`} source="GWETROOT" />
           </div>
           <p className="atlas-live-source">Dernière période exploitable · {latestDate} · NASA POWER · {series?.source.join(' + ')}</p>
           <section className="atlas-annual-summary" aria-label="Résumé des douze derniers mois NASA POWER"><h3>Résumé · 12 derniers mois</h3><div className="atlas-summary-metrics">
-            <AtlasSummaryMetric label="Pluie estimée" value={annualSummary.precipitationMm === undefined ? '—' : `${Math.round(annualSummary.precipitationMm).toLocaleString('fr-FR')} mm`} detail={annualSummary.precipitationMm === undefined ? `${annualSummary.precipitationMonths}/12 mois · cumul incomplet` : '12 mois complets · estimé depuis mm/j'} />
-            <AtlasSummaryMetric label="Température moyenne" value={annualSummary.averageTemperatureC === undefined ? '—' : `${annualSummary.averageTemperatureC.toFixed(1).replace('.', ',')} °C`} detail={`${annualSummary.temperatureMonths}/12 mois disponibles`} />
-            <AtlasSummaryMetric label="Plage annuelle min. – max." value={annualSummary.highestMaxC === undefined || annualSummary.lowestMinC === undefined ? '—' : `${annualSummary.lowestMinC.toFixed(1).replace('.', ',')}° → ${annualSummary.highestMaxC.toFixed(1).replace('.', ',')}°`} detail={`${annualSummary.extremeMonths}/12 mois · T2M_MIN à T2M_MAX`} />
+            <AtlasSummaryMetric label="Pluie estimée" value={annualSummary.precipitationMm === undefined ? '—' : formatPrecipitationTotal(annualSummary.precipitationMm, measurementSystem)} detail={annualSummary.precipitationMm === undefined ? `${annualSummary.precipitationMonths}/12 mois · cumul incomplet` : '12 mois complets · cumul estimé'} />
+            <AtlasSummaryMetric label="Température moyenne" value={annualSummary.averageTemperatureC === undefined ? '—' : formatTemperature(annualSummary.averageTemperatureC, measurementSystem)} detail={`${annualSummary.temperatureMonths}/12 mois disponibles`} />
+            <AtlasSummaryMetric label="Plage annuelle min. – max." value={annualSummary.highestMaxC === undefined || annualSummary.lowestMinC === undefined ? '—' : `${formatTemperature(annualSummary.lowestMinC, measurementSystem)} → ${formatTemperature(annualSummary.highestMaxC, measurementSystem)}`} detail={`${annualSummary.extremeMonths}/12 mois · T2M_MIN à T2M_MAX`} />
           </div></section>
           {series && <PowerCoverageSummary series={series} />}
         </>}
