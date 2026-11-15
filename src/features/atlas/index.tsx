@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Activity, CloudRain, Download, Droplets, Layers2, LocateFixed, MapPinned, Minus, Plus, Search, ShieldCheck, Satellite, Sun, ThermometerSun, X } from 'lucide-react'
+import { Activity, ArrowLeft, ArrowRight, CloudRain, Download, Droplets, Layers2, LocateFixed, MapPinned, Minus, Pause, Play, Plus, Search, ShieldCheck, Satellite, Sun, ThermometerSun, X } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
@@ -7,6 +7,7 @@ import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { PowerCoverageSummary } from './PowerCoverageSummary'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
+import { formatGibsDate, listGibsDates, resolveGibsDate, sampleGibsDates, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { downloadPowerMonthlyCsv } from '../../lib/nasa/power-export'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { formatPrecipitationRate, formatPrecipitationTotal, formatTemperature, useMeasurementSystem } from '../../lib/units/measurement-units'
@@ -42,6 +43,8 @@ export function AtlasPage() {
   const [range, setRange] = useState(12)
   const [showTimeline, setShowTimeline] = useState(false)
   const [locating, setLocating] = useState(false)
+  const [playingNdvi, setPlayingNdvi] = useState(false)
+  const { availability: gibsAvailability, error: gibsAvailabilityError } = useGibsAvailability()
   const { series, loading, error, retry } = usePowerMonthly(location)
 
   useEffect(() => {
@@ -53,6 +56,18 @@ export function AtlasPage() {
   const latestDate = latest ? formatPowerMonth(latest.date) : 'aucune période valide'
   const rangeLabel = climateRanges.find(item => item.months === range)?.label ?? '12 mois'
   const visibleRecords = series?.records.slice(-range) ?? []
+  const ndviDates = useMemo(() => {
+    const latestAllowed = daysAgo(1)
+    const oldestAllowed = daysAgo(366)
+    const recentDates = listGibsDates(gibsAvailability?.ndvi).filter(date => date >= oldestAllowed && date <= latestAllowed)
+    return sampleGibsDates(recentDates, 8)
+  }, [gibsAvailability])
+  const activeNdviDate = resolveGibsDate(imageryDate, gibsAvailability?.ndvi)
+  const activeNdviIndex = useMemo(() => {
+    if (!activeNdviDate || !ndviDates.length || activeNdviDate < ndviDates[0] || activeNdviDate > ndviDates[ndviDates.length - 1]) return -1
+    const timestamp = Date.parse(`${activeNdviDate}T00:00:00Z`)
+    return ndviDates.reduce((nearest, date, index) => Math.abs(Date.parse(`${date}T00:00:00Z`) - timestamp) < Math.abs(Date.parse(`${ndviDates[nearest]}T00:00:00Z`) - timestamp) ? index : nearest, 0)
+  }, [activeNdviDate, ndviDates])
   const visiblePeriod = visibleRecords.length
     ? `${formatPowerMonth(visibleRecords[0].date)} – ${formatPowerMonth(visibleRecords[visibleRecords.length - 1].date)} · ${visibleRecords.length} mois disponibles`
     : 'données en attente'
@@ -110,6 +125,33 @@ export function AtlasPage() {
     setCoordinateError('')
   }
 
+  const moveNdviDate = (step: number) => {
+    if (!ndviDates.length) return
+    setPlayingNdvi(false)
+    const index = activeNdviIndex < 0 ? ndviDates.length - 1 : activeNdviIndex
+    const nextIndex = Math.max(0, Math.min(ndviDates.length - 1, index + step))
+    setImageryDate(ndviDates[nextIndex])
+  }
+
+  const startNdviPlayback = () => {
+    if (!ndviDates.length) return
+    if (activeNdviIndex < 0 || activeNdviIndex === ndviDates.length - 1) setImageryDate(ndviDates[0])
+    setPlayingNdvi(true)
+  }
+
+  useEffect(() => {
+    if (!playingNdvi) return
+    const timer = window.setTimeout(() => {
+      if (activeNdviIndex < 0 || activeNdviIndex >= ndviDates.length - 1) setPlayingNdvi(false)
+      else setImageryDate(ndviDates[activeNdviIndex + 1])
+    }, 1100)
+    return () => window.clearTimeout(timer)
+  }, [playingNdvi, activeNdviIndex, ndviDates])
+
+  useEffect(() => {
+    if (!showNdvi) setPlayingNdvi(false)
+  }, [showNdvi])
+
   return <section className="atlas-page" aria-label="Atlas interactif des couches NASA">
     <header className="atlas-heading">
       <div className="atlas-title"><h1>Atlas</h1><span className="atlas-title-divider" /><p>Explorez l’imagerie NASA et les séries climatiques au point choisi</p></div>
@@ -124,6 +166,12 @@ export function AtlasPage() {
         <label className="atlas-image-date">Date souhaitée <input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label>
       </div>
       <div className="atlas-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 250 })}><Plus size={16} /></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 250 })}><Minus size={16} /></button><button type="button" aria-label="Utiliser ma position" title="Utiliser ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></div>
+      {showNdvi && <div className="atlas-ndvi-playback" role="group" aria-label="Lecture chronologique des composites NDVI NASA">
+        <button type="button" aria-label="Composite NDVI précédent" title="Image NDVI précédente" onClick={() => moveNdviDate(-1)} disabled={!ndviDates.length || activeNdviIndex < 0 || activeNdviIndex <= 0}><ArrowLeft size={14} /></button>
+        <button type="button" className="atlas-ndvi-play-toggle" aria-label={playingNdvi ? 'Mettre en pause les images NDVI' : 'Lire les images NDVI'} title={playingNdvi ? 'Pause' : 'Lire les composites'} onClick={playingNdvi ? () => setPlayingNdvi(false) : startNdviPlayback} disabled={!ndviDates.length}>{playingNdvi ? <Pause size={14} /> : <Play size={14} />}</button>
+        <button type="button" aria-label="Composite NDVI suivant" title="Image NDVI suivante" onClick={() => moveNdviDate(1)} disabled={!ndviDates.length || activeNdviIndex < 0 || activeNdviIndex >= ndviDates.length - 1}><ArrowRight size={14} /></button>
+        <span className="atlas-ndvi-playback-label"><strong>{activeNdviDate ? formatGibsDate(activeNdviDate) : 'Dates NASA en chargement'}</strong><small>{gibsAvailabilityError ? 'Dates de composites indisponibles' : activeNdviIndex < 0 ? 'Date sélectionnée hors des 12 derniers mois' : `Composite 8 jours · ${activeNdviIndex + 1} / ${ndviDates.length} · pas de 8 jours`}</small></span>
+      </div>}
       <span className="atlas-map-click-hint">Cliquez sur la carte pour choisir un point et charger NASA POWER</span>
       {coordinateError && <p className="atlas-coordinate-error" role="alert">{coordinateError}</p>}
 

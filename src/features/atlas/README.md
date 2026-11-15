@@ -2,6 +2,7 @@
 
 - **Route :** `/app/atlas`
 - **Carte :** carte MapLibre partagée avec la vue d’ensemble : fond OpenStreetMap, True Color MODIS/Terra et NDVI MODIS/Terra via NASA GIBS. Les contrôles de fond, de couche et de date changent les tuiles réellement affichées.
+- **Lecture NDVI :** les contrôles précédent, lecture/pause et suivant parcourent le domaine WMTS de NASA GIBS sur les douze derniers mois, avec un pas de huit jours ancré sur sa date la plus récente. Cela évite de présenter chaque date quotidienne WMTS comme un composite distinct. Il s’agit de composites cartographiques régionaux; FieldNova n’en extrait pas de valeur numérique à un point ni de mesure à la parcelle.
 - **Point suivi :** clic sur la carte, coordonnées saisies (latitude puis longitude) ou géolocalisation du navigateur. Le point est persisté et partagé avec les autres cartes de l’application.
 - **Graphique :** série mensuelle NASA POWER (`PRECTOTCORR`, `T2M`) associée à la maille météo MERRA-2 la plus proche. Il s’ouvre à la demande dans une fenêtre superposée à la carte, ce qui conserve la hauteur de la carte au repos. Le sélecteur expose 3, 6, 12, 36 ou 60 mois selon les données disponibles.
 - **Résumé climat 12 mois :** précipitations cumulées estimées en multipliant chaque moyenne quotidienne mensuelle (`PRECTOTCORR`) par le nombre de jours du mois; le total n’apparaît que si les douze mois ont une valeur. La température moyenne et la plage T2M_MIN–T2M_MAX sont calculées sur les mois disponibles et affichent leur couverture.
