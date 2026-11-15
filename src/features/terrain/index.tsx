@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Droplets, Layers3, LocateFixed, MapPinned, Minus, Plus, Satellite, ShieldCheck, Sprout } from 'lucide-react'
+import { ClipboardList, Droplets, Layers3, LocateFixed, MapPinned, Minus, Plus, Satellite, ShieldCheck, Sprout } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
@@ -9,6 +9,7 @@ import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { formatGibsDate, resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { SoilProfileEditor } from './SoilProfileEditor'
+import { FieldObservations } from './FieldObservations'
 import './terrain.css'
 
 type SoilLayer = 'surface' | 'root'
@@ -34,7 +35,8 @@ export function TerrainPage() {
   const gibsDateLabel = (date: string | null) => date ? formatGibsDate(date) : gibsDateError ? 'date indisponible' : 'date en chargement'
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [locating, setLocating] = useState(false)
-  const [mobileView, setMobileView] = useState<'map' | 'layers' | 'soil' | 'chart'>('map')
+  const [mobileView, setMobileView] = useState<'map' | 'layers' | 'soil' | 'chart' | 'journal'>('map')
+  const [journalOpen, setJournalOpen] = useState(false)
   const { series, loading, error, retry } = usePowerMonthly(location)
 
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
@@ -61,7 +63,7 @@ export function TerrainPage() {
     <header className="terrain-heading"><div><h1>Mon terrain</h1><p>Humidité de surface, zone racinaire et données de sol pour le point choisi</p></div><div className="terrain-source-statuses" aria-label="État des sources NASA" aria-live="polite"><span className={`terrain-source-status ${powerStatusClass}`}><i />POWER · {powerStatus}</span><span className={`terrain-source-status ${gibsStatusClass}`}><i />Disponibilité GIBS · {gibsStatus}</span></div></header>
 
     <nav className="terrain-mobile-tabs" role="group" aria-label="Panneau de la vue Mon terrain">
-      {([['map', 'Carte'], ['layers', 'SMAP'], ['soil', 'Sol & eau'], ['chart', 'Graphique']] as const).map(([view, label]) => <button key={view} type="button" aria-pressed={mobileView === view} className={mobileView === view ? 'is-active' : ''} onClick={() => setMobileView(view)}>{label}</button>)}
+      {([['map', 'Carte'], ['layers', 'SMAP'], ['soil', 'Sol & eau'], ['chart', 'Graphique'], ['journal', 'Journal']] as const).map(([view, label]) => <button key={view} type="button" aria-pressed={mobileView === view} className={mobileView === view ? 'is-active' : ''} onClick={() => setMobileView(view)}>{label}</button>)}
     </nav>
 
     <div className="terrain-map-stage">
@@ -75,6 +77,12 @@ export function TerrainPage() {
       </div>
       <div className="terrain-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 250 })}><Plus size={16} /></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 250 })}><Minus size={16} /></button><button type="button" aria-label="Utiliser ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></div>
       <span className="terrain-map-click-hint">Cliquez pour choisir un point · la couche SMAP s’affiche à une résolution native d’environ 9 km</span>
+
+      <button className="terrain-journal-toggle" type="button" aria-expanded={journalOpen} aria-controls="terrain-journal-panel" onClick={() => setJournalOpen(value => !value)}><ClipboardList size={14} />Journal de terrain</button>
+      <aside id="terrain-journal-panel" className="terrain-panel terrain-journal-panel" aria-label="Journal d’observations de terrain" hidden={!journalOpen && mobileView !== 'journal'}>
+        <header className="terrain-journal-heading"><span><strong>Journal de terrain</strong><small>Coordonnées · {coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</small></span><button type="button" aria-label="Fermer le journal" onClick={() => setJournalOpen(false)}>×</button></header>
+        <FieldObservations point={location} />
+      </aside>
 
       <aside className="terrain-panel terrain-layers-panel" aria-label="Couches d’humidité des sols">
         <header className="terrain-panel-heading"><div><span className="terrain-heading-icon"><Layers3 size={17} /></span><span><h2>Humidité du sol · NASA SMAP</h2><small>Produit L4 analysé · carte quotidienne</small></span></div><Satellite size={17} className="terrain-heading-satellite" /></header>
@@ -99,6 +107,7 @@ export function TerrainPage() {
         <SoilProfileEditor point={location} />
         <div className="terrain-note"><ShieldCheck size={13} /><span>Les valeurs POWER et SMAP sont deux produits différents ; la carte SMAP ne donne pas la valeur numérique du point cliqué.</span></div>
       </aside>
+
     </div>
 
     <section className="terrain-soil-chart" aria-label="Évolution mensuelle de l’humidité du sol">
