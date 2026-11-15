@@ -11,7 +11,7 @@ export type CropDefinition = {
   shortLabel: string
   family: string
   familyLabel: string
-  isLegume: boolean
+  isLegume: boolean | 'unknown'
   rootArchitecture: 'fibrous' | 'taproot' | 'unknown'
   origin?: 'reference-catalog' | 'local-declaration'
   sourceName?: string
@@ -78,7 +78,7 @@ export function readCropCatalog(point: GeoPoint): CropDefinition[] {
     const custom = parsed.flatMap((entry): CropDefinition[] => {
       if (!entry || typeof entry !== 'object' || typeof entry.id !== 'string' || !entry.id.startsWith('local-')
         || typeof entry.label !== 'string' || !entry.label.trim() || typeof entry.family !== 'string' || !entry.family.trim()
-        || typeof entry.familyLabel !== 'string' || !entry.familyLabel.trim() || typeof entry.isLegume !== 'boolean'
+        || typeof entry.familyLabel !== 'string' || !entry.familyLabel.trim() || !(typeof entry.isLegume === 'boolean' || entry.isLegume === 'unknown')
         || !['fibrous', 'taproot', 'unknown'].includes(entry.rootArchitecture)) return []
       const label = entry.label.trim().slice(0, 60)
       return [{
@@ -101,6 +101,7 @@ export function addCustomCrop(point: GeoPoint, input: Omit<CropDefinition, 'id' 
   const familyLabel = input.familyLabel.trim()
   const family = input.family.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
   if (!label || label.length > 60 || !familyLabel || familyLabel.length > 60 || !family || family.length > 40) throw new Error('Renseignez le nom et la famille (60 caractères maximum).')
+  if (input.isLegume !== true && input.isLegume !== false && input.isLegume !== 'unknown') throw new Error('Indiquez si le statut de légumineuse est connu.')
   if (input.sourceName && input.sourceName.length > 120) throw new Error('La référence ne peut pas dépasser 120 caractères.')
   if (input.sourceUrl && !isHttpUrl(input.sourceUrl)) throw new Error('La référence doit être une URL HTTP ou HTTPS valide.')
   const catalog = readCropCatalog(point)
@@ -166,7 +167,9 @@ export function evaluateRotation(plan: RotationPlan, catalog = cropCatalog, pref
   const crops = plan.crops.map(id => catalog.find(crop => crop.id === id)).filter((crop): crop is CropDefinition => Boolean(crop))
   const distinctFamilies = new Set(crops.map(crop => crop.family)).size
   const repeatedFamilyTransitions = crops.slice(1).reduce((count, crop, index) => count + Number(crop.family === crops[index].family), 0)
-  const legumeSeasons = crops.filter(crop => crop.isLegume).length
+  const legumeSeasons = crops.filter(crop => crop.isLegume === true).length
+  const unknownLegumeSeasons = crops.filter(crop => crop.isLegume === 'unknown').length
+  const unknownRootSeasons = crops.filter(crop => crop.rootArchitecture === 'unknown').length
   const knownRootTransitions = crops.slice(1).reduce((count, crop, index) => {
     const previous = crops[index]
     return count + Number(previous.rootArchitecture !== 'unknown' && crop.rootArchitecture !== 'unknown' && previous.rootArchitecture !== crop.rootArchitecture)
@@ -176,6 +179,8 @@ export function evaluateRotation(plan: RotationPlan, catalog = cropCatalog, pref
     distinctFamilies,
     repeatedFamilyTransitions,
     legumeSeasons,
+    unknownLegumeSeasons,
+    unknownRootSeasons,
     knownRootTransitions,
     preferredCropSeasons: crops.filter(crop => preferredCropIds.includes(crop.id)).length,
   }
@@ -194,6 +199,7 @@ export function rotationWeightsFor(workspace: Pick<RotationWorkspace, 'priority'
 export function rotationCombinedScore(metrics: ReturnType<typeof evaluateRotation>, weights: RotationPriorityWeights) {
   const active = Object.entries(weights) as Array<[RotationPriority, 1 | 2 | 3]>
   if (!active.length) return 0
+  if (rotationScoreMissingTraits(metrics, weights).length) return undefined
   const normalized: Record<RotationPriority, number> = {
     diversity: metrics.distinctFamilies / 5,
     alternation: (4 - metrics.repeatedFamilyTransitions) / 4,
@@ -205,18 +211,28 @@ export function rotationCombinedScore(metrics: ReturnType<typeof evaluateRotatio
   return active.reduce((sum, [priority, weight]) => sum + normalized[priority] * weight, 0) / totalWeight
 }
 
+export function rotationScoreMissingTraits(metrics: ReturnType<typeof evaluateRotation>, weights: RotationPriorityWeights) {
+  return [
+    ...(weights.legume && metrics.unknownLegumeSeasons > 0 ? ['légumineuse'] : []),
+    ...(weights.root && metrics.unknownRootSeasons > 0 ? ['racines'] : []),
+  ]
+}
+
 export function topRotations(plans: RotationPlan[], priority: RotationPriority | RotationPriorityWeights, unavailableCropIds: CropId[] = [], catalog = cropCatalog, preferredCropIds: CropId[] = []) {
   const weights = typeof priority === 'string' ? { [priority]: 2 } : cleanPriorityWeights(priority)
-  const complete = plans.map(plan => ({ plan, metrics: evaluateRotation(plan, catalog, preferredCropIds) })).filter(item => item.metrics.complete && !item.plan.crops.some(id => id && unavailableCropIds.includes(id)))
+  const complete = plans.map(plan => {
+    const metrics = evaluateRotation(plan, catalog, preferredCropIds)
+    return { plan, metrics, score: rotationCombinedScore(metrics, weights) }
+  }).filter(item => item.metrics.complete && item.score !== undefined && !item.plan.crops.some(id => id && unavailableCropIds.includes(id)))
   if (!complete.length) return []
-  const best = Math.max(...complete.map(item => rotationCombinedScore(item.metrics, weights)))
-  return complete.filter(item => Math.abs(rotationCombinedScore(item.metrics, weights) - best) < 1e-9).map(item => item.plan.id)
+  const best = Math.max(...complete.map(item => item.score!))
+  return complete.filter(item => Math.abs(item.score! - best) < 1e-9).map(item => item.plan.id)
 }
 
 export function rotationWeightSensitivity(plans: RotationPlan[], weights: RotationPriorityWeights, unavailableCropIds: CropId[] = [], catalog = cropCatalog, preferredCropIds: CropId[] = []) {
   const completeCount = plans.filter(plan => {
     const metrics = evaluateRotation(plan, catalog, preferredCropIds)
-    return metrics.complete && !plan.crops.some(id => id && unavailableCropIds.includes(id))
+    return metrics.complete && rotationCombinedScore(metrics, weights) !== undefined && !plan.crops.some(id => id && unavailableCropIds.includes(id))
   }).length
   if (completeCount < 2) return null
 
@@ -247,7 +263,8 @@ export function generateRotationOptions(reference: RotationPlan, priority: Rotat
       const key = crops.join('|')
       if (key === referenceKey) return
       const metrics = evaluateRotation({ id: 'option-a', title: 'Option A', crops }, catalog, preferredCropIds)
-      candidates.push({ crops: [...crops], metrics, score: rotationCombinedScore(metrics, weights), key })
+      const score = rotationCombinedScore(metrics, weights)
+      if (score !== undefined) candidates.push({ crops: [...crops], metrics, score, key })
       return
     }
     for (const crop of available) visit([...crops, crop.id])
