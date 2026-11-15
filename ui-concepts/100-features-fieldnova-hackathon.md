@@ -181,7 +181,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 97. **[P1 · PARTIEL] État de service visible** : la barre supérieure distingue la série reçue en ligne, le cache récent, la copie locale ancienne et l’indisponibilité; le bandeau démo distingue séparément les données fictives des séries NASA. Les dates de fraîcheur propres à chaque produit GIBS et les réponses servies en cache par d’autres intermédiaires ne sont pas connues.
 98. **[P1] Mode de secours hors réseau** : fournir une démo locale balisée si une API NASA est momentanément inaccessible.
 99. **[P1] Captures et script de présentation** : préparer un parcours de secours si la connexion ou la carte échoue.
-100. **[P1] Réponses aux questions des juges** : préparer preuves de validité, originalité, impact, sources et limites du prototype.
+100. **[P1 · GUIDE SOURCÉ LIVRÉ · PRÉPARATION ORALE RESTANTE] Réponses aux questions des juges** : [`judge-brief-fieldnova.md`](judge-brief-fieldnova.md) résume le défi, les données, la méthode, la licence, l’architecture d’assistant, les limites, les preuves à ouvrir et les affirmations non étayées à éviter. L’équipe doit encore ajouter ses rôles réels, répéter les réponses et recueillir des preuves d’impact et de validation terrain.
 
 ## Garde-fous : ce qu’il faut prouver avant de le montrer
 
