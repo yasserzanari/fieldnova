@@ -116,7 +116,8 @@ export function FarmSetupWizard({ open, point, onClose, onSaved }: { open: boole
         isExample: readFarmProfile(point)?.isExample === true,
       })
       writeRotationWorkspace(point, { plans, priority: draft.priority as RotationPriority, isExample: false })
-      writeRotationConstraints(point, { unavailableCropIds: draft.unavailableCropIds }, catalog)
+      const existingConstraints = readRotationConstraints(point, catalog)
+      writeRotationConstraints(point, { unavailableCropIds: draft.unavailableCropIds, preferredCropIds: existingConstraints.preferredCropIds.filter(id => !draft.unavailableCropIds.includes(id)) }, catalog)
       onSaved(savedProfile)
       onClose()
     } catch (reason) {

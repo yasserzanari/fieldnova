@@ -170,17 +170,17 @@ export function RotationExplorer() {
   const priorityWeights = rotationWeightsFor(currentWorkspace)
   const selectedPriorities = Object.entries(priorityWeights) as Array<[RotationPriority, 1 | 2 | 3]>
   const prioritySummary = selectedPriorities.map(([priority, weight]) => `${priorityLabels[priority]} ×${weight}`).join(' · ')
-  const leaders = topRotations(currentWorkspace.plans, priorityWeights, constraints.unavailableCropIds, catalog)
-  const sensitivity = rotationWeightSensitivity(currentWorkspace.plans, priorityWeights, constraints.unavailableCropIds, catalog)
+  const leaders = topRotations(currentWorkspace.plans, priorityWeights, constraints.unavailableCropIds, catalog, constraints.preferredCropIds)
+  const sensitivity = rotationWeightSensitivity(currentWorkspace.plans, priorityWeights, constraints.unavailableCropIds, catalog, constraints.preferredCropIds)
   const sensitivitySummary = sensitivity
     ? sensitivity.changedCriteria.length
       ? `Le scénario en tête change quand le poids de ${sensitivity.changedCriteria.map(priority => priorityLabels[priority]).join(', ')} varie d’un niveau.`
       : `Aucun changement du scénario en tête sur ${sensitivity.testedVariants} variation(s) d’un niveau des poids actifs.`
     : 'Complétez au moins deux rotations compatibles pour comparer leur stabilité.'
   const detailedPlan = detailPlanId ? currentWorkspace.plans.find(plan => plan.id === detailPlanId) : undefined
-  const detailedMetrics = detailedPlan ? evaluateRotation(detailedPlan, catalog) : undefined
+  const detailedMetrics = detailedPlan ? evaluateRotation(detailedPlan, catalog, constraints.preferredCropIds) : undefined
   const referencePlan = currentWorkspace.plans.find(plan => plan.id === 'reference')
-  const referenceMetrics = referencePlan ? evaluateRotation(referencePlan, catalog) : undefined
+  const referenceMetrics = referencePlan ? evaluateRotation(referencePlan, catalog, constraints.preferredCropIds) : undefined
   const detailedUnavailable = detailedPlan && detailedPlan.id !== 'reference'
     ? [...new Set(detailedPlan.crops.filter((id): id is CropId => Boolean(id && constraints.unavailableCropIds.includes(id))))]
     : []
@@ -216,7 +216,7 @@ export function RotationExplorer() {
       key: 'crops',
       title: 'Caractéristiques des cultures',
       state: detailedMetrics?.complete && detailedKnownFamilies === detailedCrops.length && detailedUnknownRoots === 0 ? 'ready' : 'partial',
-      summary: detailedMetrics?.complete ? `${detailedKnownFamilies}/5 cultures avec famille · ${detailedMetrics.legumeSeasons} année(s) avec légumineuse · ${detailedMetrics.knownRootTransitions} transition(s) racinaire(s) connue(s)` : `${detailedCrops.filter(Boolean).length}/5 cultures renseignées`,
+      summary: detailedMetrics?.complete ? `${detailedKnownFamilies}/5 cultures avec famille · ${detailedMetrics.legumeSeasons} année(s) avec légumineuse · ${detailedMetrics.knownRootTransitions} transition(s) racinaire(s) connue(s) · ${detailedMetrics.preferredCropSeasons}/5 préférées déclarées` : `${detailedCrops.filter(Boolean).length}/5 cultures renseignées`,
       detail: `${detailedUnknownRoots ? `${detailedUnknownRoots} architecture(s) racinaire(s) inconnue(s). ` : ''}${detailedLocalDeclarations ? `${detailedLocalDeclarations} culture(s) ajoutée(s) localement, traits non vérifiés. ` : ''}Les familles, légumineuses et racines alimentent les comptes descriptifs; le catalogue initial est illustratif.`,
       href: '/app/scenarios',
       action: 'Modifier les scénarios',
@@ -264,7 +264,18 @@ export function RotationExplorer() {
       const unavailableCropIds = value.unavailableCropIds.includes(cropId)
         ? value.unavailableCropIds.filter(id => id !== cropId)
         : [...value.unavailableCropIds, cropId]
-      return { pointKey, value: { unavailableCropIds } }
+      const preferredCropIds = value.preferredCropIds.filter(id => !unavailableCropIds.includes(id))
+      return { pointKey, value: { unavailableCropIds, preferredCropIds } }
+    })
+    setGenerationMessage('')
+  }
+  const togglePreferredCrop = (cropId: CropId) => {
+    setConstraintState(current => {
+      const value = current.pointKey === pointKey ? current.value : readRotationConstraints(location, catalog)
+      const preferredCropIds = value.preferredCropIds.includes(cropId)
+        ? value.preferredCropIds.filter(id => id !== cropId)
+        : [...value.preferredCropIds, cropId]
+      return { pointKey, value: { preferredCropIds, unavailableCropIds: value.unavailableCropIds.filter(id => !preferredCropIds.includes(id)) } }
     })
     setGenerationMessage('')
   }
@@ -284,9 +295,9 @@ export function RotationExplorer() {
     }
   }
   const deleteCustomCrop = (cropId: CropId) => {
-    const used = currentWorkspace.plans.some(plan => plan.crops.includes(cropId)) || constraints.unavailableCropIds.includes(cropId)
+    const used = currentWorkspace.plans.some(plan => plan.crops.includes(cropId)) || constraints.unavailableCropIds.includes(cropId) || constraints.preferredCropIds.includes(cropId)
     if (used) {
-      setCatalogMessage('Retirez d’abord cette culture des rotations et des exclusions.')
+      setCatalogMessage('Retirez d’abord cette culture des rotations, des exclusions et des préférences.')
       return
     }
     try {
@@ -300,7 +311,7 @@ export function RotationExplorer() {
   const generateOptions = () => {
     const reference = currentWorkspace.plans.find(plan => plan.id === 'reference')
     if (!reference) return
-    const generated = generateRotationOptions(reference, priorityWeights, constraints.unavailableCropIds, catalog)
+    const generated = generateRotationOptions(reference, priorityWeights, constraints.unavailableCropIds, catalog, constraints.preferredCropIds)
     if (!generated) {
       setGenerationMessage('Il faut au moins deux cultures disponibles pour produire deux options distinctes.')
       return
@@ -384,7 +395,7 @@ export function RotationExplorer() {
   const exportDecisionBrief = (includePreciseCoordinates = false) => {
     const leaderIds = new Set(leaders)
     const baseline = currentWorkspace.plans.find(plan => plan.id === 'reference')
-    const baselineMetrics = baseline ? evaluateRotation(baseline, catalog) : undefined
+    const baselineMetrics = baseline ? evaluateRotation(baseline, catalog, constraints.preferredCropIds) : undefined
     const climate = latest
       ? [
           `- Période mensuelle complète la plus récente : ${formatPowerMonth(latest.date)} (${latest.date}).`,
@@ -432,7 +443,7 @@ export function RotationExplorer() {
       return `- ${crop.label} : semis ${formatCropMonthWindow(entry?.sowing)} (disponibilité ferme : ${overlapLabel(monthWindowsOverlap(entry?.sowing, farmWorkWindows.sowing))}); récolte ${formatCropMonthWindow(entry?.harvest)} (disponibilité ferme : ${overlapLabel(monthWindowsOverlap(entry?.harvest, farmWorkWindows.harvest))})${source}.`
     })
     const rotationLines = currentWorkspace.plans.map(plan => {
-      const metrics = evaluateRotation(plan, catalog)
+      const metrics = evaluateRotation(plan, catalog, constraints.preferredCropIds)
       const crops = plan.crops.map((id, index) => {
         const crop = catalog.find(item => item.id === id)
         const root = crop?.rootArchitecture === 'fibrous' ? 'racines fasciculées' : crop?.rootArchitecture === 'taproot' ? 'racines pivotantes' : 'racines inconnues'
@@ -440,7 +451,7 @@ export function RotationExplorer() {
         return `${index + 1}. ${crop ? `${crop.label} (${crop.familyLabel}${crop.isLegume ? ', légumineuse' : ''}; ${root}${traitOrigin})` : 'culture non renseignée'}`
       }).join(' → ')
       const result = metrics.complete
-        ? `${metrics.distinctFamilies}/5 familles distinctes; ${metrics.repeatedFamilyTransitions} répétition(s) de famille entre années consécutives; ${metrics.legumeSeasons} année(s) avec légumineuse; ${metrics.knownRootTransitions} alternance(s) de racines connues${plan.id !== 'reference' && baselineMetrics?.complete ? `; écarts bruts vs référence : ${signed(metrics.distinctFamilies - baselineMetrics.distinctFamilies)} famille(s), ${signed(metrics.repeatedFamilyTransitions - baselineMetrics.repeatedFamilyTransitions)} répétition(s), ${signed(metrics.legumeSeasons - baselineMetrics.legumeSeasons)} année(s) avec légumineuse, ${signed(metrics.knownRootTransitions - baselineMetrics.knownRootTransitions)} transition(s) racinaire(s)` : ''}`
+        ? `${metrics.distinctFamilies}/5 familles distinctes; ${metrics.repeatedFamilyTransitions} répétition(s) de famille entre années consécutives; ${metrics.legumeSeasons} année(s) avec légumineuse; ${metrics.knownRootTransitions} alternance(s) de racines connues; ${metrics.preferredCropSeasons}/5 année(s) avec culture préférée déclarée${plan.id !== 'reference' && baselineMetrics?.complete ? `; écarts bruts vs référence : ${signed(metrics.distinctFamilies - baselineMetrics.distinctFamilies)} famille(s), ${signed(metrics.repeatedFamilyTransitions - baselineMetrics.repeatedFamilyTransitions)} répétition(s), ${signed(metrics.legumeSeasons - baselineMetrics.legumeSeasons)} année(s) avec légumineuse, ${signed(metrics.knownRootTransitions - baselineMetrics.knownRootTransitions)} transition(s) racinaire(s), ${signed(metrics.preferredCropSeasons - baselineMetrics.preferredCropSeasons)} année(s) avec culture préférée` : ''}`
         : 'succession incomplète; métriques non calculées'
       const score = metrics.complete ? ` · note de tri pondérée ${(rotationCombinedScore(metrics, priorityWeights) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })}/100` : ''
       return `### ${plan.title}${leaderIds.has(plan.id) ? ' — meilleure note de tri' : ''}${score}\n\n${crops}\n\n${result}.`
@@ -454,8 +465,9 @@ export function RotationExplorer() {
         ? `Point suivi : ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}.`
         : 'Coordonnées précises du point suivi omises de cette exportation.',
       `Données du scénario : ${currentWorkspace.isExample ? 'exemple illustratif' : 'scénario enregistré localement'}.`,
-      `Critères et poids : ${prioritySummary}. Note de tri pondérée = moyenne des indicateurs normalisés (familles / 5, répétitions inversées / 4, légumineuses / 5, transitions racinaires / 4), pondérée selon ces choix. Cette note sert uniquement à classer les séquences du catalogue.`,
+      `Critères et poids : ${prioritySummary}. Note de tri pondérée = moyenne des indicateurs normalisés (familles / 5, répétitions inversées / 4, légumineuses / 5, transitions racinaires / 4, cultures préférées / 5), pondérée selon ces choix. La préférence est une déclaration utilisateur, pas un indicateur agronomique; la note sert uniquement à classer les séquences du catalogue.`,
       `Cultures exclues des options candidates : ${constraints.unavailableCropIds.length ? constraints.unavailableCropIds.map(id => catalog.find(crop => crop.id === id)?.label ?? id).join(', ') : 'aucune exclusion renseignée'}.`,
+      `Cultures préférées déclarées pour le tri : ${constraints.preferredCropIds.length ? constraints.preferredCropIds.map(id => catalog.find(crop => crop.id === id)?.label ?? id).join(', ') : 'aucune'}.`,
       '',
       '## Rotations comparées',
       '',
@@ -552,8 +564,9 @@ export function RotationExplorer() {
         <section className="rotation-calendar-summary-panel"><header><span><CalendarDays size={14} /><strong>Calendrier cultural</strong></span><button type="button" onClick={() => setCalendarEditorOpen(true)}>{Object.values(cropCalendar).filter(hasCropCalendarData).length || farmWorkWindows.sowing || farmWorkWindows.harvest ? 'Modifier' : 'Renseigner'}</button></header><p>{Object.values(cropCalendar).filter(entry => entry?.sowing || entry?.harvest).length} culture(s) avec des fenêtres déclarées · {farmWorkWindows.sowing || farmWorkWindows.harvest ? 'disponibilités de la ferme saisies' : 'disponibilités non renseignées'}</p></section>
         <section className="rotation-calendar-summary-panel rotation-operations-summary"><header><span><Tractor size={14} /><strong>Matériel & opérations</strong></span><button type="button" onClick={() => setOperationsEditorOpen(true)}>{declaredFarmOperationCount(operationProfile) ? 'Modifier' : 'Renseigner'}</button></header><p>{declaredFarmOperationCount(operationProfile)}/7 opérations renseignées · ces déclarations ne valident pas le matériel requis par culture.</p></section>
         <fieldset className="rotation-priority-weights"><legend>Critères et poids</legend>{(Object.entries(priorityLabels) as Array<[RotationPriority, string]>).map(([priority, label]) => { const weight = priorityWeights[priority] ?? 0; return <label key={priority}><input type="checkbox" checked={weight > 0} disabled={weight > 0 && selectedPriorities.length === 1} onChange={event => updatePriorityWeight(priority, event.target.checked ? (weight || 1) : 0)} /><span>{label}</span><select aria-label={`Poids de ${label}`} value={weight || 1} disabled={weight === 0} onChange={event => updatePriorityWeight(priority, Number(event.target.value) as 1 | 2 | 3)}><option value={1}>×1</option><option value={2}>×2</option><option value={3}>×3</option></select></label> })}</fieldset>
-        <details className="rotation-method-details"><summary>Méthode de comparaison</summary><div><p><strong>Critère détaillé :</strong> {methodPriorityDescription[currentWorkspace.priority]} Les poids actifs sont égaux à 1, 2 ou 3 selon vos choix.</p><p>Chaque indicateur est ramené entre 0 et 1 : familles / 5, répétitions inversées / 4, légumineuses / 5, transitions racinaires documentées / 4. Le score est la moyenne pondérée de ces valeurs, affichée sur 100; il ne représente ni rendement ni bénéfice agricole. Toutes les rotations compatibles à égalité sur la note sont signalées.</p><p><strong>Option A</strong> est la première séquence classée; <strong>Option B</strong> est la suivante. Les égalités sont départagées par familles distinctes, légumineuses, transitions racinaires documentées, moins de répétitions, puis l’ordre du catalogue. Seules les séquences complètes et les exclusions saisies sont prises en compte. Les traits ajoutés localement entrent dans ces comptes tels que déclarés; ils ne sont pas vérifiés.</p><p>Le climat NASA et le profil de sol restent du contexte; ils ne participent pas à la note de rotation.</p></div></details>
+        <details className="rotation-method-details"><summary>Méthode de comparaison</summary><div><p><strong>Critère détaillé :</strong> {methodPriorityDescription[currentWorkspace.priority]} Les poids actifs sont égaux à 1, 2 ou 3 selon vos choix.</p><p>Chaque indicateur est ramené entre 0 et 1 : familles / 5, répétitions inversées / 4, légumineuses / 5, transitions racinaires documentées / 4, cultures préférées / 5. Une préférence est une déclaration personnelle de l’utilisateur, sans signification agronomique. Le score est la moyenne pondérée de ces valeurs, affichée sur 100; il ne représente ni rendement ni bénéfice agricole. Toutes les rotations compatibles à égalité sur la note sont signalées.</p><p><strong>Option A</strong> est la première séquence classée; <strong>Option B</strong> est la suivante. Les égalités sont départagées par familles distinctes, cultures préférées, légumineuses, transitions racinaires documentées, moins de répétitions, puis l’ordre du catalogue. Seules les séquences complètes et les exclusions saisies sont prises en compte. Les traits ajoutés localement entrent dans ces comptes tels que déclarés; ils ne sont pas vérifiés.</p><p>Le climat NASA et le profil de sol restent du contexte; ils ne participent pas à la note de rotation.</p></div></details>
         <details className="rotation-exclusions"><summary>Cultures indisponibles · {constraints.unavailableCropIds.length}</summary><p>Ces choix excluent une culture des options générées et de leur classement. La référence actuelle reste visible.</p><div>{catalog.map(crop => <label key={crop.id}><input type="checkbox" checked={constraints.unavailableCropIds.includes(crop.id)} onChange={() => toggleUnavailableCrop(crop.id)} /><span>{crop.label}{crop.origin === 'local-declaration' ? ' · saisie locale' : ''}</span></label>)}</div></details>
+        <details className="rotation-exclusions"><summary>Cultures préférées · {constraints.preferredCropIds.length}</summary><p>Ces déclarations personnelles ajoutent un critère explicite au tri (années avec une culture préférée / 5). Elles ne décrivent ni une aptitude ni un bénéfice agronomique. Une culture ne peut pas être à la fois préférée et indisponible.</p><div>{catalog.map(crop => <label key={crop.id}><input type="checkbox" checked={constraints.preferredCropIds.includes(crop.id)} onChange={() => togglePreferredCrop(crop.id)} /><span>{crop.label}{crop.origin === 'local-declaration' ? ' · saisie locale' : ''}</span></label>)}</div></details>
         <details className="rotation-custom-catalog"><summary>Adapter le catalogue · {catalog.length} cultures</summary><p>Ajoutez une culture utilisée à ce point. Sa famille et ses traits sont des déclarations locales; FieldNova ne les vérifie pas.</p>
           <form onSubmit={saveCustomCrop}>
             <label>Culture<input required maxLength={60} value={customCropDraft.label} onChange={event => setCustomCropDraft(value => ({ ...value, label: event.target.value }))} placeholder="Ex. sarrasin" /></label>
@@ -564,7 +577,7 @@ export function RotationExplorer() {
             <label>Lien de la référence<input type="url" maxLength={500} value={customCropDraft.sourceUrl} onChange={event => setCustomCropDraft(value => ({ ...value, sourceUrl: event.target.value }))} placeholder="https://… · facultatif" /></label>
             <button type="submit">Ajouter au point suivi</button>
           </form>
-          {catalog.filter(crop => crop.origin === 'local-declaration').map(crop => <div className="rotation-custom-crop-row" key={crop.id}><span><strong>{crop.label}</strong><small>{crop.familyLabel} · {crop.isLegume ? 'légumineuse déclarée' : 'non légumineuse déclarée'} · racine {crop.rootArchitecture === 'unknown' ? 'inconnue' : crop.rootArchitecture === 'fibrous' ? 'fasciculée' : 'pivotante'}</small>{crop.sourceName && <small>Référence : {crop.sourceName}</small>}</span><button type="button" onClick={() => deleteCustomCrop(crop.id)} aria-label={`Supprimer ${crop.label}`} disabled={currentWorkspace.plans.some(plan => plan.crops.includes(crop.id)) || constraints.unavailableCropIds.includes(crop.id)}>Retirer</button></div>)}
+          {catalog.filter(crop => crop.origin === 'local-declaration').map(crop => <div className="rotation-custom-crop-row" key={crop.id}><span><strong>{crop.label}</strong><small>{crop.familyLabel} · {crop.isLegume ? 'légumineuse déclarée' : 'non légumineuse déclarée'} · racine {crop.rootArchitecture === 'unknown' ? 'inconnue' : crop.rootArchitecture === 'fibrous' ? 'fasciculée' : 'pivotante'}</small>{crop.sourceName && <small>Référence : {crop.sourceName}</small>}</span><button type="button" onClick={() => deleteCustomCrop(crop.id)} aria-label={`Supprimer ${crop.label}`} disabled={currentWorkspace.plans.some(plan => plan.crops.includes(crop.id)) || constraints.unavailableCropIds.includes(crop.id) || constraints.preferredCropIds.includes(crop.id)}>Retirer</button></div>)}
           <small>Stockage local sur cet appareil et pour le point suivi. Les traits saisis participent au tri descriptif, sans produire de conseil agronomique.</small>
         </details>
         {catalogMessage && <p className="rotation-generation-message" role="status">{catalogMessage}</p>}
@@ -580,7 +593,7 @@ export function RotationExplorer() {
     </div>
 
     <section className="rotation-plans" aria-label="Rotations culturales sur cinq années à comparer">
-      {currentWorkspace.plans.map((plan, planIndex) => <RotationCard key={plan.id} plan={plan} catalog={catalog} planIndex={planIndex} priority={currentWorkspace.priority} priorityWeights={priorityWeights} isLeader={leaders.includes(plan.id)} example={currentWorkspace.isExample} unavailableCropIds={constraints.unavailableCropIds} onCropChange={updateCrop} onShowDetails={openPlanDetails} />)}
+      {currentWorkspace.plans.map((plan, planIndex) => <RotationCard key={plan.id} plan={plan} catalog={catalog} planIndex={planIndex} priority={currentWorkspace.priority} priorityWeights={priorityWeights} isLeader={leaders.includes(plan.id)} example={currentWorkspace.isExample} unavailableCropIds={constraints.unavailableCropIds} preferredCropIds={constraints.preferredCropIds} onCropChange={updateCrop} onShowDetails={openPlanDetails} />)}
       <p className="rotation-plans-footnote">Options exploratoires triées selon les traits du catalogue et vos exclusions · NASA et le profil local ne prédisent pas l’adaptation des cultures.</p>
     </section>
 
@@ -595,6 +608,7 @@ export function RotationExplorer() {
             <span><strong>{signed(detailedMetrics.repeatedFamilyTransitions - referenceMetrics.repeatedFamilyTransitions)}</strong><small>répétitions</small></span>
             <span><strong>{signed(detailedMetrics.legumeSeasons - referenceMetrics.legumeSeasons)}</strong><small>années avec légumineuse</small></span>
             <span><strong>{signed(detailedMetrics.knownRootTransitions - referenceMetrics.knownRootTransitions)}</strong><small>transitions racinaires connues</small></span>
+            {constraints.preferredCropIds.length > 0 && <span><strong>{signed(detailedMetrics.preferredCropSeasons - referenceMetrics.preferredCropSeasons)}</strong><small>années préférées déclarées</small></span>}
           </div>}
           {detailedPlan.id !== 'reference' && detailedMetrics.complete && referenceMetrics?.complete && <><p className="rotation-evidence-tradeoff">{priorityComparison(detailedMetrics, referenceMetrics, currentWorkspace.priority)}</p><p className="rotation-evidence-tradeoff-note">Les autres écarts sont des comptes descriptifs. FieldNova n’évalue ici ni rendement, ni coût, ni besoin en eau, ni matériel ou calendrier local.</p></>}
           <p className="rotation-evidence-verdict">{detailedUnavailable.length ? `Non retenue : ${detailedUnavailable.map(id => catalog.find(crop => crop.id === id)?.label).join(', ')} est/sont déclaré(s) indisponible(s).` : !detailedMetrics.complete ? 'Séquence incomplète; elle n’entre pas dans le classement.' : detailedPlan.id === 'reference' ? 'Cette rotation sert de référence; elle n’est pas une option candidate générée.' : leaders.includes(detailedPlan.id) ? 'Cette option atteint la meilleure note pondérée parmi les rotations complètes compatibles.' : 'Cette option est compatible avec les exclusions déclarées, mais sa note pondérée est inférieure aux options mises en avant.'}</p>
@@ -635,8 +649,8 @@ function CropTraitSources({ crop }: { crop: CropDefinition }) {
   </div>
 }
 
-function RotationCard({ plan, catalog, planIndex, priority, priorityWeights, isLeader, example, unavailableCropIds, onCropChange, onShowDetails }: { plan: RotationPlan; catalog: CropDefinition[]; planIndex: number; priority: RotationPriority; priorityWeights: ReturnType<typeof rotationWeightsFor>; isLeader: boolean; example: boolean; unavailableCropIds: CropId[]; onCropChange: (planId: RotationId, index: number, value: string) => void; onShowDetails: (planId: RotationId) => void }) {
-  const metrics = evaluateRotation(plan, catalog)
+function RotationCard({ plan, catalog, planIndex, priority, priorityWeights, isLeader, example, unavailableCropIds, preferredCropIds, onCropChange, onShowDetails }: { plan: RotationPlan; catalog: CropDefinition[]; planIndex: number; priority: RotationPriority; priorityWeights: ReturnType<typeof rotationWeightsFor>; isLeader: boolean; example: boolean; unavailableCropIds: CropId[]; preferredCropIds: CropId[]; onCropChange: (planId: RotationId, index: number, value: string) => void; onShowDetails: (planId: RotationId) => void }) {
+  const metrics = evaluateRotation(plan, catalog, preferredCropIds)
   const combinedScore = rotationCombinedScore(metrics, priorityWeights)
   const unavailable = [...new Set(plan.crops.filter((id): id is CropId => Boolean(id && unavailableCropIds.includes(id))))]
   const isReference = plan.id === 'reference'
@@ -647,14 +661,16 @@ function RotationCard({ plan, catalog, planIndex, priority, priorityWeights, isL
     <div className="rotation-season-selects">{plan.crops.map((cropId, index) => <label key={index}><span>Année {index + 1}</span><select aria-label={`${plan.title}, année ${index + 1}`} title={catalog.find(crop => crop.id === cropId)?.label ?? 'Choisir une culture'} value={cropId} onChange={event => onCropChange(plan.id, index, event.target.value)}><option value="">Choisir</option>{catalog.map(crop => <option key={crop.id} value={crop.id} disabled={!isReference && unavailableCropIds.includes(crop.id) && cropId !== crop.id}>{crop.shortLabel}{unavailableCropIds.includes(crop.id) ? ' · indisponible' : ''}</option>)}</select></label>)}</div>
     <div className="rotation-family-trail" role="list" aria-label={`Familles botaniques des cinq années · ${plan.title}`}>{plan.crops.map((cropId, index) => { const crop = catalog.find(item => item.id === cropId); return <span key={index} className={`rotation-family-step family-${crop?.family ?? 'unknown'}`} role="listitem" aria-label={`Année ${index + 1} : ${crop ? `${crop.label}, famille ${crop.familyLabel}` : 'culture et famille à renseigner'}`} title={crop ? `${crop.label} · ${crop.familyLabel}${crop.origin === 'local-declaration' ? ' · déclaration locale non vérifiée' : ''}` : 'Famille inconnue tant que la culture n’est pas choisie'}><small>A{index + 1}</small><strong>{crop?.familyLabel ?? 'À choisir'}</strong></span> })}</div>
     <div className="rotation-card-metrics" aria-label={`Indicateurs de ${plan.title}`}><span><strong>{metrics.complete ? `${metrics.distinctFamilies}/5` : '—'}</strong><small>familles</small></span><span><strong>{metrics.complete ? metrics.repeatedFamilyTransitions : '—'}</strong><small>répétitions</small></span><span><strong>{metrics.complete ? metrics.legumeSeasons : '—'}</strong><small>légumineuses</small></span><span><strong>{metrics.complete ? metrics.knownRootTransitions : '—'}</strong><small>racines</small></span><span><strong>{metrics.complete ? `${Math.round(combinedScore * 100)}/100` : '—'}</strong><small>note de tri</small></span></div>
-    <button type="button" className="rotation-card-detail" onClick={() => onShowDetails(plan.id)} aria-label={`Voir pourquoi pour ${plan.title}`}><span>{incompatible ? `Non retenue : ${unavailable.map(id => catalog.find(crop => crop.id === id)?.shortLabel).join(', ')} indisponible(s).` : metrics.complete ? `${rotationDetail(metrics.distinctFamilies, metrics.repeatedFamilyTransitions, metrics.legumeSeasons, metrics.knownRootTransitions, priority)} Note pondérée ${Math.round(combinedScore * 100)}/100.` : 'Renseignez les 5 années pour comparer ce scénario.'}</span><span>Pourquoi ? <ChevronRight size={10} /></span></button>
+    {preferredCropIds.length > 0 && <p className="rotation-preference-count">Cultures préférées déclarées : {metrics.complete ? `${metrics.preferredCropSeasons}/5 années` : 'rotation incomplète'}</p>}
+    <button type="button" className="rotation-card-detail" onClick={() => onShowDetails(plan.id)} aria-label={`Voir pourquoi pour ${plan.title}`}><span>{incompatible ? `Non retenue : ${unavailable.map(id => catalog.find(crop => crop.id === id)?.shortLabel).join(', ')} indisponible(s).` : metrics.complete ? `${rotationDetail(metrics.distinctFamilies, metrics.repeatedFamilyTransitions, metrics.legumeSeasons, metrics.knownRootTransitions, metrics.preferredCropSeasons, priority)} Note pondérée ${Math.round(combinedScore * 100)}/100.` : 'Renseignez les 5 années pour comparer ce scénario.'}</span><span>Pourquoi ? <ChevronRight size={10} /></span></button>
   </article>
 }
 
-function rotationDetail(families: number, repeats: number, legumes: number, rootTransitions: number, priority: RotationPriority) {
+function rotationDetail(families: number, repeats: number, legumes: number, rootTransitions: number, preferred: number, priority: RotationPriority) {
   if (priority === 'diversity') return `${families} famille${families > 1 ? 's' : ''} distincte${families > 1 ? 's' : ''} sur 5 années.`
   if (priority === 'alternation') return `${repeats} répétition${repeats > 1 ? 's' : ''} de famille entre années consécutives.`
   if (priority === 'root') return `${rootTransitions} transition${rootTransitions > 1 ? 's' : ''} entre racines documentées; les cultures inconnues sont ignorées.`
+  if (priority === 'preference') return `${preferred} année${preferred > 1 ? 's' : ''} avec une culture déclarée préférée (choix personnel).`
   return `${legumes} année${legumes > 1 ? 's' : ''} avec une légumineuse.`
 }
 
@@ -662,6 +678,7 @@ function priorityExplanation(metrics: ReturnType<typeof evaluateRotation>, prior
   if (priority === 'diversity') return `${metrics.distinctFamilies} famille(s) botanique(s) distincte(s) sur cinq années.`
   if (priority === 'alternation') return `${metrics.repeatedFamilyTransitions} répétition(s) de famille entre années consécutives (moins de répétitions donne une valeur de critère plus élevée).`
   if (priority === 'legume') return `${metrics.legumeSeasons} année(s) avec légumineuse sur cinq.`
+  if (priority === 'preference') return `${metrics.preferredCropSeasons} année(s) avec une culture préférée déclarée sur cinq; il s’agit d’une préférence personnelle.`
   return `${metrics.knownRootTransitions} transition(s) entre architectures racinaires connues; les cultures inconnues ne sont pas comptées.`
 }
 
@@ -672,7 +689,9 @@ function priorityComparison(metrics: ReturnType<typeof evaluateRotation>, refere
       ? reference.repeatedFamilyTransitions - metrics.repeatedFamilyTransitions
       : priority === 'legume'
         ? metrics.legumeSeasons - reference.legumeSeasons
-        : metrics.knownRootTransitions - reference.knownRootTransitions
+        : priority === 'root'
+          ? metrics.knownRootTransitions - reference.knownRootTransitions
+          : metrics.preferredCropSeasons - reference.preferredCropSeasons
   if (difference === 0) return `Critère choisi : même valeur que la référence (${priorityLabels[priority]}).`
   const quantity = Math.abs(difference)
   const direction = difference > 0 ? 'de plus' : 'de moins'
@@ -695,4 +714,5 @@ const methodPriorityDescription: Record<RotationPriority, string> = {
   alternation: 'nombre de répétitions de famille entre deux années consécutives (à minimiser, de 0 à 4).',
   legume: 'nombre d’années avec au moins une légumineuse (à maximiser, de 0 à 5).',
   root: 'nombre de transitions entre architectures racinaires connues d’années consécutives (à maximiser, de 0 à 4; valeurs inconnues ignorées).',
+  preference: 'nombre d’années avec une culture que vous avez déclarée préférée (à maximiser, de 0 à 5; critère personnel, pas agronomique).',
 }

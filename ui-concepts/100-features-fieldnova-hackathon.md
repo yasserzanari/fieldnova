@@ -14,8 +14,8 @@ FieldNova dispose déjà d’une base utile : carte interactive, couches NASA GI
 
 Cette liste reste un portefeuille de 100 idées, pas un engagement à toutes les livrer. Au 15 novembre 2026, les modules suivants ont été intégrés dans `main` :
 
-- **Rotation au centre du MVP :** rotation actuelle et deux options éditables sur cinq années; priorité modifiable; métriques sur familles, répétitions, légumineuses et alternance de systèmes racinaires documentés.
-- **Options de rotation exploratoires :** génération locale de deux séquences depuis le catalogue, avec cultures déclarées indisponibles exclues et règles de classement visibles. Les options restent éditables; les séquences incomplètes ne reçoivent ni note ni classement. Le climat, le sol et le calendrier ne sont pas utilisés comme prédicteurs.
+- **Rotation au centre du MVP :** rotation actuelle et deux options éditables sur cinq années; priorités pondérées modifiables; métriques sur familles, répétitions, légumineuses, alternance de systèmes racinaires documentés et cultures préférées déclarées (choix personnel, pas agronomique).
+- **Options de rotation exploratoires :** génération locale de deux séquences depuis le catalogue, avec cultures déclarées indisponibles exclues, préférences utilisateur prises en compte uniquement quand leur critère est activé, et règles de classement visibles. Les options restent éditables; les séquences incomplètes ne reçoivent ni note ni classement. Le climat, le sol et le calendrier ne sont pas utilisés comme prédicteurs.
 - **Contexte de décision :** séries NASA POWER mensuelles avec coordonnées de grille et valeurs comparées aux mêmes mois des années précédentes; profil de sol local avec origine, date et référence déclarées; coupe par horizons saisie localement, avec intervalles manquants visibles comme inconnus.
 - **Parcelle et preuves :** import GeoJSON WGS84, contour synchronisé sur les cartes, superficie géodésique approximative et export d’une fiche Markdown contenant sources, calculs, valeurs manquantes et limites.
 - **Assistant outillé :** chat à gauche et carte à droite; lectures de NASA POWER, du profil local et des rotations; changements de couche réels; questions hors périmètre sans appel NASA automatique.
@@ -23,7 +23,7 @@ Cette liste reste un portefeuille de 100 idées, pas un engagement à toutes les
 - **Traits agronomiques sourcés :** la fiche « Pourquoi ? » relie par culture la taxonomie et le statut de légumineuse à INPN TAXREF et l’architecture racinaire connue à la publication DRAAF Hauts-de-France; les racines inconnues n’entrent pas dans le calcul. La référence DRAAF est régionale et ne constitue pas un conseil local.
 - **Import local dans l’assistant :** un CSV de sol reçoit un aperçu révocable et n’est enregistré qu’après confirmation; aucun fichier n’est transmis à Codex CLI.
 - **Démo :** [script de 90 secondes et plans vidéo](demo-script-90s-fieldnova.md).
-- **Profil guidé :** cinq étapes locales pour le point confirmé, la rotation actuelle, l’accès à l’eau, les cultures indisponibles et la priorité; l’état du sol existant est consultable dans « Mon terrain ».
+- **Profil guidé :** cinq étapes locales pour le point confirmé, la rotation actuelle, l’accès à l’eau, les cultures indisponibles et la priorité; l’état du sol existant est consultable dans « Mon terrain ». Les cultures préférées se définissent dans Scénarios.
 
 L’assistant lit localement les CSV d’analyse de sol après sélection; les PDF et images ne sont pas pris en charge. FieldNova ne calcule pas de statistiques NASA à l’intérieur d’une limite de parcelle. Le catalogue et les rotations restent illustratifs, et les références racinaires générales ne sont pas validées localement; aucun rendement, besoin en eau, amélioration de sol ou prévision n’est calculé.
 
@@ -62,7 +62,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 4. **[LIVRÉ] Choix du mode d’exploitation** : pluvial, irrigué, mixte ou inconnu, sans déduire ce choix des seules données satellites.
 5. **[P1 · PARTIEL] Disponibilité des équipements** : déclarer par point le statut (matériel de la ferme, prestataire prévu, indisponible ou inconnu) pour sept familles d’opérations, avec équipement et précision facultatifs. Ces informations sont visibles dans la fiche de décision, l’Assistant et l’export. Les besoins par culture et leur validation locale restent à établir; aucun scénario n’est qualifié de faisable et le classement ne change pas.
 6. **[P1 · PARTIEL] Fenêtre de travail habituelle** : l’utilisateur peut déclarer les mois où semis et récolte sont habituellement possibles. La fiche rotation, l’Assistant et l’export rendent ces déclarations visibles et comparent le chevauchement mensuel aux fenêtres culturales saisies. Le travail du sol, les équipements et la faisabilité restent à modéliser; ces déclarations ne changent pas le classement.
-7. **[P1] Préférences et exclusions de cultures** : cultures appréciées, impossibles ou soumises à un contrat local.
+7. **[PARTIELLEMENT LIVRÉ · P1] Préférences et exclusions de cultures** : cultures préférées ou indisponibles déclarées par point; la préférence peut pondérer le tri si l’utilisateur active ce critère. Les contrats locaux ne sont pas modélisés.
 8. **[P1] Tolérance au risque** : faible, moyenne ou élevée, avec explication de l’effet sur le classement des scénarios.
 9. **[P2] Plusieurs profils de fermes** : gérer différentes exploitations sans mélanger leurs données.
 10. **[P2] Parcours de prise en main** : faire découvrir carte, profil de sol, scénarios et provenance à un nouvel utilisateur.

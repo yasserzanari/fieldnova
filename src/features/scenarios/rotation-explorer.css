@@ -75,6 +75,7 @@
 .rotation-exclusions label { display:flex; min-height:24px; align-items:center; gap:6px; color:#555447; font-size:8px; cursor:pointer; }
 .rotation-exclusions input { width:13px; height:13px; margin:0; accent-color:#477442; }
 .rotation-exclusions input:focus-visible { outline:2px solid #91b378; outline-offset:2px; }
+.rotation-preference-count { margin:0; color:#59734b; font-size:8px; line-height:1.2; }
 .rotation-custom-catalog { margin-top:7px; padding:7px; border:1px solid #e1e8d9; border-radius:8px; background:#f7f9f3; }
 .rotation-custom-catalog > summary { color:#3f6341; font-size:8px; font-weight:700; cursor:pointer; }
 .rotation-custom-catalog > p,.rotation-custom-catalog > small { display:block; margin:6px 0; color:#777465; font-size:7px; line-height:1.4; }
