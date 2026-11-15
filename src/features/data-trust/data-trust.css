@@ -85,9 +85,31 @@
 .trust-data-error { display:flex; flex:none; align-items:flex-start; gap:6px; margin-top:8px; padding:8px; border:1px solid #ead9c2; border-radius:8px; background:#fff8ed; color:#805f3c; font-size:8px; line-height:1.4; }
 .trust-data-error svg { flex:none; }
 .trust-empty-dot.is-connected { background:#77a763; }
+.trust-mobile-tabs { display:none; }
 @media(max-width:1220px) { .trust-workspace { grid-template-columns:minmax(220px,24%) minmax(280px,1fr) minmax(270px,29%); gap:8px; }.trust-catalog-panel { padding-inline:8px; }.trust-details-panel { padding-inline:9px; }.trust-source-item { grid-template-columns:26px minmax(0,1fr) auto; gap:5px; }.trust-source-mark { width:26px; height:26px; }.trust-status-pill { padding:4px; }.trust-meta-row { grid-template-columns:90px minmax(0,1fr); } }
 @media(max-width:960px) { .trust-workspace { grid-template-columns:minmax(205px,31%) minmax(0,1fr); grid-template-rows:minmax(280px,1fr) minmax(260px,.92fr); }.trust-catalog-panel { grid-column:1; grid-row:1 / -1; }.trust-map-stage { grid-column:2; grid-row:1; }.trust-details-panel { grid-column:2; grid-row:2; }.trust-lineage ol { grid-template-columns:1fr 1fr; column-gap:7px; }.trust-lineage ol::before { display:none; }.trust-lineage li { min-height:48px; }.trust-provenance-note { margin-top:7px; } }
-@media(max-width:680px) { .trust-page { height:auto; min-height:100%; grid-template-rows:auto auto; overflow:visible; padding:12px 10px; }.trust-page-heading { align-items:flex-start; }.trust-page-heading h1 { font-size:17px; }.trust-page-heading p { max-width:300px; }.trust-status-banner { max-width:145px; padding:6px 7px; font-size:7px; line-height:1.3; }.trust-workspace { grid-template-columns:1fr; grid-template-rows:minmax(310px,40dvh) minmax(480px,58dvh) minmax(430px,52dvh); gap:8px; }.trust-catalog-panel { grid-column:1; grid-row:1; }.trust-map-stage { grid-column:1; grid-row:2; }.trust-details-panel { grid-column:1; grid-row:3; }.trust-source-item { min-height:65px; }.trust-catalog-list { min-height:130px; }.trust-lineage ol { grid-template-columns:1fr; }.trust-lineage li { min-height:51px; }.trust-map-legend small { max-width:160px; } }
+.trust-mobile-tabs button:focus-visible { outline:2px solid #6b8e57; outline-offset:2px; }
+@media(max-width:680px) {
+  .trust-page { height:100%; min-height:0; grid-template-rows:auto 36px minmax(0,1fr); gap:7px; overflow:hidden; padding:8px; }
+  .trust-page-heading { min-height:0; align-items:center; gap:7px; }
+  .trust-page-heading > div { align-items:flex-start; gap:6px; }
+  .trust-heading-icon { width:27px; height:27px; }
+  .trust-page-heading h1 { font-size:15px; }
+  .trust-page-heading p { display:none; }
+  .trust-status-banner { max-width:145px; padding:5px 6px; font-size:7px; line-height:1.25; }
+  .trust-mobile-tabs { display:grid; min-height:36px; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
+  .trust-mobile-tabs button { min-height:34px; border:1px solid #e5e4da; border-radius:8px; background:#fffefa; color:#706d5f; font-size:9px; font-weight:650; }
+  .trust-mobile-tabs button.is-active { border-color:#cddcbe; background:#edf3e7; color:#42663b; }
+  .trust-workspace { display:block; height:100%; min-height:0; overflow:hidden; }
+  .trust-catalog-panel, .trust-details-panel, .trust-map-stage { width:100%; height:100%; min-height:0; max-height:100%; }
+  .trust-catalog-panel, .trust-details-panel { padding:9px; }
+  .trust-catalog-panel.is-mobile-hidden, .trust-details-panel.is-mobile-hidden, .trust-map-stage.is-mobile-hidden { display:none; }
+  .trust-catalog-list { min-height:0; }
+  .trust-source-item { min-height:65px; }
+  .trust-lineage ol { grid-template-columns:1fr; }
+  .trust-lineage li { min-height:51px; }
+  .trust-map-legend small { max-width:160px; }
+}
 .trust-transformation-audit { display:grid; gap:7px; padding:8px; border:1px solid #e5e4da; border-radius:8px; background:#fbfaf6; }
 .trust-transformation-audit summary { color:#4c6843; font-size:8px; font-weight:700; cursor:pointer; }
 .trust-transformation-audit ol { display:grid; gap:7px; margin:0; padding-left:17px; }
