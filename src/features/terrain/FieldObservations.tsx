@@ -43,6 +43,7 @@ export function FieldObservations({ point }: { point: GeoPoint }) {
 
   const addObservation = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (items.length >= FIELD_OBSERVATION_LIMIT) { setError('Le journal a atteint sa limite. Exportez le CSV puis supprimez des entrées avant d’en ajouter une nouvelle.'); return }
     const detail = note.trim()
     if (!detail) { setError('Ajoutez une observation avant de l’enregistrer.'); return }
     if (!date || Number.isNaN(Date.parse(`${date}T12:00:00`))) { setError('Choisissez une date valide.'); return }
@@ -67,7 +68,7 @@ export function FieldObservations({ point }: { point: GeoPoint }) {
       </div>
       <label className="terrain-observation-note-label">Observation<textarea value={note} onChange={event => setNote(event.target.value)} maxLength={1000} rows={3} placeholder="Décrivez ce que vous avez observé ou réalisé…" required /></label>
       {error && <p className="terrain-observation-error" role="alert">{error}</p>}
-      <button className="terrain-observation-submit" type="submit"><Plus size={14} />Enregistrer l’observation</button>
+      <button className="terrain-observation-submit" type="submit" disabled={items.length >= FIELD_OBSERVATION_LIMIT}><Plus size={14} />Enregistrer l’observation</button>
     </form>
     <div className="terrain-observation-list-heading"><strong>Historique de ce point</strong><span>{items.length} / {FIELD_OBSERVATION_LIMIT}</span><button type="button" onClick={() => downloadFieldObservationsCsv(items)} disabled={!items.length}><Download size={12} />Exporter CSV</button></div>
     {items.length === 0 ? <p className="terrain-observations-empty">Aucune observation enregistrée pour ce point. Vos notes resteront séparées des données NASA.</p> : <ol className="terrain-observation-list">{items.map(item => <li key={item.id}>
