@@ -7,7 +7,7 @@ import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
-import { readSoilProfile, soilSourceLabels, type FarmSoilProfile } from '../../lib/farm/soil-profile'
+import { readSoilProfile, resolveSoilHorizonProvenance, soilSourceLabels, type FarmSoilProfile } from '../../lib/farm/soil-profile'
 import { cropCatalog, evaluateRotation, exampleRotationWorkspace, generateRotationOptions, priorityLabels, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightsFor, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
 import { emptyRotationConstraints, readRotationConstraints, writeRotationConstraints } from './rotation-constraints'
 import { clearSavedParcelBoundary, parseParcelGeoJSON, saveParcelBoundary, useParcelBoundary } from '../../lib/geo/parcel-boundary'
@@ -288,9 +288,7 @@ export function RotationExplorer() {
       `- Enregistré localement le : ${soil.updatedAt ? new Date(soil.updatedAt).toLocaleDateString('fr-FR') : 'aucune date enregistrée'}.`,
       ...(soil.horizons?.length ? soil.horizons.map((horizon, index) => {
         const texture = horizon.texture && horizon.texture !== 'unknown' ? ({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[horizon.texture] : 'inconnue'
-        const sourceType = horizon.sourceType ?? soil.sourceType ?? 'farmer-reported'
-        const sourceName = horizon.sourceName ?? soil.sourceName
-        const sampleDate = horizon.sampleDate ?? soil.sampleDate
+        const { sourceType, sourceName, sampleDate } = resolveSoilHorizonProvenance(horizon, soil)
         return `- Horizon ${index + 1} · ${horizon.topCm}–${horizon.bottomCm} cm : texture ${texture}; pH ${horizon.ph === undefined ? 'inconnu' : horizon.ph.toLocaleString('fr-FR')}; matière organique ${horizon.organicMatterPercent === undefined ? 'inconnue' : `${horizon.organicMatterPercent.toLocaleString('fr-FR')} %`}; origine déclarée ${soilSourceLabels[sourceType]}${sourceName ? ` · ${sourceName}` : ''}; date ${sampleDate || 'non précisée'} (non vérifiée).`
       }) : ['- Aucun horizon local détaillé n’est renseigné.']),
       '- Les profondeurs non couvertes par les horizons déclarés restent inconnues.',

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Download, FileSpreadsheet, Layers3, Pencil, Save, Trash2, Upload, X } from 'lucide-react'
 import type { GeoPoint } from '../../lib/geo/location'
-import { clearSoilProfile, readSoilProfile, soilSourceLabels, validateSoilHorizons, type FarmSoilProfile, type SoilHorizon, writeSoilProfile } from '../../lib/farm/soil-profile'
+import { clearSoilProfile, readSoilProfile, resolveSoilHorizonProvenance, soilSourceLabels, validateSoilHorizons, type FarmSoilProfile, type SoilHorizon, writeSoilProfile } from '../../lib/farm/soil-profile'
 import { parseSoilAnalysisCsv, soilAnalysisCsvTemplate, type SoilAnalysisCsvImport } from '../../lib/farm/soil-analysis-csv'
 
 const textureLabels = { sandy: 'Sableux', loamy: 'Limoneux', clayey: 'Argileux', unknown: 'Inconnu' } as const
@@ -79,6 +79,14 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
 
   const hasGeneralProfile = profile.texture !== undefined || profile.ph !== undefined || profile.organicMatterPercent !== undefined || profile.effectiveDepthCm !== undefined || profile.drainage !== undefined
   const hasProfile = hasGeneralProfile || Boolean(profile.horizons?.length)
+  const fieldSource = `${soilSourceLabels[profile.sourceType ?? 'farmer-reported']}${profile.sourceName ? ` · ${profile.sourceName}` : ''}${profile.sampleDate ? ` · ${new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${profile.sampleDate}T12:00:00Z`))}` : ''} · non vérifiée`
+  const generalFieldRows = [
+    { label: 'Texture', value: profile.texture && profile.texture !== 'unknown' ? textureLabels[profile.texture] : undefined },
+    { label: 'pH', value: profile.ph === undefined ? undefined : decimal(profile.ph) },
+    { label: 'Matière organique', value: profile.organicMatterPercent === undefined ? undefined : `${decimal(profile.organicMatterPercent)} %` },
+    { label: 'Profondeur utile', value: profile.effectiveDepthCm === undefined ? undefined : `${decimal(profile.effectiveDepthCm)} cm` },
+    { label: 'Drainage', value: profile.drainage && profile.drainage !== 'unknown' ? drainageLabels[profile.drainage] : undefined },
+  ]
   const hasDraftValue = draft.texture !== undefined || draft.ph !== undefined || draft.organicMatterPercent !== undefined || draft.effectiveDepthCm !== undefined || draft.drainage !== undefined
     || Boolean(draft.horizons?.length)
   const soilSummary = [
@@ -154,6 +162,12 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
       </span>
       <button className="terrain-profile-edit" type="button" onClick={edit} aria-label={hasProfile ? 'Modifier le profil de sol local' : 'Renseigner le profil de sol local'}><Pencil size={13} /><span>{hasProfile ? 'Modifier' : 'Renseigner'}</span></button>
     </div>
+    {hasProfile && <section className="terrain-field-provenance" aria-label="État et provenance de chaque champ de sol">
+      <header><strong>État des champs généraux</strong><small>Origine commune déclarée · non vérifiée</small></header>
+      <dl>{generalFieldRows.map(field => <div key={field.label}><dt>{field.label}</dt><dd><strong>{field.value ?? 'Inconnu'}</strong><span className={field.value ? 'is-known' : ''}>{field.value ? 'Renseigné' : 'Non renseigné'}</span></dd></div>)}</dl>
+      {hasGeneralProfile && <small className="terrain-field-source">Origine appliquée aux valeurs renseignées : {fieldSource}. Aucun niveau de fiabilité indépendant n’est calculé.</small>}
+      {!hasGeneralProfile && <small className="terrain-field-source">Aucun champ général saisi. La provenance des horizons est affichée avec leur composition.</small>}
+    </section>}
     {profile.horizons?.length ? <SoilHorizonVisual horizons={profile.horizons} defaultSourceType={profile.sourceType} defaultSourceName={profile.sourceName} defaultSampleDate={profile.sampleDate} /> : null}
     {profile.updatedAt && <p className="terrain-profile-date">Enregistré localement · {new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium' }).format(new Date(profile.updatedAt))} · Origine déclarée : {soilSourceLabels[profile.sourceType ?? 'farmer-reported']} (non vérifiée)</p>}
 
@@ -222,16 +236,14 @@ function SoilHorizonVisual({ horizons, defaultSourceType, defaultSourceName, def
       const texture = layer.texture && layer.texture !== 'unknown' ? textureLabels[layer.texture].toLocaleLowerCase('fr') : 'texture inconnue'
       const values = [layer.ph !== undefined ? `pH ${decimal(layer.ph)}` : '', layer.organicMatterPercent !== undefined ? `${decimal(layer.organicMatterPercent)} % MO` : ''].filter(Boolean).join(' · ')
       const source = layer.gap ? '' : horizonSourceSummary(layer, defaultSourceType, defaultSourceName, defaultSampleDate)
-      return <div key={`${layer.topCm}-${layer.bottomCm}-${index}`} className={`terrain-horizon-layer ${layer.gap ? 'is-gap' : `texture-${layer.texture ?? 'unknown'}`}`} role="listitem" title={`${layer.topCm}–${layer.bottomCm} cm · ${texture}${values ? ` · ${values}` : ''}${source ? ` · ${source}` : ''}`}><span>{layer.topCm}–{layer.bottomCm} cm</span><strong>{layer.gap ? 'Non décrit' : texture}</strong>{values && <small>{values}</small>}</div>
+      return <div key={`${layer.topCm}-${layer.bottomCm}-${index}`} className={`terrain-horizon-layer ${layer.gap ? 'is-gap' : `texture-${layer.texture ?? 'unknown'}`}`} role="listitem" aria-label={`${layer.topCm} à ${layer.bottomCm} cm · ${texture}${values ? ` · ${values}` : ''}${source ? ` · Origine déclarée : ${source}` : ''}`} title={`${layer.topCm}–${layer.bottomCm} cm · ${texture}${values ? ` · ${values}` : ''}${source ? ` · ${source}` : ''}`}><span>{layer.topCm}–{layer.bottomCm} cm</span><strong>{layer.gap ? 'Non décrit' : texture}</strong>{values && <small>{values}</small>}</div>
     })}</div>
     <small className="terrain-horizon-beyond">Au-delà de {depth} cm : non documenté.</small>
   </div>
 }
 
 function horizonSourceSummary(horizon: SoilHorizon, defaultSourceType?: FarmSoilProfile['sourceType'], defaultSourceName?: string, defaultSampleDate?: string) {
-  const sourceType = horizon.sourceType ?? defaultSourceType ?? 'farmer-reported'
-  const sourceName = horizon.sourceName ?? defaultSourceName
-  const sampleDate = horizon.sampleDate ?? defaultSampleDate
+  const { sourceType, sourceName, sampleDate } = resolveSoilHorizonProvenance(horizon, { sourceType: defaultSourceType, sourceName: defaultSourceName, sampleDate: defaultSampleDate })
   const date = sampleDate ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${sampleDate}T12:00:00Z`)) : undefined
   return [soilSourceLabels[sourceType], sourceName, date].filter(Boolean).join(' · ')
 }

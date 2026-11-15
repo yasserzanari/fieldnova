@@ -9,7 +9,7 @@ import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { farmWaterAccessLabels, farmWaterConstraintLabels, readFarmProfile } from '../../lib/farm/farm-profile'
-import { readSoilProfile, soilSourceLabels } from '../../lib/farm/soil-profile'
+import { readSoilProfile, resolveSoilHorizonProvenance, soilSourceLabels } from '../../lib/farm/soil-profile'
 import { readRotationConstraints } from '../scenarios/rotation-constraints'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { cropCatalog, evaluateRotation, priorityLabels, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightsFor, type CropId, type RotationPriority } from '../scenarios/rotation-model'
@@ -150,10 +150,8 @@ function formatSoilAnswer(point: GeoPoint) {
     const texture = horizon.texture && horizon.texture !== 'unknown' ? ({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[horizon.texture] : 'inconnue'
     const ph = horizon.ph === undefined ? 'pH inconnu' : `pH ${horizon.ph.toLocaleString('fr-FR')}`
     const organicMatter = horizon.organicMatterPercent === undefined ? 'matière organique inconnue' : `${horizon.organicMatterPercent.toLocaleString('fr-FR')} % de matière organique`
-    const sourceType = horizon.sourceType ?? profile.sourceType ?? 'farmer-reported'
-    const sampleDate = horizon.sampleDate ?? profile.sampleDate
+    const { sourceType, sampleDate, sourceName: reference } = resolveSoilHorizonProvenance(horizon, profile)
     const sample = sampleDate ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${sampleDate}T12:00:00Z`)) : 'date non précisée'
-    const reference = horizon.sourceName ?? profile.sourceName
     return `Horizon ${index + 1} (${horizon.topCm}–${horizon.bottomCm} cm) : texture ${texture}, ${ph}, ${organicMatter}. Origine déclarée : ${soilSourceLabels[sourceType]}${reference ? ` · ${reference}` : ''} · ${sample} (non vérifiée).`
   }) ?? []
   if (!entries.length && !horizons.length) return 'Aucune caractéristique de sol n’est renseignée pour ce point. Ces champs restent inconnus tant qu’ils ne sont pas saisis; vous pouvez les compléter dans « Mon terrain ». Les données NASA de la carte ne remplacent pas une analyse de sol.'
