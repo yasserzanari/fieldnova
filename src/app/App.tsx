@@ -6,6 +6,7 @@ import { featureRoutes } from './navigation'
 const PublicLanding = lazy(() => import('../features/landing/PublicLanding').then(module => ({ default: module.PublicLanding })))
 const LoginPage = lazy(() => import('../features/auth/LoginPage').then(module => ({ default: module.LoginPage })))
 const DemoEntryPage = lazy(() => import('../features/demo/DemoEntryPage').then(module => ({ default: module.DemoEntryPage })))
+const TechnicalPage = lazy(() => import('../features/technical/TechnicalPage').then(module => ({ default: module.TechnicalPage })))
 
 export function App() {
   return (
@@ -14,6 +15,7 @@ export function App() {
         <Route path="/" element={<Suspense fallback={<RouteLoading />}><PublicLanding /></Suspense>} />
         <Route path="/login" element={<Suspense fallback={<RouteLoading />}><LoginPage /></Suspense>} />
         <Route path="/demo" element={<Suspense fallback={<RouteLoading />}><DemoEntryPage /></Suspense>} />
+        <Route path="/methode" element={<Suspense fallback={<RouteLoading />}><TechnicalPage /></Suspense>} />
         <Route path="/app" element={<AppShell />}>
           <Route index element={<Navigate to="overview" replace />} />
           {featureRoutes.map(({ path, Component }) => (

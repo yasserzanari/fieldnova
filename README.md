@@ -15,6 +15,7 @@ Le serveur Vite écoute sur `http://localhost:5173` et recharge l’application 
 
 - `src/app/` — routes, shell authentifié, navigation commune et configuration globale.
 - `src/features/landing/` — site public et présentation du produit.
+- `src/features/technical/` — page publique `/methode` sur les sources, traitements, licences et limites.
 - `src/features/auth/` — connexion et parcours d’accès.
 - `src/features/demo/` — lancement public et sortie restaurable du cas fictif.
 - `src/features/overview/` — vue d’ensemble de l’exploitation.
@@ -50,3 +51,5 @@ Les valeurs d’exemple sont étiquetées dans l’interface et séparées des o
 ## Licence
 
 Le code FieldNova est publié sous licence MIT. Voir [LICENSE](LICENSE). Cette licence couvre le code du projet; elle ne remplace pas les conditions et attributions propres aux jeux de données, fonds de carte, bibliothèques et autres contenus tiers référencés dans [`ui-concepts/references-and-data-sources.md`](ui-concepts/references-and-data-sources.md).
+
+La page publique [Méthode & données](/methode) résume les données utilisées, les calculs du prototype et les limites avant toute interprétation.
