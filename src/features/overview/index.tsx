@@ -6,6 +6,7 @@ import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
+import { readRotationComparisonCount, ROTATION_COMPARISON_RECORDED_EVENT, rotationComparisonStorageKey } from '../../lib/impact/rotation-comparison-counter'
 import { readFarmProfile, type FarmProfile } from '../../lib/farm/farm-profile'
 import { readSoilProfile } from '../../lib/farm/soil-profile'
 import { evaluateRotation, readRotationWorkspace } from '../scenarios/rotation-model'
@@ -31,6 +32,7 @@ export function OverviewPage() {
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const { series, loading, error, retry } = usePowerMonthly(location)
   const [farmProfile, setFarmProfile] = useState<FarmProfile | null>(() => readFarmProfile(location))
+  const [comparisonCount, setComparisonCount] = useState(() => readRotationComparisonCount(location))
   const [evidence, setEvidence] = useState(() => ({ soil: readSoilProfile(location), rotation: readRotationWorkspace(location) }))
   const [farmSetupOpen, setFarmSetupOpen] = useState(false)
   const [latitude, setLatitude] = useState(String(location.latitude))
@@ -42,6 +44,7 @@ export function OverviewPage() {
     setLatitude(String(location.latitude))
     setLongitude(String(location.longitude))
     setFarmProfile(readFarmProfile(location))
+    setComparisonCount(readRotationComparisonCount(location))
     setEvidence({ soil: readSoilProfile(location), rotation: readRotationWorkspace(location) })
     setCoordError('')
   }, [location.latitude, location.longitude])
@@ -53,6 +56,19 @@ export function OverviewPage() {
     }
     window.addEventListener('fieldnova:demo-mode-change', reloadLocalData)
     return () => window.removeEventListener('fieldnova:demo-mode-change', reloadLocalData)
+  }, [location.latitude, location.longitude])
+
+  useEffect(() => {
+    const refreshCount = () => setComparisonCount(readRotationComparisonCount(location))
+    const refreshFromStorage = (event: StorageEvent) => {
+      if (event.key === rotationComparisonStorageKey(location)) refreshCount()
+    }
+    window.addEventListener(ROTATION_COMPARISON_RECORDED_EVENT, refreshCount)
+    window.addEventListener('storage', refreshFromStorage)
+    return () => {
+      window.removeEventListener(ROTATION_COMPARISON_RECORDED_EVENT, refreshCount)
+      window.removeEventListener('storage', refreshFromStorage)
+    }
   }, [location.latitude, location.longitude])
 
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
@@ -144,6 +160,7 @@ export function OverviewPage() {
             <EvidenceRow label="Sol" detail={soilAvailable ? 'Renseigné localement' : 'Inconnu'} available={soilAvailable} to="/app/terrain" />
             <EvidenceRow label="Rotations" detail={rotationAvailable ? `${completeRotations} plan${completeRotations > 1 ? 's' : ''} renseigné${completeRotations > 1 ? 's' : ''}` : evidence.rotation.isExample ? 'Exemple fictif' : 'À renseigner'} available={rotationAvailable} to="/app/scenarios" />
           </section>
+          <div className="overview-comparison-count" aria-label={`${comparisonCount} comparaisons générées pour ce point`}><span><Activity size={13} /></span><strong>{comparisonCount}</strong><div><b>Comparaisons générées</b><small>Pour ce point · stockées sur cet appareil</small></div></div>
           <Link to="/app/atlas" className="overview-panel-link">Ouvrir l’Atlas NASA <ExternalLink size={14} /></Link>
         </aside>
 

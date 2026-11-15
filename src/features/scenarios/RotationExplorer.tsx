@@ -7,6 +7,7 @@ import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
+import { recordRotationComparison } from '../../lib/impact/rotation-comparison-counter'
 import { readSoilProfile, resolveSoilHorizonProvenance, soilSourceLabels, type FarmSoilProfile } from '../../lib/farm/soil-profile'
 import { cropCatalog, evaluateRotation, exampleRotationWorkspace, generateRotationOptions, priorityLabels, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightsFor, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
 import { emptyRotationConstraints, readRotationConstraints, writeRotationConstraints } from './rotation-constraints'
@@ -188,6 +189,7 @@ export function RotationExplorer() {
       setGenerationMessage('Il faut au moins deux cultures disponibles pour produire deux options distinctes.')
       return
     }
+    recordRotationComparison(location)
     changeWorkspace(current => ({ ...current, plans: current.plans.map(plan => generated.find(candidate => candidate.id === plan.id) ?? plan) }))
     setGenerationMessage('Options classées selon les poids choisis et les cultures déclarées disponibles; les valeurs brutes restent visibles.')
   }
