@@ -155,7 +155,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 77. **[P1 · LIVRÉ · COHÉRENCE PHYSIQUE PARTIELLE] Contrôle d’unité et de plage** : la traçabilité signale pluie négative, humidité de sol hors fraction 0–1 et maximum inférieur au minimum; les valeurs brutes restent inchangées. Pas de seuil statistique ni de validation agronomique.
 78. **[P1] Validation indépendante des règles agronomiques** : documenter la source ou l’avis expert, la région et la date de révision.
 79. **[P2] Comparaison avec une station de terrain** : évaluer un produit NASA contre une observation indépendante lorsque les données existent.
-80. **[P2] Téléchargement de la fiche de preuves** : générer la méthodologie et les sources pour un scénario donné.
+80. **[P2 · LIVRÉ · MARKDOWN LOCAL] Téléchargement de la fiche de preuves** : « Exporter la fiche » génère une comparaison partageable avec rotations, scores et méthode, contexte NASA POWER sourcé et limites, profil de sol avec provenance déclarée et points à vérifier; les coordonnées précises sont omises par défaut et peuvent être incluses explicitement. Aucun envoi serveur ni PDF n’est prévu dans cet export.
 
 ### I. Impact, adaptation et communauté — 81 à 90
 
