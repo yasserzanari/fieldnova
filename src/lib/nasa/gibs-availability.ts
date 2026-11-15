@@ -23,6 +23,11 @@ export type GibsProduct = keyof typeof GIBS_PRODUCTS
 type DatePeriod = { start: string; end: string; stepDays: number }
 export type GibsAvailability = Record<GibsProduct, DatePeriod[]>
 
+export function formatGibsDate(date: string | null) {
+  if (!date) return 'date du produit indisponible'
+  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`))
+}
+
 const CACHE_TTL_MS = 15 * 60 * 1000
 let cache: { fetchedAt: number; value: GibsAvailability } | null = null
 let request: Promise<GibsAvailability> | null = null

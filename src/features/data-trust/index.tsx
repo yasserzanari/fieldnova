@@ -5,7 +5,7 @@ import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { formatPowerMonth, latestCompleteRecord, powerQualityFlags, type PowerMonthlyRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
-import { resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
+import { formatGibsDate, resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { useSelectedLocation } from '../../lib/geo/location'
 import './data-trust.css'
 
@@ -94,9 +94,7 @@ export function DataTrustPage() {
       : layer === 'surface'
         ? 'SMAP L4 · humidité de surface'
         : 'SMAP L4 · humidité zone racinaire'
-  const displayedGibsDateLabel = displayedGibsDate
-    ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${displayedGibsDate}T12:00:00Z`))
-    : null
+  const displayedGibsDateLabel = displayedGibsDate ? formatGibsDate(displayedGibsDate) : null
   const connectedCount = error || isDemoSnapshot ? 1 : 2
 
   return <section className="trust-page" aria-label="Sources de données et traçabilité">
