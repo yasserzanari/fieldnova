@@ -33,6 +33,13 @@ export type PowerMonthlySeries = {
   records: PowerMonthlyRecord[]
 }
 
+export type PowerQualityFlag = {
+  date: string
+  parameter: string
+  value: number
+  rule: string
+}
+
 type PowerResponse = {
   header?: { sources?: string[]; time_standard?: string; fill_value?: number }
   geometry?: { coordinates?: number[] }
@@ -190,6 +197,26 @@ function isPowerMonthlySeries(value: unknown): value is PowerMonthlySeries {
 
 export function latestCompleteRecord(records: PowerMonthlyRecord[]) {
   return [...records].reverse().find(record => record.temperatureC !== undefined || record.precipitationMmPerDay !== undefined || record.surfaceSoilWetness !== undefined || record.rootZoneWetness !== undefined)
+}
+
+/** Flags only hard physical contradictions; values remain untouched for audit and charts. */
+export function powerQualityFlags(records: PowerMonthlyRecord[]): PowerQualityFlag[] {
+  const flags: PowerQualityFlag[] = []
+  for (const record of records) {
+    const checks: Array<[keyof PowerMonthlyRecord, string, (value: number) => boolean, string]> = [
+      ['precipitationMmPerDay', 'PRECTOTCORR', value => value < 0, 'Une précipitation agrégée ne peut pas être négative.'],
+      ['surfaceSoilWetness', 'GWETTOP', value => value < 0 || value > 1, 'La fraction d’humidité doit rester entre 0 et 1.'],
+      ['rootZoneWetness', 'GWETROOT', value => value < 0 || value > 1, 'La fraction d’humidité doit rester entre 0 et 1.'],
+    ]
+    for (const [field, parameter, invalid, rule] of checks) {
+      const value = record[field]
+      if (typeof value === 'number' && invalid(value)) flags.push({ date: record.date, parameter, value, rule })
+    }
+    if (record.temperatureMaxC !== undefined && record.temperatureMinC !== undefined && record.temperatureMaxC < record.temperatureMinC) {
+      flags.push({ date: record.date, parameter: 'T2M_MAX / T2M_MIN', value: record.temperatureMaxC, rule: 'La température maximale est inférieure à la minimale.' })
+    }
+  }
+  return flags
 }
 
 export function formatPowerMonth(isoMonth: string) {

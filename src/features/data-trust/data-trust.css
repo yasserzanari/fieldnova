@@ -94,3 +94,13 @@
 .trust-transformation-audit li { display:grid; gap:2px; padding-left:2px; color:#777465; font-size:8px; }
 .trust-transformation-audit li strong { color:#4f6346; font-size:8px; }
 .trust-transformation-audit li small { color:#777465; font-size:7px; line-height:1.4; }
+.trust-quality-audit { display:grid; gap:6px; margin-top:7px; padding:8px; border:1px solid #dce8d2; border-radius:8px; background:#f6f9f1; }
+.trust-quality-audit.has-flags { border-color:#ead7b7; background:#fff9ee; }
+.trust-quality-audit header { display:grid; gap:3px; }
+.trust-quality-audit header strong { color:#4f7046; font-size:8px; }
+.trust-quality-audit.has-flags header strong { color:#8a6334; }
+.trust-quality-audit header small { color:#817d6e; font-size:7px; }
+.trust-quality-audit summary { color:#755b37; font-size:7px; font-weight:680; cursor:pointer; }
+.trust-quality-audit ul { display:grid; gap:5px; margin:6px 0 0; padding-left:15px; }
+.trust-quality-audit li { display:grid; gap:2px; color:#6f6a5b; font-size:7px; line-height:1.35; }
+.trust-quality-audit li strong { color:#665137; }
