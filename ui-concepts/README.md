@@ -1,6 +1,6 @@
-# Concepts UI FieldNova — sélection à valider
+# Concepts UI FieldNova — références visuelles
 
-Cette sélection rassemble les six écrans générés qui correspondent le mieux aux préférences exprimées : carte interactive au centre, informations en panneaux superposés, navigation latérale cohérente, vues sans défilement vertical, visualisation du sol avec niveaux de confiance et calendrier cultural.
+Cette sélection rassemble six maquettes générées qui correspondent aux préférences exprimées : carte interactive au centre, informations en panneaux superposés, navigation latérale cohérente, vues sans défilement vertical, visualisation du sol avec niveaux de confiance et calendrier cultural. Elles servent de références visuelles et ne représentent pas l’application courante.
 
 Les images sont des maquettes visuelles. Les nombres, parcelles, emplacements, sources et graphiques affichés sont des exemples de démonstration et ne représentent pas des mesures en temps réel.
 
@@ -43,6 +43,10 @@ Le catalogue et ses filtres sont à gauche ; la couverture géographique est vis
 ## À confirmer
 
 Merci de confirmer les écrans que tu souhaites garder, et d’indiquer les ajustements éventuels. Le dashboard du globe est une proposition spécifique pour l’écran d’accueil ; les cinq autres visuels couvrent les onglets de la navigation.
+
+## Captures de l’application
+
+Les captures datées de l’application réelle sont dans [`demo-captures/`](demo-captures/README.md). Elles documentent les vues implémentées au 15 novembre 2026 et leur état de démonstration; elles sont distinctes des maquettes ci-dessus.
 
 ## Démonstration
 
