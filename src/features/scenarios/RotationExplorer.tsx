@@ -8,6 +8,7 @@ import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord, type PowerMonthlyRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { recordRotationComparison } from '../../lib/impact/rotation-comparison-counter'
+import { farmWaterAccessLabels, farmWaterConstraintLabels, readFarmProfile } from '../../lib/farm/farm-profile'
 import { readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, type FarmSoilProfile, type SoilFieldKey } from '../../lib/farm/soil-profile'
 import { cropCatalog, evaluateRotation, exampleRotationWorkspace, generateRotationOptions, priorityLabels, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightSensitivity, rotationWeightsFor, topRotations, type CropId, type RotationId, type RotationPlan, type RotationPriority, type RotationWorkspace, writeRotationWorkspace } from './rotation-model'
 import { emptyRotationConstraints, readRotationConstraints, writeRotationConstraints } from './rotation-constraints'
@@ -157,6 +158,7 @@ export function RotationExplorer() {
     ? [...new Set(detailedPlan.crops.filter((id): id is CropId => Boolean(id && constraints.unavailableCropIds.includes(id))))]
     : []
   const soil = soilState.pointKey === pointKey ? soilState.value : readSoilProfile(location)
+  const farmProfile = readFarmProfile(location)
   const soilValues = soilSummary(soil)
   const soilHasGeneralValues = hasGeneralSoilValues(soil)
   const changeWorkspace = (update: (value: RotationWorkspace) => RotationWorkspace, markAsLocal = false) => {
@@ -300,6 +302,13 @@ export function RotationExplorer() {
       }) : ['- Aucun horizon local détaillé n’est renseigné.']),
       '- Les profondeurs non couvertes par les horizons déclarés restent inconnues.',
     ]
+    const farmLines = farmProfile ? [
+      `- Accès à l’eau déclaré : ${farmWaterAccessLabels[farmProfile.waterAccess]}.`,
+      `- Restrictions d’eau déclarées : ${farmWaterConstraintLabels[farmProfile.waterConstraint]}.`,
+      `- Nature du profil : ${farmProfile.isExample ? 'exemple fictif' : 'saisie locale'}; non vérifiée indépendamment.`,
+    ] : [
+      '- Aucun profil de ferme n’est renseigné pour ce point; accès et restrictions d’eau restent inconnus.',
+    ]
     const rotationLines = currentWorkspace.plans.map(plan => {
       const metrics = evaluateRotation(plan)
       const crops = plan.crops.map((id, index) => {
@@ -339,6 +348,11 @@ export function RotationExplorer() {
       ...soilLines,
       'Ces champs sont des saisies locales de l’utilisateur; ils ne sont ni vérifiés par laboratoire ni fournis par la NASA.',
       '',
+      '## Profil de ferme · eau',
+      '',
+      ...farmLines,
+      'Ces catégories proviennent du profil local; elles ne donnent ni quota, ni dose, ni calendrier d’irrigation et ne participent pas au classement des rotations.',
+      '',
       '## Méthode et limites',
       '',
       `Sources des familles et traits génériques : [${rotationSources.botanicalFamilies.label}](${rotationSources.botanicalFamilies.url}), [${rotationSources.rootArchitecture.label}](${rotationSources.rootArchitecture.url}) et [${rotationSources.legumes.label}](${rotationSources.legumes.url}). Ces références ne valident pas les traits pour cette parcelle ou sa variété.`,
@@ -369,6 +383,10 @@ export function RotationExplorer() {
       <span className="rotation-map-hint">{drawingParcel ? 'Mode dessin actif · chaque clic ajoute un sommet au contour temporaire' : 'Cliquez pour déplacer le point suivi · les profils et séries suivent la position sélectionnée'}</span>
 
       <aside className={`rotation-context-panel rotation-context-left ${mobileContextPanel === 'local' ? 'is-mobile-active' : 'is-mobile-hidden'}`} aria-label="Contexte du sol local et du climat NASA">
+        <header className="rotation-panel-heading"><span className="rotation-panel-icon climate"><Droplets size={15} /></span><span><strong>Profil de ferme · eau</strong><small>{farmProfile ? farmProfile.isExample ? 'Exemple fictif' : 'Déclaration locale · non vérifiée' : 'Aucune déclaration pour ce point'}</small></span></header>
+        {farmProfile ? <ul className="rotation-soil-list"><li>{farmWaterAccessLabels[farmProfile.waterAccess]}</li><li>{farmWaterConstraintLabels[farmProfile.waterConstraint]}</li></ul> : <p className="rotation-context-empty">Accès à l’eau et restrictions restent inconnus tant qu’ils ne sont pas déclarés.</p>}
+        <p className="rotation-climate-footnote">Non utilisés pour noter les rotations : les besoins en eau des cultures ne sont pas modélisés.</p>
+        <div className="rotation-context-divider" />
         <header className="rotation-panel-heading"><span className="rotation-panel-icon soil"><Sprout size={15} /></span><span><strong>Sol local</strong><small>{soilHasGeneralValues ? Object.keys(soil.fieldProvenance ?? {}).length ? 'Origines déclarées par caractéristique' : `Origine déclarée : ${soilSourceLabels[soil.sourceType ?? 'farmer-reported']}` : soil.horizons?.length ? 'Origine propre à chaque horizon' : 'Aucune donnée renseignée'}</small></span></header>
         {soilValues.length ? <ul className="rotation-soil-list">{soilValues.map(value => <li key={value}>{value}</li>)}</ul> : <p className="rotation-context-empty">Aucune caractéristique de sol n’est renseignée pour ce point.</p>}
         <Link to="/app/terrain" className="rotation-context-link">Renseigner le profil du sol <ArrowUpRight size={12} /></Link>
@@ -433,6 +451,7 @@ export function RotationExplorer() {
         </section>
         <section className="rotation-evidence-context"><div><h3>Contexte observé pour ce point</h3>{currentSeries && latest ? <p>NASA POWER · {formatPowerMonth(latest.date)} · centre MERRA-2 {currentSeries.gridPoint.latitude.toFixed(3)}, {currentSeries.gridPoint.longitude.toFixed(3)} · {currentSeries.source.join(' + ')}. {latest.precipitationMmPerDay === undefined ? 'Pluie indisponible' : `${latest.precipitationMmPerDay.toLocaleString('fr-FR')} mm/j`} · {latest.temperatureC === undefined ? 'température indisponible' : `${latest.temperatureC.toLocaleString('fr-FR')} °C`}.</p> : <p>{climateLoading ? 'Données NASA POWER en cours de chargement.' : climateError ? `Données NASA indisponibles : ${climateError}` : 'Aucune série NASA POWER chargée pour ce point.'}</p>}</div>
           <div><h3>Profil local du sol</h3><p>{soilValues.length || soil.sampleDate || soil.samplingMethod || soil.sourceName || soil.horizons?.length ? `${soilValues.length ? `${soilValues.join(' · ')} · ` : 'Fiche de prélèvement renseignée · '}${soilHasGeneralValues ? Object.keys(soil.fieldProvenance ?? {}).length ? 'origines déclarées séparément par caractéristique, non vérifiées' : `${soilSourceLabels[soil.sourceType ?? 'farmer-reported']} (origine générale déclarée, non vérifiée)` : 'horizons saisis localement; leur provenance peut différer'}${!Object.keys(soil.fieldProvenance ?? {}).length && soil.sourceName ? ` · ${soil.sourceName}` : ''}${!Object.keys(soil.fieldProvenance ?? {}).length && soil.sampleDate ? ` · échantillon du ${soil.sampleDate}` : ''}${!Object.keys(soil.fieldProvenance ?? {}).length && soil.samplingMethod ? ` · méthode de prélèvement : ${soil.samplingMethod}` : ''}.` : 'Aucune caractéristique de sol renseignée pour ce point.'}</p></div>
+          <div><h3>Profil de ferme · eau</h3><p>{farmProfile ? `${farmWaterAccessLabels[farmProfile.waterAccess]} · ${farmWaterConstraintLabels[farmProfile.waterConstraint]} · ${farmProfile.isExample ? 'exemple fictif' : 'déclaration locale non vérifiée'}.` : 'Aucun profil renseigné; accès à l’eau et restrictions restent inconnus.'} Cette information ne participe pas au classement, qui ne modélise pas les besoins en eau des cultures.</p></div>
           <p className="rotation-evidence-limit">Climat NASA et sol local sont affichés comme éléments de contexte; ils ne participent pas au classement actuel.</p>
         </section>
         <section className="rotation-evidence-section"><h3>Points à vérifier avant toute décision</h3><ul><li>Calendrier local, variété et durée du cycle.</li><li>Disponibilité d’eau, matériel, débouché et règles de succession régionales.</li><li>Les classifications génériques et les données NASA régionales doivent être confrontées aux observations de l’exploitation et à un avis agronomique local.</li></ul></section>
