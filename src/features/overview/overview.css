@@ -84,3 +84,43 @@
 @media(max-width:1120px) { .overview-page { grid-template-rows:43px minmax(0,1fr) 205px; }.overview-panel { padding:9px; }.overview-parcels-panel { width:226px; }.overview-climate-panel { top:86px; width:272px; }.overview-map-stage { border-radius:14px; }.overview-coordinate-form { grid-template-columns:1fr 1fr 28px; } }
 @media(max-width:820px) { .overview-page { height:auto; min-height:calc(100dvh - 62px); grid-template-rows:auto minmax(650px,72dvh) auto; overflow:visible; padding:14px; }.overview-heading { align-items:flex-start; }.overview-heading p { max-width:420px; }.overview-map-stage { min-height:650px; }.overview-panel { top:auto; bottom:10px; max-height:295px; overflow:auto; }.overview-parcels-panel { left:10px; width:calc(48% - 14px); }.overview-climate-panel { right:10px; width:calc(52% - 14px); }.overview-map-controls { top:89px; right:8px; left:auto; }.overview-bottom-grid { grid-template-columns:1fr; }.overview-bottom-panel { min-height:180px; }.overview-map-click-hint { bottom:316px; } }
 @media(max-width:560px) { .overview-page { grid-template-rows:auto minmax(830px,87dvh) auto; padding:12px 10px; }.overview-heading h1 { font-size:19px; }.overview-heading p { max-width:245px; font-size:9px; }.overview-farm-profile-button { max-width:46%; gap:5px; padding-right:6px; }.overview-farm-profile-button strong { font-size:9px; }.overview-farm-profile-button small { font-size:7px; }.overview-farm-profile-icon { width:25px; height:25px; }.overview-map-stage { min-height:830px; }.overview-map-topline { top:8px; right:8px; left:8px; flex-direction:column; align-items:flex-start; }.overview-map-options { width:100%; grid-template-columns:1fr auto; align-items:start; }.overview-imagery-date { align-self:start; }.overview-map-controls { top:91px; right:8px; }.overview-panel { right:8px; left:8px; width:auto; max-height:274px; }.overview-parcels-panel { bottom:291px; }.overview-climate-panel { bottom:8px; }.overview-map-click-hint { bottom:573px; max-width:calc(100% - 24px); }.overview-bottom-grid { gap:8px; }.overview-bottom-panel { min-height:184px; padding-inline:8px; }.overview-bottom-heading h2 { font-size:8px; }.data-quality { max-width:36%; }.map-location { min-height:30px; font-size:8px; } }
+
+.overview-mobile-tabs { display:none; }
+@media(max-width:820px) {
+  .overview-page { height:100%; min-height:0; grid-template-rows:auto 48px minmax(0,1fr); gap:8px; overflow:hidden; padding:10px; }
+  .overview-heading { min-height:42px; align-items:center; }
+  .overview-heading p { max-width:50vw; }
+  .overview-mobile-tabs { display:flex; min-width:0; gap:4px; padding:3px; border:1px solid #e7e5da; border-radius:10px; background:#f3f2eb; }
+  .overview-mobile-tabs button { min-width:0; min-height:44px; flex:1; padding:0 4px; border:0; border-radius:7px; background:transparent; color:#676454; font-size:11px; font-weight:650; cursor:pointer; }
+  .overview-mobile-tabs button.is-active { background:#fffefa; color:#315d39; box-shadow:0 1px 3px #263c201a; }
+  .overview-map-stage { min-height:0; border-radius:12px; }
+  .overview-bottom-grid { display:none; }
+  .overview-panel { top:10px; right:auto; bottom:auto; left:auto; width:auto; max-height:none; overflow:auto; }
+  .overview-parcels-panel { left:10px; }
+  .overview-climate-panel { right:10px; }
+  .overview-map-controls { top:auto; right:10px; bottom:10px; left:auto; }
+  .overview-map-click-hint { right:62px; bottom:12px; left:10px; max-width:none; }
+  .overview-page.mobile-view-map .overview-parcels-panel,.overview-page.mobile-view-map .overview-climate-panel { display:none; }
+  .overview-page.mobile-view-point .overview-map-stage > :not(.overview-parcels-panel),.overview-page.mobile-view-climate .overview-map-stage > :not(.overview-climate-panel) { display:none; }
+  .overview-page.mobile-view-point .overview-map-stage,.overview-page.mobile-view-climate .overview-map-stage { display:grid; grid-template:1fr / 1fr; border:0; background:transparent; box-shadow:none; }
+  .overview-page.mobile-view-point .overview-parcels-panel,.overview-page.mobile-view-climate .overview-climate-panel { position:static; width:100%; height:100%; grid-area:1 / 1; padding:12px; border:1px solid #e6e3d9; border-radius:11px; background:#fffefa; box-shadow:none; }
+  .overview-page.mobile-view-history .overview-map-stage { display:none; }
+  .overview-page.mobile-view-history .overview-bottom-grid { display:grid; min-height:0; grid-template-columns:1fr; grid-template-rows:1fr 1fr; gap:8px; overflow:auto; }
+  .overview-page.mobile-view-history .overview-bottom-panel { min-height:0; padding:8px; }
+  .overview-page.mobile-view-history .overview-climate-chart { min-height:50px; }
+}
+@media(max-width:560px) {
+  .overview-page { grid-template-rows:auto 48px minmax(0,1fr); padding:8px; }
+  .overview-heading h1 { font-size:17px; }
+  .overview-heading p { display:none; }
+  .overview-farm-profile-button { max-width:56%; }
+  .overview-mobile-tabs button { font-size:10px; }
+  .overview-map-topline { top:8px; right:8px; left:8px; flex-direction:row; align-items:flex-start; }
+  .overview-map-options { width:auto; grid-template-columns:1fr; justify-items:end; }
+  .overview-imagery-date { display:none; }
+  .overview-map-controls { top:auto; right:8px; bottom:8px; }
+  .overview-map-click-hint { bottom:14px; max-width:calc(100% - 76px); font-size:7px; }
+  .overview-page.mobile-view-point .overview-parcels-panel,.overview-page.mobile-view-climate .overview-climate-panel { padding:10px; }
+  .overview-page.mobile-view-history .overview-bottom-grid { gap:6px; }
+  .overview-page.mobile-view-history .overview-bottom-panel { padding:6px; }
+}

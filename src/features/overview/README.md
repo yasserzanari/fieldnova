@@ -2,6 +2,7 @@
 
 - **Route :** `/app/overview`
 - **Carte :** MapLibre avec fond OpenStreetMap, imagerie MODIS/Terra True Color et couche NDVI 8 jours servies par NASA GIBS. La carte se déplace, zoome, accepte une sélection de point au clic et permet de saisir des coordonnées ou de demander la position du navigateur.
+- **Panneaux mobiles :** sur petit écran, Carte, Point, Climat & eau et Historique occupent la hauteur disponible sans défilement de page. Les données longues restent défilables dans leur panneau; sur grand écran, les panneaux continuent de flotter sur la carte et les deux graphiques restent visibles sous celle-ci.
 - **Données climatiques :** séries mensuelles NASA POWER pour le point sélectionné (`PRECTOTCORR`, `T2M`, `T2M_MAX`, `T2M_MIN`, `GWETROOT`). Les valeurs de remplissage NASA sont ignorées. L’API interroge la coordonnée choisie; FieldNova dérive le centre MERRA-2 de plus proche voisin depuis la grille native documentée et en affiche l’empreinte de 0,5° × 0,625° sur la carte.
 - **Graphiques :** précipitations moyennes quotidiennes mensuelles, température moyenne et humidité racinaire modélisée ; les tracés proviennent directement des séries NASA reçues. Les infobulles SVG exposent la valeur exacte et la période.
 - **Persistance :** le point choisi est mémorisé en local et partagé entre onglets via `useSelectedLocation`.

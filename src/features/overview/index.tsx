@@ -26,6 +26,7 @@ function formatCoord(value: number, suffix: string) {
 }
 
 export function OverviewPage() {
+  const [mobileView, setMobileView] = useState<'map' | 'point' | 'climate' | 'history'>('map')
   const measurementSystem = useMeasurementSystem()
   const { location, selectLocation } = useSelectedLocation()
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('streets')
@@ -118,13 +119,17 @@ export function OverviewPage() {
   const availableEvidenceCount = [nasaAvailable, farmAvailable, soilAvailable, rotationAvailable].filter(Boolean).length
 
   return (
-    <section className="overview-page" aria-label="Vue d’ensemble avec données NASA en direct">
+    <section className={`overview-page mobile-view-${mobileView}`} aria-label="Vue d’ensemble avec données NASA en direct">
       <header className="overview-heading">
         <div><h1>Vue d’ensemble</h1><p>Choisissez un point sur la carte pour charger le climat NASA à cet emplacement.</p></div>
         <button className="overview-farm-profile-button" type="button" onClick={() => setFarmSetupOpen(true)} aria-label={farmProfile ? `Modifier le profil de ${farmProfile.name}` : 'Configurer le profil de ma ferme'}>
           <span className="overview-farm-profile-icon"><Sprout size={16} /></span><span><strong>{farmProfile?.name ?? 'Configurer ma ferme'}</strong><small>{farmProfile?.isExample ? 'Profil fictif · exemple agricole' : farmProfile ? 'Profil enregistré localement' : 'Ajouter mes priorités et contraintes'}</small></span><ChevronRight size={16} />
         </button>
       </header>
+
+      <nav className="overview-mobile-tabs" role="group" aria-label="Panneau de la vue d’ensemble">
+        {([['map', 'Carte'], ['point', 'Point'], ['climate', 'Climat & eau'], ['history', 'Historique']] as const).map(([view, label]) => <button key={view} type="button" aria-pressed={mobileView === view} className={mobileView === view ? 'is-active' : ''} onClick={() => setMobileView(view)}>{label}</button>)}
+      </nav>
 
       <div className="overview-map-stage">
         <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={updatePoint} onMapReady={setMap} ariaLabel="Carte interactive OpenStreetMap et couches NASA GIBS" />
