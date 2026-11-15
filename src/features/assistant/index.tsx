@@ -23,8 +23,9 @@ import { AssistantSoilImportCard, type AssistantSoilImport } from './AssistantSo
 import './assistant.css'
 
 type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
+type Intent = 'soil' | 'calendar' | 'farm' | 'rotation' | 'climate' | 'unknown'
 type EvidenceTag = { label: string; kind: 'source' | 'calculation' | 'local' | 'limit' | 'missing' }
-type Message = { id: number; role: 'user' | 'assistant'; text: string; point?: GeoPoint; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[]; evidenceTags?: EvidenceTag[]; soilImport?: AssistantSoilImport }
+type Message = { id: number; role: 'user' | 'assistant'; text: string; point?: GeoPoint; intent?: Intent; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[]; evidenceTags?: EvidenceTag[]; soilImport?: AssistantSoilImport }
 type CodexStatus = 'checking' | 'ready' | 'unavailable'
 
 const sources: AISource[] = [
@@ -166,7 +167,7 @@ function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, 
   return `${prefix}${summary ? ` NASA POWER indique ${summary}.` : ' Aucune mesure climatique exploitable n’est disponible pour ce mois.'} La carte montre ${requestedLayer}. Dites-moi si vous voulez examiner la pluie, la température, l’humidité du sol ou le NDVI. Les séries POWER sont mensuelles et ne constituent ni une prévision ni un diagnostic parcellaire.`
 }
 
-function classifyQuestion(question: string) {
+function classifyQuestion(question: string, contextualIntent?: Intent) {
   const lower = question.toLocaleLowerCase('fr')
   const asksSoilProfile = /profil de (?:mon |la )?sol|texture|\bph\b|matière organique|drainage|profondeur|horizon|couche|analyse de sol/.test(lower)
   const asksCalendar = /calendrier.{0,18}(?:cultural|culture|semis|récolte)|\bsemis\b|\bsemer\b|\brécolter\b|\bplanter\b|\b(?:date|période|fenêtre|quand).{0,20}récolte\b|\brécolte.{0,15}(?:date|période|fenêtre)\b|fenêtre.{0,15}travail|disponibilité.{0,20}(?:ferme|semis|récolte)|mois où.{0,20}(?:semer|récolter)/.test(lower)
@@ -175,8 +176,14 @@ function classifyQuestion(question: string) {
   const asksFarmProfile = /ma ferme|mon exploitation|accès.{0,3}eau|eau disponible|ressource en eau|approvisionnement en eau|restriction.{0,12}eau|contrainte.{0,12}eau|profil (?:de (?:ma |la )?ferme|d'exploitation|agricole)/.test(lower) || asksEquipment
   const asksClimate = /pluie|précip|température|\bchaud\b|\bfroid\b|humidité|climat|météo|nasa|ndvi|vigueur|satellite|imagerie|irrig/.test(lower)
   const asksLayer: LayerId | undefined = /ndvi|vigueur/.test(lower) ? 'ndvi' : /humidité de surface|smap surface/.test(lower) ? 'surface' : /humidité racinaire|humidité du sol|racine/.test(lower) ? 'root' : undefined
-  const intent = asksSoilProfile ? 'soil' : asksEquipment ? 'farm' : asksCalendar ? 'calendar' : asksRotation ? 'rotation' : asksFarmProfile ? 'farm' : asksClimate ? 'climate' : 'unknown'
-  return { intent, asksLayer }
+  const intent: Intent = asksSoilProfile ? 'soil' : asksEquipment ? 'farm' : asksCalendar ? 'calendar' : asksRotation ? 'rotation' : asksFarmProfile ? 'farm' : asksClimate ? 'climate' : 'unknown'
+  const contextual = intent === 'unknown' && contextualIntent !== undefined
+  return { intent: contextual ? contextualIntent : intent, asksLayer, contextual }
+}
+
+function isContextualFollowup(question: string) {
+  const normalized = question.toLocaleLowerCase('fr').trim().replace(/[?!.,…]+$/g, '').replace(/\s+/g, ' ')
+  return /^(?:et\s+(?:(?:alors|pour|dans|ça|cela|ce|cette|celui|celle|là)\b)?|pourquoi(?:\s+(?:ça|cela|ce|cette|l’option|l’alternative))?|comment\s+(?:ça|cela|ce|cette|l’option|l’alternative)|qu’est-ce que ça|qu’est-ce que cela|que signifie(?:\s+(?:ça|cela))?|peux-tu\s+(?:détailler|préciser|expliquer)|tu peux\s+(?:détailler|préciser|expliquer)|détaille|précise|explique|et si)\b/.test(normalized)
 }
 
 function asksForUnsupportedFarmDecision(question: string) {
@@ -351,13 +358,16 @@ export function AssistantPage() {
     if (!question) return
     const id = ++lastId.current
     const userId = ++lastId.current
-    const route = classifyQuestion(question)
     const unsupportedFarmDecision = asksForUnsupportedFarmDecision(question)
+    const lastUserMessage = [...messages].reverse().find(message => message.role === 'user')
+    const contextualIntent = !unsupportedFarmDecision && isContextualFollowup(question) && lastUserMessage?.intent !== 'unknown' ? lastUserMessage?.intent : undefined
+    const route = classifyQuestion(question, contextualIntent)
     const messagePoint = { latitude: location.latitude, longitude: location.longitude }
     const requestedLayer = route.asksLayer ?? layer
     if (route.asksLayer) setLayer(route.asksLayer)
-    setMessages(current => [...current, { id: userId, role: 'user', text: question, point: messagePoint }, { id, role: 'assistant', text: '', point: messagePoint, running: true }])
+    setMessages(current => [...current, { id: userId, role: 'user', text: question, point: messagePoint, intent: unsupportedFarmDecision ? 'unknown' : route.intent }, { id, role: 'assistant', text: '', point: messagePoint, running: true }])
     const trace: TraceNode[] = []
+    if (route.contextual) trace.push({ id: `context-${id}`, type: 'step', primary: 'Relance rattachée au sujet précédent', secondary: 'Le dernier sujet FieldNova est vérifié avec le même outil et le point courant.', status: 'completed' })
     let currentSeries = series
     let answer: string
     let evidence = ''
