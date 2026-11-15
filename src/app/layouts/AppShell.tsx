@@ -1,12 +1,13 @@
 import { Bell, ChevronDown, ChevronLeft, CircleHelp, CloudRain, FlaskConical, Leaf, MapPin, Menu, ThermometerSun, UserRound } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { featureRoutes } from '../navigation'
-import { useSelectedLocation } from '../../lib/geo/location'
+import { isValidGeoPoint, useSelectedLocation } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { exitDemoWorkspace, readDemoWorkspace, type DemoWorkspace } from '../../lib/demo/demo-workspace'
 import { formatPrecipitationRate, formatTemperature, setMeasurementSystem, useMeasurementSystem } from '../../lib/units/measurement-units'
+import './point-coordinate-editor.css'
 
 function coordinate(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(2).replace('.', ',')}° ${value < 0 ? negative : positive}`
@@ -41,12 +42,63 @@ export function AppShell() {
   const [quitPromptOpen, setQuitPromptOpen] = useState(false)
   const keepDemoButton = useRef<HTMLButtonElement>(null)
   const quitDemoButton = useRef<HTMLButtonElement>(null)
-  const { location } = useSelectedLocation()
+  const pointEditorRef = useRef<HTMLDivElement>(null)
+  const pointTriggerRef = useRef<HTMLButtonElement>(null)
+  const latitudeInputRef = useRef<HTMLInputElement>(null)
+  const { location, selectLocation } = useSelectedLocation()
+  const [pointEditorOpen, setPointEditorOpen] = useState(false)
+  const [latitudeDraft, setLatitudeDraft] = useState('')
+  const [longitudeDraft, setLongitudeDraft] = useState('')
+  const [pointError, setPointError] = useState('')
   const measurementSystem = useMeasurementSystem()
   const { series, loading, error } = usePowerMonthly(location)
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
   const unavailable = Boolean(error)
   const usingDemoSnapshot = series?.deliveryMode === 'demo-fixture'
+
+  const closePointEditor = (restoreFocus = true) => {
+    setPointEditorOpen(false)
+    setPointError('')
+    if (restoreFocus) requestAnimationFrame(() => pointTriggerRef.current?.focus())
+  }
+
+  const openPointEditor = () => {
+    setLatitudeDraft(location.latitude.toFixed(5))
+    setLongitudeDraft(location.longitude.toFixed(5))
+    setPointError('')
+    setPointEditorOpen(true)
+  }
+
+  const savePoint = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const latitude = Number(latitudeDraft.trim().replace(',', '.'))
+    const longitude = Number(longitudeDraft.trim().replace(',', '.'))
+    if (!latitudeDraft.trim() || !longitudeDraft.trim() || !isValidGeoPoint({ latitude, longitude })) {
+      setPointError('Latitude : −90 à 90°. Longitude : −180 à 180°. Saisissez des degrés décimaux.')
+      return
+    }
+    try {
+      selectLocation({ latitude, longitude })
+      closePointEditor()
+    } catch {
+      setPointError('Le navigateur n’a pas pu enregistrer ce point sur cet appareil.')
+    }
+  }
+
+  useEffect(() => {
+    if (!pointEditorOpen) return
+    latitudeInputRef.current?.focus()
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') closePointEditor() }
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.target instanceof Node && !pointEditorRef.current?.contains(event.target) && !pointTriggerRef.current?.contains(event.target)) closePointEditor(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [pointEditorOpen])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -190,7 +242,19 @@ export function AppShell() {
             <Menu size={19} />
           </button>
           <div className="topbar-context">
-            <span className="context-control"><MapPin size={17} /> Point suivi · {coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</span>
+            <div className="context-point-control">
+              <button ref={pointTriggerRef} type="button" className="context-control" aria-label={`Modifier le point suivi, actuellement ${coordinate(location.latitude, 'N', 'S')} et ${coordinate(location.longitude, 'E', 'O')}`} aria-haspopup="dialog" aria-expanded={pointEditorOpen} onClick={() => pointEditorOpen ? closePointEditor() : openPointEditor()}><MapPin size={17} aria-hidden="true" />Point suivi · {coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</button>
+              {pointEditorOpen && <div ref={pointEditorRef} id="point-coordinate-editor" className="point-coordinate-editor" role="dialog" aria-label="Modifier le point suivi">
+                <h2>Choisir un point</h2>
+                <p>Coordonnées WGS84 en degrés décimaux. Latitude : −90 à 90°; longitude : −180 à 180°.</p>
+                <form onSubmit={savePoint}>
+                  <label>Latitude<input ref={latitudeInputRef} aria-label="Latitude en degrés décimaux" type="text" inputMode="decimal" autoComplete="off" value={latitudeDraft} onChange={event => setLatitudeDraft(event.target.value)} /></label>
+                  <label>Longitude<input aria-label="Longitude en degrés décimaux" type="text" inputMode="decimal" autoComplete="off" value={longitudeDraft} onChange={event => setLongitudeDraft(event.target.value)} /></label>
+                  {pointError && <p className="point-coordinate-error" role="alert">{pointError}</p>}
+                  <div><button type="button" className="point-coordinate-cancel" onClick={() => closePointEditor()}>Annuler</button><button type="submit" className="point-coordinate-save">Appliquer</button></div>
+                </form>
+              </div>}
+            </div>
             <span className="context-weather" aria-live="polite">
               <ThermometerSun size={16} />
               {loading ? <strong>NASA POWER…</strong> : unavailable ? <strong>Données indisponibles</strong> : latest?.temperatureC !== undefined ? <strong>{formatTemperature(latest.temperatureC, measurementSystem)} · {formatPowerMonth(latest.date)}</strong> : <strong>Température non disponible</strong>}
