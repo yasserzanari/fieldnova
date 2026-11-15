@@ -11,7 +11,7 @@ import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { formatGibsDate, resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { readDemoWorkspace } from '../../lib/demo/demo-workspace'
 import { farmWaterAccessLabels, farmWaterConstraintLabels, readFarmProfile } from '../../lib/farm/farm-profile'
-import { fieldObservationKindLabel, readFieldObservations, type ObservationKind } from '../../lib/farm/field-observations'
+import { fieldObservationKindLabel, readFieldObservations, writeFieldObservations, type FieldObservation, type ObservationKind } from '../../lib/farm/field-observations'
 import { archiveSoilAnalysis, readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, writeSoilProfile, type SoilFieldKey } from '../../lib/farm/soil-profile'
 import { parseSoilAnalysisCsv } from '../../lib/farm/soil-analysis-csv'
 import { readRotationConstraints } from '../scenarios/rotation-constraints'
@@ -21,12 +21,13 @@ import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatLength, formatPrecipitationRate, formatTemperature, useMeasurementSystem } from '../../lib/units/measurement-units'
 import { evaluateRotation, priorityLabels, readCropCatalog, readRotationWorkspace, rotationCombinedScore, rotationScoreMissingTraits, rotationSources, rotationWeightsFor, type CropDefinition, type CropId, type RotationPriority } from '../scenarios/rotation-model'
 import { AssistantSoilImportCard, type AssistantSoilImport } from './AssistantSoilImportCard'
+import { AssistantObservationCard, type AssistantObservationDraft } from './AssistantObservationCard'
 import './assistant.css'
 
 type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
 type Intent = 'soil' | 'calendar' | 'farm' | 'rotation' | 'climate' | 'observations' | 'unknown'
 type EvidenceTag = { label: string; kind: 'source' | 'calculation' | 'local' | 'limit' | 'missing' }
-type Message = { id: number; role: 'user' | 'assistant'; text: string; point?: GeoPoint; intent?: Intent; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[]; evidenceTags?: EvidenceTag[]; soilImport?: AssistantSoilImport }
+type Message = { id: number; role: 'user' | 'assistant'; text: string; point?: GeoPoint; intent?: Intent; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[]; evidenceTags?: EvidenceTag[]; soilImport?: AssistantSoilImport; observationDraft?: AssistantObservationDraft }
 type CodexStatus = 'checking' | 'ready' | 'unavailable'
 
 const sources: AISource[] = [
@@ -171,7 +172,7 @@ function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, 
 
 function classifyQuestion(question: string, contextualIntent?: Intent) {
   const lower = question.toLocaleLowerCase('fr')
-  const asksObservations = /journal|observations? de (?:terrain|champ)|notes? de (?:terrain|champ)|observations?.{0,24}(?:enregistr|saisi|noté)|(?:enregistr|saisi|noté).{0,24}observations?|historique.{0,24}(?:terrain|champ|irrigation|semis|récolte)|qu['’]ai-je (?:fait|noté|observé)|qu['’]est-ce que j['’]ai (?:fait|noté|observé)|(?:semis|semé|semer|récolte|récolté|irrigation|irrigué).{0,30}(?:noté|enregistr|fait|observ)|(?:noté|enregistr|fait|observ).{0,30}(?:semis|semé|récolte|irrigation|irrigué)|(?:semé|irrigué|récolté|noté|observé).{0,20}(?:quand|date|historique)/.test(lower)
+  const asksObservations = /journal|observations? de (?:terrain|champ)|notes? de (?:terrain|champ)|observations?.{0,24}(?:enregistr|saisi|noté)|(?:enregistr|saisi|noté).{0,24}observations?|historique.{0,24}(?:terrain|champ|irrigation|semis|récolte)|qu['’]ai-je (?:fait|noté|observé)|qu['’]est-ce que j['’]ai (?:fait|noté|observé)|(?:semis|semé|semer|récolte|récolté|irrigation|irrigué).{0,30}(?:noté|enregistr|fait|observ)|(?:noté|enregistr|fait|observ).{0,30}(?:semis|semé|récolte|irrigation|irrigué)|(?:semé|irrigué|récolté|noté|observé).{0,20}(?:quand|date|historique)|(?:ajoute|ajouter|consigne|consigner|enregistre|enregistrer).{0,45}(?:journal|observation|note de terrain|semis|récolte|irrigation)/.test(lower)
   const asksSoilProfile = /profil de (?:mon |la )?sol|texture|\bph\b|matière organique|drainage|profondeur|horizon|couche|analyse de sol/.test(lower)
   const asksCalendar = /calendrier.{0,18}(?:cultural|culture|semis|récolte)|\bsemis\b|\bsemer\b|\brécolter\b|\bplanter\b|\b(?:date|période|fenêtre|quand).{0,20}récolte\b|\brécolte.{0,15}(?:date|période|fenêtre)\b|fenêtre.{0,15}travail|disponibilité.{0,20}(?:ferme|semis|récolte)|mois où.{0,20}(?:semer|récolter)/.test(lower)
   const asksEquipment = /matériel|équipement|tracteur|semoir|moissonneuse|prestataire|opérations? faisables/.test(lower)
@@ -194,6 +195,28 @@ function asksForUnsupportedFarmDecision(question: string) {
   const asksIrrigationDose = /\b(?:dose|quantité|volume|combien de)\b.{0,35}\b(?:irrig|eau)|\b(?:irrig|arros).{0,35}\b(?:dose|quantité|volume|combien de|date|quand)|\bquand irriguer\b/.test(lower)
   const asksYieldPrediction = /\b(?:prédire|prediction|prévision|estimer|estimation)\b.{0,35}\b(?:rendement|récolte)|\b(?:rendement|récolte)\b.{0,35}\b(?:prédire|prediction|prévision|estimer|estimation)/.test(lower)
   return asksIrrigationDose || asksYieldPrediction
+}
+
+function asksToRecordObservation(question: string) {
+  return /\b(?:ajoute|ajouter|consigne|consigner|enregistre|enregistrer|note)\b.{0,60}\b(?:journal|observation|note de terrain|semis|récolte|irrigation)\b/i.test(question)
+}
+
+function observationTextFromRequest(question: string) {
+  const explicit = question.match(/(?:\:|[«“"]).+?(?:[»”"])?\s*$/)
+  if (explicit) return explicit[0].replace(/^\s*(?:\:|[«“"]+)\s*/, '').replace(/[»”"]+\s*$/, '').trim()
+  return question.trim().slice(0, 1000)
+}
+
+function observationKindFromRequest(question: string): ObservationKind {
+  const lower = question.toLocaleLowerCase('fr')
+  return /\bsemis?\b|\bsemé\b|\bsemer\b/.test(lower) ? 'semis'
+    : /\brécoltes?\b|\brécolté\b|\brécolter\b/.test(lower) ? 'recolte'
+      : /\birrigations?\b|\birrigué\b|\barrosage\b|\barrosé\b/.test(lower) ? 'irrigation' : 'note'
+}
+
+function todayForObservation() {
+  const date = new Date()
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
 }
 
 function formatFarmProfileAnswer(point: GeoPoint, question: string) {
@@ -392,6 +415,7 @@ export function AssistantPage() {
     let usedSources: AISource[] = []
     let evidenceTags: EvidenceTag[] = []
     let soilImport: AssistantSoilImport | undefined
+    let observationDraft: AssistantObservationDraft | undefined
     if (files.length) {
       if (files.length !== 1) {
         answer = 'Joignez un seul fichier CSV d’analyse de sol à la fois. Aucune pièce jointe n’a été lue ni transmise.'
@@ -433,12 +457,21 @@ export function AssistantPage() {
     } else if (route.intent === 'observations') {
       const observations = readFieldObservations(location)
       const category = /\bsemis?\b|\bsemé\b|\bsemer\b/.test(question.toLocaleLowerCase('fr')) ? 'semis' : /\brécoltes?\b|\brécolté\b|\brécolter\b/.test(question.toLocaleLowerCase('fr')) ? 'récolte' : /\birrigations?\b|\birrigué\b|\barrosage\b|\barrosé\b/.test(question.toLocaleLowerCase('fr')) ? 'irrigation' : undefined
-      trace.push(traceNode(`observations-${id}`, 'read', 'Journal de terrain local · navigateur', `${observations.length} observation(s) disponible(s)`, category ? `Filtre appliqué · ${category} · point suivi` : 'Entrées déclaratives du point suivi · stockage sur cet appareil'))
-      traceHeading = 'Journal local consulté'
-      answer = formatFieldObservationsAnswer(location, question)
+      if (asksToRecordObservation(question)) {
+        observationDraft = { date: todayForObservation(), kind: observationKindFromRequest(question), crop: '', note: observationTextFromRequest(question), author: '', state: 'ready' }
+        trace.push({ id: `observation-draft-${id}`, type: 'step', primary: 'Nouvelle observation préparée', secondary: 'Aucune donnée enregistrée · vérification et confirmation requises', status: 'completed' })
+        traceHeading = 'Action locale en attente de confirmation'
+        answer = 'J’ai préparé une entrée pour votre journal. Vérifiez ou corrigez les champs ci-dessous; rien ne sera enregistré avant votre confirmation.'
+      } else {
+        trace.push(traceNode(`observations-${id}`, 'read', 'Journal de terrain local · navigateur', `${observations.length} observation(s) disponible(s)`, category ? `Filtre appliqué · ${category} · point suivi` : 'Entrées déclaratives du point suivi · stockage sur cet appareil'))
+        traceHeading = 'Journal local consulté'
+        answer = formatFieldObservationsAnswer(location, question)
+      }
       evidence = answer
       usedSources = [fieldJournalSource]
-      evidenceTags = observations.length
+      evidenceTags = observationDraft
+        ? [{ label: 'Déclaration à confirmer', kind: 'local' }, { label: 'Aucune écriture sans accord', kind: 'limit' }]
+        : observations.length
         ? [{ label: 'Déclarations locales', kind: 'local' }, { label: 'Non vérifiées · non NASA', kind: 'limit' }]
         : [{ label: 'Journal vide pour ce point', kind: 'missing' }, { label: 'Aucune donnée déduite', kind: 'limit' }]
     } else if (route.intent === 'soil') {
@@ -565,7 +598,7 @@ export function AssistantPage() {
       trace.push({ id: `codex-${id}`, type: 'step', primary: 'Codex CLI non connecté · réponse locale utilisée', secondary: 'Connectez Codex CLI sur le serveur de démonstration', status: 'failed' })
       traceHeading = 'Réponse locale FieldNova'
     }
-    setMessages(current => current.map(message => message.id === id ? { ...message, text: answer, trace, traceHeading, running: false, sources: usedSources.length ? usedSources : undefined, evidenceTags, soilImport } : message))
+    setMessages(current => current.map(message => message.id === id ? { ...message, text: answer, trace, traceHeading, running: false, sources: usedSources.length ? usedSources : undefined, evidenceTags, soilImport, observationDraft } : message))
   }
 
   const saveSoilImport = (messageId: number, imported: AssistantSoilImport) => {
@@ -604,6 +637,25 @@ export function AssistantPage() {
   const activeLayer = layerOptions.find(item => item.id === layer)!
   const dismissSoilImport = (messageId: number) => setMessages(current => current.map(message => message.id === messageId && message.soilImport
     ? { ...message, text: 'Aperçu ignoré. Le profil de sol n’a pas été modifié.', soilImport: undefined, evidenceTags: [{ label: 'Aucune donnée enregistrée', kind: 'limit' }] }
+    : message))
+  const saveObservation = (messageId: number, point: GeoPoint, value: Omit<AssistantObservationDraft, 'state' | 'error'>) => {
+    try {
+      const current = readFieldObservations(point)
+      if (current.length >= 200) throw new Error('Le journal contient déjà 200 entrées. Exportez le CSV puis supprimez des entrées avant d’en ajouter une nouvelle.')
+      const entry: FieldObservation = { id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`, ...value }
+      writeFieldObservations(point, [entry, ...current])
+      setMessages(items => items.map(item => item.id === messageId && item.observationDraft
+        ? { ...item, text: 'L’observation confirmée a été ajoutée au journal local de ce point.', observationDraft: { ...value, state: 'saved', error: undefined }, evidenceTags: [{ label: 'Déclaration enregistrée localement', kind: 'local' }, { label: 'Non vérifiée · non NASA', kind: 'limit' }] }
+        : item))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'L’enregistrement local a échoué.'
+      setMessages(items => items.map(item => item.id === messageId && item.observationDraft
+        ? { ...item, observationDraft: { ...value, state: 'ready', error: message } }
+        : item))
+    }
+  }
+  const dismissObservation = (messageId: number) => setMessages(current => current.map(message => message.id === messageId && message.observationDraft
+    ? { ...message, text: 'Action annulée. Le journal n’a pas été modifié.', observationDraft: undefined, evidenceTags: [{ label: 'Aucune donnée enregistrée', kind: 'limit' }] }
     : message))
   const LayerIcon = activeLayer.icon
   const latest = series ? latestCompleteRecord(series.records) : undefined
@@ -656,6 +708,7 @@ export function AssistantPage() {
                 {Boolean(message.evidenceTags?.length) && <div className="assistant-evidence-tags" aria-label="Nature et limites des éléments utilisés">{message.evidenceTags!.map((tag, index) => <span key={`${message.id}-${index}`} className={`is-${tag.kind}`}>{tag.label}</span>)}</div>}
                 {message.text && summarizeForField(message.text).length + 80 < message.text.trim().length ? <div className="assistant-field-answer"><div className="assistant-field-summary"><strong>En bref</strong><p>{summarizeForField(message.text)}</p></div><div className="assistant-answer-details"><button type="button" aria-expanded={Boolean(expandedAnswers[message.id])} onClick={() => setExpandedAnswers(current => ({ ...current, [message.id]: !current[message.id] }))}>{expandedAnswers[message.id] ? 'Masquer les détails' : 'Voir la réponse détaillée'}</button>{expandedAnswers[message.id] && <div className="assistant-answer-full"><p className="assistant-answer-text">{detailedFieldAnswer(message.text)}</p>{message.sources && <AISources className="assistant-sources" label="Sources utilisées" sources={message.sources} />}<MessageActions text={message.text} actions={['copy', 'feedback']} quiet={false} className="assistant-actions" /></div>}</div></div> : message.text ? <><p className="assistant-answer-text">{message.text}</p>{message.sources && <AISources className="assistant-sources" label="Sources utilisées" sources={message.sources} />}<MessageActions text={message.text} actions={['copy', 'feedback']} quiet={false} className="assistant-actions" /></> : message.running ? <p className="assistant-pending">Consultation des données sélectionnées…</p> : null}
                 {message.soilImport && <AssistantSoilImportCard value={message.soilImport} onApply={() => saveSoilImport(message.id, message.soilImport!)} onDismiss={() => dismissSoilImport(message.id)} />}
+                {message.observationDraft && <AssistantObservationCard value={message.observationDraft} onSave={value => saveObservation(message.id, message.point ?? location, value)} onDismiss={() => dismissObservation(message.id)} />}
               </>}
             </div>
           </article>)}
