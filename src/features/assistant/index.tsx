@@ -10,7 +10,7 @@ import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, offlineDemoP
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { readDemoWorkspace } from '../../lib/demo/demo-workspace'
 import { farmWaterAccessLabels, farmWaterConstraintLabels, readFarmProfile } from '../../lib/farm/farm-profile'
-import { readSoilProfile, resolveSoilHorizonProvenance, soilSourceLabels } from '../../lib/farm/soil-profile'
+import { readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, type SoilFieldKey } from '../../lib/farm/soil-profile'
 import { readRotationConstraints } from '../scenarios/rotation-constraints'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { cropCatalog, evaluateRotation, priorityLabels, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightsFor, type CropId, type RotationPriority } from '../scenarios/rotation-model'
@@ -34,18 +34,25 @@ const rotationWorkspaceSource: AISource = { id: 'fieldnova-rotations', title: 'F
 
 function soilProfileSource(point: GeoPoint): AISource {
   const profile = readSoilProfile(point)
-  const fieldCount = [profile.texture, profile.ph, profile.organicMatterPercent, profile.effectiveDepthCm, profile.drainage].filter(value => value !== undefined).length
+  const fields: SoilFieldKey[] = ['texture', 'ph', 'organicMatterPercent', 'effectiveDepthCm', 'drainage']
+  const knownFields = fields.filter(field => profile[field] !== undefined)
+  const fieldCount = knownFields.length
   const horizonCount = profile.horizons?.length ?? 0
-  const origin = fieldCount ? soilSourceLabels[profile.sourceType ?? 'farmer-reported'] : horizonCount ? 'origine propre à chaque horizon' : 'aucune valeur déclarée'
-  const reference = profile.sourceName ? ` · ${profile.sourceName}` : ''
-  const date = profile.sampleDate ? ` · échantillon ${profile.sampleDate}` : ''
-  const method = profile.samplingMethod ? ` · méthode de prélèvement déclarée : ${profile.samplingMethod}` : ''
+  const origin = fieldCount ? knownFields.map(field => `${soilFieldLabels[field]} : ${soilFieldOrigin(profile, field)}`).join(' · ') : horizonCount ? 'origine propre à chaque horizon' : 'aucune valeur déclarée'
+  const hasIndependentValues = Boolean(profile.sourceName || profile.sampleDate || profile.samplingMethod)
+  const recordNote = !fieldCount && hasIndependentValues ? ` · référence : ${profile.sourceName || 'non précisée'} · échantillon : ${profile.sampleDate || 'date non précisée'}${profile.samplingMethod ? ` · méthode déclarée : ${profile.samplingMethod}` : ''}` : ''
   return {
     id: 'fieldnova-soil',
     title: 'FieldNova · profil local du sol',
     url: '/app/terrain',
-    snippet: `${fieldCount} caractéristique(s) générale(s) · ${horizonCount} horizon(s) · origine déclarée : ${origin}${reference}${date}${method}. Données locales, non vérifiées.`,
+    snippet: `${fieldCount} caractéristique(s) générale(s) · ${horizonCount} horizon(s) · origine déclarée : ${origin}${recordNote}. Données locales, non vérifiées.`,
   }
+}
+
+function soilFieldOrigin(profile: ReturnType<typeof readSoilProfile>, field: SoilFieldKey) {
+  const origin = resolveSoilFieldProvenance(profile, field)
+  const date = origin.sampleDate ?? 'date non précisée'
+  return `${soilSourceLabels[origin.sourceType]}${origin.sourceName ? ` · ${origin.sourceName}` : ''} · ${date}${origin.samplingMethod ? ` · méthode : ${origin.samplingMethod}` : ''} (non vérifiée)`
 }
 
 function farmProfileSource(point: GeoPoint): AISource {
@@ -164,13 +171,14 @@ function formatFarmProfileAnswer(point: GeoPoint) {
 
 function formatSoilAnswer(point: GeoPoint) {
   const profile = readSoilProfile(point)
-  const entries = [
-    profile.texture && profile.texture !== 'unknown' ? `texture ${({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[profile.texture]}` : '',
-    profile.ph !== undefined ? `pH ${profile.ph.toLocaleString('fr-FR')}` : '',
-    profile.organicMatterPercent !== undefined ? `${profile.organicMatterPercent.toLocaleString('fr-FR')} % de matière organique` : '',
-    profile.effectiveDepthCm !== undefined ? `${profile.effectiveDepthCm} cm de profondeur utile` : '',
-    profile.drainage && profile.drainage !== 'unknown' ? `drainage ${({ poor: 'lent', moderate: 'modéré', good: 'rapide' } as const)[profile.drainage]}` : '',
-  ].filter(Boolean)
+  const fields: Array<{ key: SoilFieldKey; value: string }> = [
+    ...(profile.texture && profile.texture !== 'unknown' ? [{ key: 'texture' as const, value: `texture ${({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[profile.texture]}` }] : []),
+    ...(profile.ph !== undefined ? [{ key: 'ph' as const, value: `pH ${profile.ph.toLocaleString('fr-FR')}` }] : []),
+    ...(profile.organicMatterPercent !== undefined ? [{ key: 'organicMatterPercent' as const, value: `${profile.organicMatterPercent.toLocaleString('fr-FR')} % de matière organique` }] : []),
+    ...(profile.effectiveDepthCm !== undefined ? [{ key: 'effectiveDepthCm' as const, value: `${profile.effectiveDepthCm} cm de profondeur utile` }] : []),
+    ...(profile.drainage && profile.drainage !== 'unknown' ? [{ key: 'drainage' as const, value: `drainage ${({ poor: 'lent', moderate: 'modéré', good: 'rapide' } as const)[profile.drainage]}` }] : []),
+  ]
+  const entries = fields.map(field => field.value)
   const horizons = profile.horizons?.map((horizon, index) => {
     const texture = horizon.texture && horizon.texture !== 'unknown' ? ({ sandy: 'sableuse', loamy: 'limoneuse', clayey: 'argileuse' } as const)[horizon.texture] : 'inconnue'
     const ph = horizon.ph === undefined ? 'pH inconnu' : `pH ${horizon.ph.toLocaleString('fr-FR')}`
@@ -183,8 +191,8 @@ function formatSoilAnswer(point: GeoPoint) {
     if (profile.sampleDate || profile.samplingMethod || profile.sourceName) return `Une fiche de prélèvement est enregistrée au point suivi ${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}${profile.sampleDate ? ` · date ${profile.sampleDate}` : ''}${profile.samplingMethod ? ` · méthode déclarée : ${profile.samplingMethod}` : ''}${profile.sourceName ? ` · référence : ${profile.sourceName}` : ''}. Aucune caractéristique de sol mesurée n’est renseignée. Ces données restent déclaratives et locales.`
     return 'Aucune caractéristique de sol n’est renseignée pour ce point. Ces champs restent inconnus tant qu’ils ne sont pas saisis; vous pouvez les compléter dans « Mon terrain ». Les données NASA de la carte ne remplacent pas une analyse de sol.'
   }
-  const profileOrigin = entries.length
-    ? `Origine déclarée pour ces caractéristiques générales : ${soilSourceLabels[profile.sourceType ?? 'farmer-reported']}${profile.sourceName ? ` · ${profile.sourceName}` : ''} · ${profile.sampleDate ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${profile.sampleDate}T12:00:00Z`)) : 'date non précisée'}${profile.samplingMethod ? ` · méthode de prélèvement déclarée : ${profile.samplingMethod}` : ''} (non vérifiée). `
+  const profileOrigin = fields.length
+    ? `Origine déclarée par caractéristique : ${fields.map(field => `${soilFieldLabels[field.key]} · ${soilFieldOrigin(profile, field.key)}`).join(' ; ')}. `
     : ''
   return `Pour ce point, le profil local saisi dans FieldNova indique : ${entries.length ? `${entries.join(' · ')}. ` : ''}${horizons.length ? `${horizons.join(' ')} Les profondeurs non couvertes restent inconnues. ` : ''}${profileOrigin}Ces valeurs locales ne sont pas des mesures NASA.`
 }
