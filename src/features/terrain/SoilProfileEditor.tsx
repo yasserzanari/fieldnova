@@ -218,6 +218,18 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
       <small>Cette liste ne classe pas les analyses par valeur scientifique. Les propriétés du sol ne modifient pas le classement descriptif des rotations dans cette version.</small>
       <button type="button" onClick={edit}>{hasProfile ? 'Compléter le profil' : 'Saisir les données connues'}</button>
     </details>
+    <details className="terrain-indicator-guide">
+      <summary>Comprendre les indicateurs du sol</summary>
+      <p>La santé du sol ne se résume pas à une valeur unique. Cette fiche explique ce que les champs renseignés décrivent et les mesures qui manquent; FieldNova ne calcule pas de note de santé.</p>
+      <div className="terrain-indicator-grid">
+        <article><h3>pH · indicateur chimique</h3><p>Décrit l’acidité ou l’alcalinité. Son interprétation dépend du sol, de la culture et de la méthode d’analyse.</p><small>Pour comparer : même méthode d’extraction, profondeur et laboratoire si possible.</small></article>
+        <article><h3>Matière organique · indicateur chimique</h3><p>Participe aux fonctions de fertilité, de structure et de stabilité; un pourcentage seul ne décrit pas toutes ces fonctions.</p><small>À conserver : méthode du laboratoire, unité et profondeur de l’échantillon.</small></article>
+        <article><h3>Texture, profondeur et drainage · contexte physique</h3><p>Décrivent des propriétés du profil et le déplacement de l’eau. Elles ne mesurent pas à elles seules la structure, l’infiltration ou le tassement.</p><small>À documenter : horizon, profondeur, lieu et méthode d’observation.</small></article>
+        <article><h3>Mesures complémentaires à recueillir</h3><p>La densité apparente, l’infiltration, la stabilité des agrégats, la compaction et l’activité biologique nécessitent des observations ou protocoles dédiés.</p><small>Aucune de ces mesures n’est déduite par FieldNova des images satellite ou du profil actuel.</small></article>
+      </div>
+      <small className="terrain-indicator-method-note">Pour suivre une évolution, comparez des prélèvements du même champ, à profondeur et méthode comparables. Une référence régionale ou une analyse seule ne suffit pas à conclure à une amélioration.</small>
+      <nav aria-label="Références sur les indicateurs de santé du sol"><a href="https://www.nrcs.usda.gov/conservation-basics/soil/soil-health/soil-health-assessment" target="_blank" rel="noreferrer">USDA NRCS · Évaluer la santé du sol</a><a href="https://www.fao.org/land-water/land/land-governance-and-planning/land-resources-planning-toolbox/detail/visual-soil--field-assessment-tool-%28vs-fast%29/en" target="_blank" rel="noreferrer">FAO · Évaluation visuelle du sol</a></nav>
+    </details>
     {hasSampleMetadata && <p className="terrain-profile-date">Fiche de prélèvement · point suivi {point.latitude.toFixed(4)}, {point.longitude.toFixed(4)} · {profile.sampleDate ? `date ${profile.sampleDate}` : 'date non renseignée'} · {profile.samplingMethod ? `méthode : ${profile.samplingMethod}` : 'méthode non renseignée'}.</p>}
     {profile.horizons?.length ? <SoilHorizonVisual horizons={profile.horizons} defaultSourceType={profile.sourceType} defaultSourceName={profile.sourceName} defaultSampleDate={profile.sampleDate} defaultSamplingMethod={profile.samplingMethod} /> : null}
     {analysisHistory.length > 0 && <SoilAnalysisHistory history={analysisHistory} newer={newerSnapshot} older={olderSnapshot} onNewerChange={setComparisonNewerId} onOlderChange={setComparisonOlderId} />}
