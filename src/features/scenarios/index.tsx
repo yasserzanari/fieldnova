@@ -1,7 +1,7 @@
 import { useMemo, useState, type CSSProperties } from 'react'
 import { Activity, CalendarDays, CloudRain, Droplets, ExternalLink, LocateFixed, MapPinned, RefreshCw, ShieldCheck, ThermometerSun } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
@@ -97,13 +97,21 @@ function formatCoord(value: number, positive: string, negative: string) {
 }
 
 export function ScenariosPage() {
-  const [mode, setMode] = useState<'rotations' | 'climate' | 'water'>('rotations')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = searchParams.get('view')
+  const mode = view === 'climate' || view === 'water' ? view : 'rotations'
+  const changeMode = (nextMode: 'rotations' | 'climate' | 'water') => setSearchParams(current => {
+    const next = new URLSearchParams(current)
+    if (nextMode === 'rotations') next.delete('view')
+    else next.set('view', nextMode)
+    return next
+  })
   return <div className="scenario-hub">
     <div className="scenario-hub-toolbar" role="group" aria-label="Modes des scénarios">
       <span>Comparer</span>
-      <button type="button" aria-pressed={mode === 'rotations'} className={mode === 'rotations' ? 'is-active' : ''} onClick={() => setMode('rotations')}>Rotations culturales</button>
-      <button type="button" aria-pressed={mode === 'climate'} className={mode === 'climate' ? 'is-active' : ''} onClick={() => setMode('climate')}>Climat historique</button>
-      <button type="button" aria-pressed={mode === 'water'} className={mode === 'water' ? 'is-active' : ''} onClick={() => setMode('water')}>Hypothèses d’eau</button>
+      <button type="button" aria-pressed={mode === 'rotations'} className={mode === 'rotations' ? 'is-active' : ''} onClick={() => changeMode('rotations')}>Rotations culturales</button>
+      <button type="button" aria-pressed={mode === 'climate'} className={mode === 'climate' ? 'is-active' : ''} onClick={() => changeMode('climate')}>Climat historique</button>
+      <button type="button" aria-pressed={mode === 'water'} className={mode === 'water' ? 'is-active' : ''} onClick={() => changeMode('water')}>Hypothèses d’eau</button>
     </div>
     <div className={`scenario-hub-content ${mode === 'water' ? 'is-water-mode' : ''}`}>{mode === 'rotations' ? <RotationExplorer /> : mode === 'climate' ? <ClimateScenariosPage /> : <WaterAvailabilityScenarios />}</div>
   </div>
