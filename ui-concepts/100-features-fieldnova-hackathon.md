@@ -61,7 +61,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 3. **[LIVRÉ] Priorité explicite de l’agriculteur** : choisir parmi les indicateurs descriptifs disponibles pour classer les rotations, sans les transformer en rendement ou bénéfice prédit.
 4. **[LIVRÉ] Choix du mode d’exploitation** : pluvial, irrigué, mixte ou inconnu, sans déduire ce choix des seules données satellites.
 5. **[P1] Disponibilité des équipements** : indiquer les opérations faisables avec le matériel réel de l’exploitation.
-6. **[P1] Fenêtre de travail habituelle** : saisir les périodes où semis, récolte et travail du sol sont possibles.
+6. **[P1 · PARTIEL] Fenêtre de travail habituelle** : l’utilisateur peut déclarer les mois où semis et récolte sont habituellement possibles. La fiche rotation compare le chevauchement mensuel avec les fenêtres culturales saisies. Le travail du sol, les équipements et la faisabilité restent à modéliser; ces déclarations ne changent pas le classement.
 7. **[P1] Préférences et exclusions de cultures** : cultures appréciées, impossibles ou soumises à un contrat local.
 8. **[P1] Tolérance au risque** : faible, moyenne ou élevée, avec explication de l’effet sur le classement des scénarios.
 9. **[P2] Plusieurs profils de fermes** : gérer différentes exploitations sans mélanger leurs données.
@@ -102,7 +102,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 35. **[P1 · PARTIEL] Familles botaniques** : les cartes affichent désormais les familles année par année; le détail ouvre TAXREF/INPN, et les cartes comptent aussi les familles distinctes et répétitions consécutives. Aucune répétition n’est bloquée sans règle et validation locales.
 36. **[P1] Cultures de couverture** : ajouter une option dédiée, avec ses coûts opérationnels et ses limites locales.
 37. **[P1] Intercultures et mélanges** : représenter deux cultures simultanées et éviter de les traiter comme une rotation simple.
-38. **[P1 · PARTIEL] Calendrier cultural local** : fenêtres de semis et de récolte saisies par l’utilisateur et liées au point suivi, avec source/variété facultative. Aucune date n’est préremplie; les fenêtres sont visibles dans la justification de la rotation, consultables dans l’Assistant et incluses dans l’export Markdown avec leur provenance, sans modifier le classement. Les durées de croissance, références régionales et validations agronomiques restent à intégrer.
+38. **[P1 · PARTIEL] Calendrier cultural local** : fenêtres de semis et de récolte saisies par l’utilisateur et liées au point suivi, avec source/variété facultative. Aucune date n’est préremplie; les fenêtres sont visibles dans la justification de la rotation, consultables dans l’Assistant et incluses dans l’export Markdown avec leur provenance. La justification compare aussi leur chevauchement aux disponibilités habituelles déclarées. Aucune de ces données ne modifie le classement. Les durées de croissance, références régionales et validations agronomiques restent à intégrer.
 39. **[P2] Variétés et durées de cycle** : différencier les caractéristiques variétales des valeurs génériques de l’espèce.
 40. **[P2] Rotation éditable manuellement** : laisser l’agriculteur imposer une culture ou un ordre, puis recalculer les contraintes.
 

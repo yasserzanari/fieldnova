@@ -9,9 +9,11 @@ export type CropCalendarEntry = {
   sourceUrl?: string
 }
 export type CropCalendar = Record<CropId, CropCalendarEntry>
+export type FarmWorkWindows = { sowing?: CropMonthWindow; harvest?: CropMonthWindow }
 
 const monthNames = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
 const storageKey = (point: GeoPoint) => `fieldnova:crop-calendar:v1:${point.latitude.toFixed(4)},${point.longitude.toFixed(4)}`
+const workWindowsStorageKey = (point: GeoPoint) => `fieldnova:work-windows:v1:${point.latitude.toFixed(4)},${point.longitude.toFixed(4)}`
 const isHttpUrl = (value: string) => {
   try { const url = new URL(value); return url.protocol === 'http:' || url.protocol === 'https:' } catch { return false }
 }
@@ -38,6 +40,38 @@ export function readCropCalendar(point: GeoPoint): CropCalendar {
 
 export function writeCropCalendar(point: GeoPoint, value: CropCalendar) {
   localStorage.setItem(storageKey(point), JSON.stringify(value))
+}
+
+function readMonthWindow(candidate: unknown): CropMonthWindow | undefined {
+  if (!candidate || typeof candidate !== 'object') return undefined
+  const { startMonth, endMonth } = candidate as Record<string, unknown>
+  return Number.isInteger(startMonth) && Number(startMonth) >= 1 && Number(startMonth) <= 12 && Number.isInteger(endMonth) && Number(endMonth) >= 1 && Number(endMonth) <= 12
+    ? { startMonth: Number(startMonth), endMonth: Number(endMonth) } : undefined
+}
+
+export function readFarmWorkWindows(point: GeoPoint): FarmWorkWindows {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(workWindowsStorageKey(point)) ?? '{}') as Record<string, unknown>
+    return { sowing: readMonthWindow(parsed.sowing), harvest: readMonthWindow(parsed.harvest) }
+  } catch { return {} }
+}
+
+export function writeFarmWorkWindows(point: GeoPoint, value: FarmWorkWindows) {
+  localStorage.setItem(workWindowsStorageKey(point), JSON.stringify({ sowing: readMonthWindow(value.sowing), harvest: readMonthWindow(value.harvest) }))
+}
+
+export function monthWindowsOverlap(first: CropMonthWindow | undefined, second: CropMonthWindow | undefined) {
+  if (!first || !second) return undefined
+  const monthsIn = (window: CropMonthWindow) => {
+    const months = new Set<number>()
+    for (let month = window.startMonth; ; month = month % 12 + 1) {
+      months.add(month)
+      if (month === window.endMonth) break
+    }
+    return months
+  }
+  const declaredMonths = monthsIn(first)
+  return [...monthsIn(second)].some(month => declaredMonths.has(month))
 }
 
 export function formatCropMonthWindow(window: CropMonthWindow | undefined) {
