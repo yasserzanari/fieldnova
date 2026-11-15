@@ -8,8 +8,8 @@ function csvCell(value: string) {
 
 export function fieldObservationsCsv(items: FieldObservation[]) {
   const rows = [
-    ['Date', 'Type', 'Culture', 'Observation', 'Auteur'],
-    ...items.map(item => [item.date, fieldObservationKindLabel(item.kind), item.crop, item.note, item.author]),
+    ['Date', 'Type', 'Culture', 'Observation', 'Auteur', 'Photo jointe'],
+    ...items.map(item => [item.date, fieldObservationKindLabel(item.kind), item.crop, item.note, item.author, item.photoId ? 'Oui · conservée sur cet appareil' : 'Non']),
   ]
   return `\uFEFF${rows.map(row => row.map(csvCell).join(';')).join('\r\n')}\r\n`
 }
