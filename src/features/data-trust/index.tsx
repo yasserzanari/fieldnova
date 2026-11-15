@@ -131,7 +131,7 @@ export function DataTrustPage() {
           <ol>{(selected.id === 'power' ? [
             { title: 'Coordonnée active', desc: `${coordinate(location.latitude, 'N', 'S')} · ${coordinate(location.longitude, 'E', 'O')}`, done: true },
             { title: 'Requête NASA POWER', desc: latest ? `Série reçue · ${formatPowerMonth(latest.date)}` : loading ? 'Requête en cours' : 'Requête indisponible', done: Boolean(series) },
-            { title: 'Contrôle des valeurs', desc: 'Valeurs manquantes écartées; unités et date conservées.', done: Boolean(series) },
+            { title: 'Filtrage des valeurs', desc: 'Mois en cours et valeurs de remplissage exclus; paramètres sans valeur restent inconnus.', done: Boolean(series) },
             { title: 'Utilisation dans FieldNova', desc: 'Graphiques, indicateurs, empreinte de maille sur la carte et réponses de l’assistant.', done: Boolean(series) },
           ] : selected.id === 'gibs' ? [
             { title: 'Produit NASA GIBS', desc: 'MODIS true color/NDVI et SMAP surface/racines.', done: true },
@@ -145,6 +145,13 @@ export function DataTrustPage() {
             { title: 'Usage dans FieldNova', desc: 'Aucune valeur de cette source n’est affichée comme donnée réelle.', done: false },
           ]).map((item, index) => <li className={item.done ? 'lineage-done' : 'lineage-next'} key={item.title}><span className="lineage-marker">{item.done ? <Check size={11} /> : index + 1}</span><span><strong>{item.title}</strong><small>{item.desc}</small></span></li>)}</ol>
           {selected.id === 'power' && series && <section className="trust-coverage-audit" aria-label="Couverture des périodes mensuelles NASA POWER"><header><strong>Valeurs disponibles par mois</strong><small>Fenêtre demandée · {series.requestedMonths.length} mois clos</small></header><div>{coverage.map(item => <span key={item.field}><strong>{item.label}</strong><small>{item.available}/{series.requestedMonths.length} mois exploitables</small></span>)}</div><details><summary>Mois sans valeur exploitable</summary><ul>{coverage.map(item => <li key={item.field}><strong>{item.label}</strong><small>{item.missing.length ? item.missing.map(formatPowerMonth).join(' · ') : 'Aucun mois manquant'}</small></li>)}</ul></details></section>}
+          {selected.id === 'power' && series && <details className="trust-transformation-audit"><summary>Étapes de transformation de cette série</summary><ol>
+            <li><strong>Point transmis</strong><small>{series.point.latitude.toFixed(3)}, {series.point.longitude.toFixed(3)} · arrondi à 0,001° pour la requête NASA POWER.</small></li>
+            <li><strong>Paramètres et période</strong><small>PRECTOTCORR, T2M, T2M_MAX, T2M_MIN, GWETTOP, GWETROOT · UTC · {series.requestedMonths[0] ? formatPowerMonth(series.requestedMonths[0]) : 'aucun mois'} à {series.requestedMonths[series.requestedMonths.length - 1] ? formatPowerMonth(series.requestedMonths[series.requestedMonths.length - 1]) : 'aucun mois'}.</small></li>
+            <li><strong>Calendrier et valeurs</strong><small>Les clés YYYYMM deviennent YYYY-MM; le mois en cours, les valeurs de remplissage NASA et les champs absents ne sont pas convertis en zéro.</small></li>
+            <li><strong>Repère spatial dérivé</strong><small>Le centre MERRA-2 de plus proche voisin et l’empreinte 0,5° × 0,625° sont calculés séparément à partir du point suivi; ils ne sont pas une limite de parcelle.</small></li>
+            <li><strong>Affichages dérivés</strong><small>Les fractions GWETTOP/GWETROOT sont multipliées par 100 pour les indicateurs en pourcentage; les repères historiques comparent le même mois des années antérieures.</small></li>
+          </ol></details>}
           <div className="trust-provenance-note"><ShieldCheck size={14} /><p>Les valeurs affichées gardent leur source, leur unité, leur date et leur couverture spatiale. Les données de grille ne décrivent pas une parcelle individuelle.</p></div>
         </div>}
         <footer className="trust-detail-footer"><span><span className={`trust-empty-dot ${selected.status === 'Connecté' && !error ? 'is-connected' : ''}`} />{selected.id === 'power' && error ? 'Récupération en échec' : selected.status === 'Connecté' ? 'Source intégrée' : selected.status}</span><button type="button" onClick={() => setPanel('lineage')}>Voir la traçabilité <ArrowUpRight size={13} /></button></footer>

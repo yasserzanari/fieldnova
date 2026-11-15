@@ -151,7 +151,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 73. **[P0 · LIVRÉ] Séparation entre observation, modèle et saisie utilisateur** : NASA POWER/MERRA-2 et GIBS/SMAP sont nommés comme données ou produits modélisés; le profil de sol et le profil de ferme gardent leur provenance déclarée; les valeurs inconnues restent vides.
 74. **[P0 · LIVRÉ] Dates et valeurs manquantes auditables** : NASA POWER exclut le mois en cours; la traçabilité expose la fenêtre de mois clos et, variable par variable, le nombre de valeurs exploitables et la liste des mois manquants.
 75. **[P1] Limites spatiales affichées sur la carte** : résolution régionale ou maille NASA visible près de toute valeur importante.
-76. **[P1] Journal de transformation** : conserver les étapes de conversion, agrégation, filtre et calcul dérivé.
+76. **[P1 · PARTIEL] Journal de transformation** : l’onglet Traçabilité détaille pour la série NASA POWER le point arrondi transmis, les paramètres/période, l’exclusion du mois en cours et des valeurs de remplissage, la maille MERRA-2 dérivée et la conversion des humidités en pourcentage. Les étapes de rendu et de date des tuiles GIBS ne sont pas interrogées par l’API de la carte.
 77. **[P1] Contrôle d’unité et de plage** : détecter les données impossibles sans écraser silencieusement la valeur brute.
 78. **[P1] Validation indépendante des règles agronomiques** : documenter la source ou l’avis expert, la région et la date de révision.
 79. **[P2] Comparaison avec une station de terrain** : évaluer un produit NASA contre une observation indépendante lorsque les données existent.
