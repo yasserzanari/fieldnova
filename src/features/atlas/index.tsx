@@ -42,6 +42,7 @@ export function AtlasPage() {
   const [coordinateError, setCoordinateError] = useState('')
   const [range, setRange] = useState(12)
   const [showTimeline, setShowTimeline] = useState(false)
+  const [mobileView, setMobileView] = useState<'map' | 'layers' | 'point' | 'timeline'>('map')
   const [locating, setLocating] = useState(false)
   const [playingNdvi, setPlayingNdvi] = useState(false)
   const { availability: gibsAvailability, error: gibsAvailabilityError } = useGibsAvailability()
@@ -152,11 +153,15 @@ export function AtlasPage() {
     if (!showNdvi) setPlayingNdvi(false)
   }, [showNdvi])
 
-  return <section className="atlas-page" aria-label="Atlas interactif des couches NASA">
+  return <section className={`atlas-page mobile-view-${mobileView}`} aria-label="Atlas interactif des couches NASA">
     <header className="atlas-heading">
       <div className="atlas-title"><h1>Atlas</h1><span className="atlas-title-divider" /><p>Explorez l’imagerie NASA et les séries climatiques au point choisi</p></div>
-      <div className="atlas-heading-actions"><button type="button" className={`atlas-history-toggle ${showTimeline ? 'is-active' : ''}`} aria-expanded={showTimeline} aria-controls="atlas-climate-history" onClick={() => setShowTimeline(value => !value)}><Activity size={14} /><span>Historique climatique</span></button><form className="atlas-search" onSubmit={submitCoordinates} role="search"><Search size={16} aria-hidden="true" /><input aria-label="Coordonnées, latitude puis longitude" value={coordinateInput} onChange={event => setCoordinateInput(event.target.value)} placeholder="Latitude, longitude" /><button type="submit" aria-label="Aller aux coordonnées"><MapPinned size={15} /></button></form></div>
+      <div className="atlas-heading-actions"><button type="button" className={`atlas-history-toggle ${showTimeline ? 'is-active' : ''}`} aria-expanded={showTimeline} aria-controls="atlas-climate-history" onClick={() => setShowTimeline(value => { const next = !value; if (window.matchMedia('(max-width: 820px)').matches) setMobileView(next ? 'timeline' : 'map'); return next })}><Activity size={14} /><span>Historique climatique</span></button><form className="atlas-search" onSubmit={submitCoordinates} role="search"><Search size={16} aria-hidden="true" /><input aria-label="Coordonnées, latitude puis longitude" value={coordinateInput} onChange={event => setCoordinateInput(event.target.value)} placeholder="Latitude, longitude" /><button type="submit" aria-label="Aller aux coordonnées"><MapPinned size={15} /></button></form></div>
     </header>
+
+    <nav className="atlas-mobile-tabs" role="group" aria-label="Panneau de l’Atlas">
+      {([['map', 'Carte'], ['layers', 'Couches'], ['point', 'Point suivi'], ['timeline', 'Historique']] as const).map(([view, label]) => <button key={view} type="button" aria-pressed={mobileView === view} className={mobileView === view ? 'is-active' : ''} onClick={() => { setMobileView(view); setShowTimeline(view === 'timeline') }}>{label}</button>)}
+    </nav>
 
     <div className="atlas-map-stage">
       <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive OpenStreetMap et couches satellite NASA GIBS" />
@@ -210,7 +215,7 @@ export function AtlasPage() {
 
       {showTimeline && <section id="atlas-climate-history" className="atlas-data-timeline" aria-label="Graphiques climatiques NASA POWER">
       <div className="atlas-timeline-controls"><div><span className="timeline-icon"><Activity size={16} /></span><span><strong>Série climatique NASA POWER</strong><small>{rangeLabel} demandés · {visiblePeriod} · point suivi</small></span></div><div className="atlas-timeline-actions"><div className="timeline-ranges" role="group" aria-label="Période du graphique">{climateRanges.map(({ months, label, control }) => <button key={months} type="button" aria-pressed={range === months} className={range === months ? 'is-active' : ''} aria-label={`Afficher les ${label} précédents`} title={`Afficher les ${label} précédents`} onClick={() => setRange(months)}>{control}</button>)}</div><button className="atlas-export-button" type="button" aria-label="Télécharger les séries mensuelles NASA POWER en CSV, avec coordonnées arrondies à 0,001 degré" title="CSV · coordonnées arrondies à 0,001° · valeurs absentes conservées vides" disabled={!series} onClick={() => series && downloadPowerMonthlyCsv(series)}><Download size={14} /><span>CSV</span></button></div></div>
-      <button type="button" className="atlas-history-close" aria-label="Fermer l’historique climatique" onClick={() => setShowTimeline(false)}><X size={15} /></button>
+      <button type="button" className="atlas-history-close" aria-label="Fermer l’historique climatique" onClick={() => { setShowTimeline(false); setMobileView('map') }}><X size={15} /></button>
       <PowerClimateChart records={series?.records ?? []} requestedMonths={series?.requestedMonths} source={series?.source.join(' + ') ?? 'en attente'} months={range} title="Précipitations et température · données mensuelles NASA" compact />
       </section>}
     </div>
