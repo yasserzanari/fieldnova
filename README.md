@@ -32,7 +32,7 @@ Le serveur Vite écoute sur `http://localhost:5173` et recharge l’application 
 
 ## État
 
-Le shell partagé, la landing page, la connexion de démonstration et les six vues de l’espace sont réalisés : Vue d’ensemble, Atlas, Mon terrain, Scénarios, Assistant et Données & confiance. Depuis l’accueil, « Essayer la démo fictive » ouvre directement un cas réinitialisable sans identifiants.
+Le shell partagé, la landing page, l’entrée de démonstration et les six vues de l’espace sont réalisés : Vue d’ensemble, Atlas, Mon terrain, Scénarios, Assistant et Données & confiance. Depuis l’accueil, « Essayer la démo fictive » ouvre directement un cas réinitialisable sans identifiants. `/login` ne crée pas de comptes : en développement, les identifiants d’exemple mènent au même lancement balisé; dans les autres builds, la page propose l’accès à la démo sans identifiants.
 
 ### Données et limites actuelles
 

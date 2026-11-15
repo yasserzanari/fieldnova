@@ -45,9 +45,11 @@
 .login-options a, .login-options button, .login-signup a { padding: 0; border: 0; background: transparent; color: var(--color-forest-800); font: inherit; font-weight: 650; text-decoration: none; cursor: pointer; }
 .login-options a:hover, .login-options button:hover, .login-signup a:hover { text-decoration: underline; }
 .login-error { margin: -7px 0 0; color: #a43e2d; font-size: 13px; line-height: 1.45; }
-.login-submit { display: flex; min-height: 54px; align-items: center; justify-content: center; gap: 10px; border: 0; border-radius: 13px; background: var(--color-forest-900); color: #fff; font-size: 14px; font-weight: 680; cursor: pointer; transition: background .18s ease, transform .18s ease; }
+.login-submit { display: flex; min-height: 54px; align-items: center; justify-content: center; gap: 10px; border: 0; border-radius: 13px; background: var(--color-forest-900); color: #fff; font-size: 14px; font-weight: 680; text-decoration: none; cursor: pointer; transition: background .18s ease, transform .18s ease; }
 .login-submit:hover { transform: translateY(-1px); background: var(--color-forest-800); }
 .login-submit-arrow { transform: rotate(180deg); }
+.login-demo-note,.login-no-auth p { margin:0; color:var(--color-soil-600); font-size:12px; line-height:1.55; }
+.login-no-auth { display:grid; gap:19px; margin-top:30px; }
 .login-divider { display: flex; align-items: center; gap: 14px; margin: 28px 0 19px; color: #878373; font-size: 12px; }
 .login-divider::before, .login-divider::after { height: 1px; flex: 1; background: #e4e0d5; content: ''; }
 .login-google { position: relative; display: flex; width: 100%; min-height: 51px; align-items: center; justify-content: center; gap: 10px; border: 1px solid #e0ded5; border-radius: 13px; background: #f7f6f0; color: #777467; font-size: 13px; font-weight: 600; cursor: not-allowed; }
