@@ -3,7 +3,7 @@ import { Download, FileSpreadsheet, Layers3, Pencil, Save, Trash2, Upload, X } f
 import type { GeoPoint } from '../../lib/geo/location'
 import { archiveSoilAnalysis, clearSoilProfile, readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, validateSoilHorizons, type FarmSoilProfile, type SoilAnalysisSnapshot, type SoilFieldKey, type SoilFieldProvenance, type SoilHorizon, writeSoilProfile } from '../../lib/farm/soil-profile'
 import { parseSoilAnalysisCsv, soilAnalysisCsvTemplate, type SoilAnalysisCsvImport } from '../../lib/farm/soil-analysis-csv'
-import { formatLength, useMeasurementSystem } from '../../lib/units/measurement-units'
+import { formatLength, lengthFromDisplayUnits, lengthInDisplayUnits, lengthUnit, useMeasurementSystem } from '../../lib/units/measurement-units'
 
 const textureLabels = { sandy: 'Sableux', loamy: 'Limoneux', clayey: 'Argileux', unknown: 'Inconnu' } as const
 const drainageLabels = { poor: 'Lent', moderate: 'Modéré', good: 'Rapide', unknown: 'Inconnu' } as const
@@ -27,6 +27,10 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const csvInputRef = useRef<HTMLInputElement>(null)
   const locationKey = `${point.latitude.toFixed(4)},${point.longitude.toFixed(4)}`
+  const depthUnit = lengthUnit(measurementSystem)
+  const maxSoilDepth = Number(lengthInDisplayUnits(400, measurementSystem).toFixed(1))
+  const displayDepth = (value: number) => Number(lengthInDisplayUnits(value, measurementSystem).toFixed(1))
+  const saveDisplayDepth = (value: string) => value === '' ? undefined : lengthFromDisplayUnits(Number(value), measurementSystem)
 
   useEffect(() => {
     setProfile(readSoilProfile(point))
@@ -245,7 +249,7 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
           <div className="terrain-soil-field"><label>Texture du sol<select value={draft.texture ?? ''} onChange={event => setDraft(value => ({ ...value, texture: (event.target.value || undefined) as FarmSoilProfile['texture'] }))}><option value="">Non renseignée</option><option value="sandy">Sableux</option><option value="loamy">Limoneux</option><option value="clayey">Argileux</option><option value="unknown">Inconnue</option></select></label><SoilFieldOriginEditor field="texture" profile={draft} onChange={updateFieldProvenance} /></div>
           <div className="terrain-soil-field"><label>pH<input type="number" min="0" max="14" step="0.1" inputMode="decimal" placeholder="Ex. 6,5" value={draft.ph ?? ''} onChange={event => setDraft(value => ({ ...value, ph: event.target.value === '' ? undefined : Number(event.target.value) }))} /></label><SoilFieldOriginEditor field="ph" profile={draft} onChange={updateFieldProvenance} /></div>
           <div className="terrain-soil-field"><label>Matière organique (%)<input type="number" min="0" max="100" step="0.1" inputMode="decimal" placeholder="Ex. 2,4" value={draft.organicMatterPercent ?? ''} onChange={event => setDraft(value => ({ ...value, organicMatterPercent: event.target.value === '' ? undefined : Number(event.target.value) }))} /></label><SoilFieldOriginEditor field="organicMatterPercent" profile={draft} onChange={updateFieldProvenance} /></div>
-          <div className="terrain-soil-field"><label>Profondeur utile (cm)<input type="number" min="0" max="400" step="1" inputMode="numeric" placeholder="Ex. 90" value={draft.effectiveDepthCm ?? ''} onChange={event => setDraft(value => ({ ...value, effectiveDepthCm: event.target.value === '' ? undefined : Number(event.target.value) }))} /></label><SoilFieldOriginEditor field="effectiveDepthCm" profile={draft} onChange={updateFieldProvenance} /></div>
+          <div className="terrain-soil-field"><label>Profondeur utile ({depthUnit})<input type="number" min="0" max={maxSoilDepth} step={measurementSystem === 'us-customary' ? '0.1' : '1'} inputMode="decimal" placeholder={measurementSystem === 'us-customary' ? 'Ex. 35.4' : 'Ex. 90'} value={draft.effectiveDepthCm === undefined ? '' : displayDepth(draft.effectiveDepthCm)} onChange={event => setDraft(value => ({ ...value, effectiveDepthCm: saveDisplayDepth(event.target.value) }))} /></label><SoilFieldOriginEditor field="effectiveDepthCm" profile={draft} onChange={updateFieldProvenance} /></div>
           <div className="terrain-soil-field"><label>Drainage<select value={draft.drainage ?? ''} onChange={event => setDraft(value => ({ ...value, drainage: (event.target.value || undefined) as FarmSoilProfile['drainage'] }))}><option value="">Non renseigné</option><option value="poor">Lent</option><option value="moderate">Modéré</option><option value="good">Rapide</option><option value="unknown">Inconnu</option></select></label><SoilFieldOriginEditor field="drainage" profile={draft} onChange={updateFieldProvenance} /></div>
           <section className="terrain-horizon-editor terrain-soil-field-wide" aria-label="Horizons de sol déclarés">
             <header><span><strong>Composition par profondeur</strong><small>Ajoutez uniquement les couches décrites par votre relevé ou analyse.</small></span></header>
@@ -267,8 +271,8 @@ export function SoilProfileEditor({ point }: { point: GeoPoint }) {
             {(draft.horizons ?? []).map((horizon, index) => <fieldset className="terrain-horizon-fields" key={index}>
               <legend>Horizon {index + 1}</legend>
               <button className="terrain-horizon-remove" type="button" aria-label={`Supprimer l’horizon ${index + 1}`} onClick={() => removeHorizon(index)}><Trash2 size={12} /></button>
-              <label>Début (cm)<input type="number" min="0" max="399" step="1" value={horizon.topCm} onChange={event => updateHorizon(index, { topCm: event.target.value === '' ? Number.NaN : Number(event.target.value) })} /></label>
-              <label>Fin (cm)<input type="number" min="1" max="400" step="1" value={horizon.bottomCm} onChange={event => updateHorizon(index, { bottomCm: event.target.value === '' ? Number.NaN : Number(event.target.value) })} /></label>
+              <label>Début ({depthUnit})<input type="number" min="0" max={maxSoilDepth} step={measurementSystem === 'us-customary' ? '0.1' : '1'} value={displayDepth(horizon.topCm)} onChange={event => updateHorizon(index, { topCm: event.target.value === '' ? Number.NaN : lengthFromDisplayUnits(Number(event.target.value), measurementSystem) })} /></label>
+              <label>Fin ({depthUnit})<input type="number" min={measurementSystem === 'us-customary' ? '0.1' : '1'} max={maxSoilDepth} step={measurementSystem === 'us-customary' ? '0.1' : '1'} value={displayDepth(horizon.bottomCm)} onChange={event => updateHorizon(index, { bottomCm: event.target.value === '' ? Number.NaN : lengthFromDisplayUnits(Number(event.target.value), measurementSystem) })} /></label>
               <label>Texture<select value={horizon.texture ?? ''} onChange={event => updateHorizon(index, { texture: (event.target.value || undefined) as SoilHorizon['texture'] })}><option value="">Inconnue</option><option value="sandy">Sableux</option><option value="loamy">Limoneux</option><option value="clayey">Argileux</option><option value="unknown">Non déterminée</option></select></label>
               <label>pH<input type="number" min="0" max="14" step="0.1" value={horizon.ph ?? ''} onChange={event => updateHorizon(index, { ph: event.target.value === '' ? undefined : Number(event.target.value) })} /></label>
               <label>Matière org. (%)<input type="number" min="0" max="100" step="0.1" value={horizon.organicMatterPercent ?? ''} onChange={event => updateHorizon(index, { organicMatterPercent: event.target.value === '' ? undefined : Number(event.target.value) })} /></label>

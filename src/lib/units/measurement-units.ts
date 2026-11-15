@@ -48,7 +48,19 @@ export function formatPrecipitationTotal(mm: number, system: MeasurementSystem, 
 }
 
 export function formatLength(cm: number, system: MeasurementSystem, precision = 1) {
-  return `${format(system === 'us-customary' ? cm / 2.54 : cm, precision)} ${system === 'us-customary' ? 'in' : 'cm'}`
+  return `${format(lengthInDisplayUnits(cm, system), precision)} ${lengthUnit(system)}`
+}
+
+export function lengthInDisplayUnits(cm: number, system: MeasurementSystem) {
+  return system === 'us-customary' ? cm / 2.54 : cm
+}
+
+export function lengthFromDisplayUnits(value: number, system: MeasurementSystem) {
+  return system === 'us-customary' ? value * 2.54 : value
+}
+
+export function lengthUnit(system: MeasurementSystem) {
+  return system === 'us-customary' ? 'in' : 'cm'
 }
 
 export function formatDistance(km: number, system: MeasurementSystem, precision = 0) {
