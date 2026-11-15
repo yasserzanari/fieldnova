@@ -15,7 +15,7 @@ import { emptyRotationConstraints, readRotationConstraints, writeRotationConstra
 import { clearSavedParcelBoundary, parseParcelGeoJSON, saveParcelBoundary, useParcelBoundary } from '../../lib/geo/parcel-boundary'
 import { RotationEvidenceBridge, type DecisionEvidenceItem } from './RotationEvidenceBridge'
 import { RotationCalendarEditor } from './RotationCalendarEditor'
-import { formatCropMonthWindow, hasCropCalendarData, readCropCalendar, writeCropCalendar, type CropCalendar } from './crop-calendar'
+import { formatCropMonthWindow, hasCropCalendarData, monthWindowsOverlap, readCropCalendar, readFarmWorkWindows, writeCropCalendar, writeFarmWorkWindows, type CropCalendar, type FarmWorkWindows } from './crop-calendar'
 import './rotation-explorer.css'
 
 function dayBefore(days: number) {
@@ -69,6 +69,7 @@ export function RotationExplorer() {
   const [workspace, setWorkspace] = useState(() => ({ pointKey, value: readRotationWorkspace(location) }))
   const [constraintState, setConstraintState] = useState(() => ({ pointKey, value: readRotationConstraints(location) }))
   const [calendarState, setCalendarState] = useState(() => ({ pointKey, value: readCropCalendar(location) }))
+  const [workWindowsState, setWorkWindowsState] = useState(() => ({ pointKey, value: readFarmWorkWindows(location) }))
   const [calendarEditorOpen, setCalendarEditorOpen] = useState(false)
   const [catalogVersion, setCatalogVersion] = useState(0)
   const catalog = useMemo(() => readCropCatalog(location), [pointKey, catalogVersion])
@@ -92,6 +93,7 @@ export function RotationExplorer() {
     setWorkspace({ pointKey, value: readRotationWorkspace(location, pointCatalog) })
     setConstraintState({ pointKey, value: readRotationConstraints(location, pointCatalog) })
     setCalendarState({ pointKey, value: readCropCalendar(location) })
+    setWorkWindowsState({ pointKey, value: readFarmWorkWindows(location) })
     setCatalogVersion(version => version + 1)
     setSaveError('')
     setConstraintError('')
@@ -105,6 +107,7 @@ export function RotationExplorer() {
       setWorkspace({ pointKey, value: readRotationWorkspace(location, pointCatalog) })
       setConstraintState({ pointKey, value: readRotationConstraints(location, pointCatalog) })
       setCalendarState({ pointKey, value: readCropCalendar(location) })
+      setWorkWindowsState({ pointKey, value: readFarmWorkWindows(location) })
       setCatalogVersion(version => version + 1)
     }
     window.addEventListener('fieldnova:demo-mode-change', reloadLocalExampleData)
@@ -150,6 +153,7 @@ export function RotationExplorer() {
   const currentWorkspace = workspace.pointKey === pointKey ? workspace.value : readRotationWorkspace(location, catalog)
   const constraints = constraintState.pointKey === pointKey ? constraintState.value : emptyRotationConstraints()
   const cropCalendar = calendarState.pointKey === pointKey ? calendarState.value : readCropCalendar(location)
+  const farmWorkWindows = workWindowsState.pointKey === pointKey ? workWindowsState.value : readFarmWorkWindows(location)
   const latest = useMemo(() => currentSeries ? latestCompleteRecord(currentSeries.records) : undefined, [currentSeries])
   const climateReferences = {
     precipitation: sameMonthReference(currentSeries?.records ?? [], latest, 'precipitationMmPerDay', 'mm/j'),
@@ -527,7 +531,7 @@ export function RotationExplorer() {
       </aside>
 
       <aside className={`rotation-context-panel rotation-context-right ${mobileContextPanel === 'criteria' ? 'is-mobile-active' : 'is-mobile-hidden'}`} aria-label="Critère de comparaison et explication">
-        <section className="rotation-calendar-summary-panel"><header><span><CalendarDays size={14} /><strong>Calendrier cultural</strong></span><button type="button" onClick={() => setCalendarEditorOpen(true)}>{Object.values(cropCalendar).filter(hasCropCalendarData).length ? 'Modifier' : 'Renseigner'}</button></header><p>{Object.values(cropCalendar).filter(entry => entry?.sowing || entry?.harvest).length} culture(s) avec des fenêtres déclarées · aucune date par défaut</p></section>
+        <section className="rotation-calendar-summary-panel"><header><span><CalendarDays size={14} /><strong>Calendrier cultural</strong></span><button type="button" onClick={() => setCalendarEditorOpen(true)}>{Object.values(cropCalendar).filter(hasCropCalendarData).length || farmWorkWindows.sowing || farmWorkWindows.harvest ? 'Modifier' : 'Renseigner'}</button></header><p>{Object.values(cropCalendar).filter(entry => entry?.sowing || entry?.harvest).length} culture(s) avec des fenêtres déclarées · {farmWorkWindows.sowing || farmWorkWindows.harvest ? 'disponibilités de la ferme saisies' : 'disponibilités non renseignées'}</p></section>
         <fieldset className="rotation-priority-weights"><legend>Critères et poids</legend>{(Object.entries(priorityLabels) as Array<[RotationPriority, string]>).map(([priority, label]) => { const weight = priorityWeights[priority] ?? 0; return <label key={priority}><input type="checkbox" checked={weight > 0} disabled={weight > 0 && selectedPriorities.length === 1} onChange={event => updatePriorityWeight(priority, event.target.checked ? (weight || 1) : 0)} /><span>{label}</span><select aria-label={`Poids de ${label}`} value={weight || 1} disabled={weight === 0} onChange={event => updatePriorityWeight(priority, Number(event.target.value) as 1 | 2 | 3)}><option value={1}>×1</option><option value={2}>×2</option><option value={3}>×3</option></select></label> })}</fieldset>
         <details className="rotation-method-details"><summary>Méthode de comparaison</summary><div><p><strong>Critère détaillé :</strong> {methodPriorityDescription[currentWorkspace.priority]} Les poids actifs sont égaux à 1, 2 ou 3 selon vos choix.</p><p>Chaque indicateur est ramené entre 0 et 1 : familles / 5, répétitions inversées / 4, légumineuses / 5, transitions racinaires documentées / 4. Le score est la moyenne pondérée de ces valeurs, affichée sur 100; il ne représente ni rendement ni bénéfice agricole. Toutes les rotations compatibles à égalité sur la note sont signalées.</p><p><strong>Option A</strong> est la première séquence classée; <strong>Option B</strong> est la suivante. Les égalités sont départagées par familles distinctes, légumineuses, transitions racinaires documentées, moins de répétitions, puis l’ordre du catalogue. Seules les séquences complètes et les exclusions saisies sont prises en compte. Les traits ajoutés localement entrent dans ces comptes tels que déclarés; ils ne sont pas vérifiés.</p><p>Le climat NASA et le profil de sol restent du contexte; ils ne participent pas à la note de rotation.</p></div></details>
         <details className="rotation-exclusions"><summary>Cultures indisponibles · {constraints.unavailableCropIds.length}</summary><p>Ces choix excluent une culture des options générées et de leur classement. La référence actuelle reste visible.</p><div>{catalog.map(crop => <label key={crop.id}><input type="checkbox" checked={constraints.unavailableCropIds.includes(crop.id)} onChange={() => toggleUnavailableCrop(crop.id)} /><span>{crop.label}{crop.origin === 'local-declaration' ? ' · saisie locale' : ''}</span></label>)}</div></details>
@@ -582,13 +586,14 @@ export function RotationExplorer() {
           <div className="rotation-evidence-source-links"><a href={rotationSources.legumes.url} target="_blank" rel="noreferrer">Contexte sur la diversité des rotations · INRAE</a></div>
         </section>
         <section className="rotation-evidence-section"><h3>Calendrier déclaré pour cette rotation</h3>
-          <div className="rotation-evidence-table-wrap"><table className="rotation-evidence-table"><thead><tr><th>Année</th><th>Culture</th><th>Semis</th><th>Récolte</th><th>Source déclarée</th></tr></thead><tbody>{detailedPlan.crops.map((cropId, index) => { const crop = catalog.find(item => item.id === cropId); const entry = crop ? cropCalendar[crop.id] : undefined; return <tr key={index}><td>{index + 1}</td><td>{crop?.label ?? 'Non renseignée'}</td><td>{formatCropMonthWindow(entry?.sowing)}</td><td>{formatCropMonthWindow(entry?.harvest)}</td><td>{entry?.sourceName ? <span className="rotation-calendar-evidence-source">{entry.sourceName}{entry.sourceUrl && <> · <a href={entry.sourceUrl} target="_blank" rel="noreferrer">ouvrir</a></>}</span> : 'Aucune source renseignée'}</td></tr> })}</tbody></table></div>
-          <p>Ces fenêtres sont des déclarations locales pour le point suivi, pas une validation de faisabilité. Elles sont affichées comme contexte et ne changent ni les options ni leur classement.</p>
+          <p>Disponibilité habituelle déclarée : semis {formatCropMonthWindow(farmWorkWindows.sowing)} · récolte {formatCropMonthWindow(farmWorkWindows.harvest)}.</p>
+          <div className="rotation-evidence-table-wrap"><table className="rotation-evidence-table"><thead><tr><th>Année</th><th>Culture</th><th>Semis</th><th>Disponibilité semis</th><th>Récolte</th><th>Disponibilité récolte</th><th>Source déclarée</th></tr></thead><tbody>{detailedPlan.crops.map((cropId, index) => { const crop = catalog.find(item => item.id === cropId); const entry = crop ? cropCalendar[crop.id] : undefined; const semisOverlap = monthWindowsOverlap(entry?.sowing, farmWorkWindows.sowing); const harvestOverlap = monthWindowsOverlap(entry?.harvest, farmWorkWindows.harvest); const overlapLabel = (overlap: boolean | undefined) => overlap === undefined ? 'Inconnue' : overlap ? 'Chevauchement déclaré' : 'Aucun chevauchement déclaré'; return <tr key={index}><td>{index + 1}</td><td>{crop?.label ?? 'Non renseignée'}</td><td>{formatCropMonthWindow(entry?.sowing)}</td><td>{overlapLabel(semisOverlap)}</td><td>{formatCropMonthWindow(entry?.harvest)}</td><td>{overlapLabel(harvestOverlap)}</td><td>{entry?.sourceName ? <span className="rotation-calendar-evidence-source">{entry.sourceName}{entry.sourceUrl && <> · <a href={entry.sourceUrl} target="_blank" rel="noreferrer">ouvrir</a></>}</span> : 'Aucune source renseignée'}</td></tr> })}</tbody></table></div>
+          <p>Les fenêtres de culture et de disponibilité sont des déclarations locales mensuelles. Le chevauchement indique seulement des mois en commun; il ne valide ni la faisabilité, ni la météo, ni le matériel. Aucune donnée manquante n’est supposée et ces déclarations ne changent ni les options ni leur classement.</p>
         </section>
         <RotationEvidenceBridge items={decisionEvidenceItems} checks={[...new Set(decisionChecks)]} onNavigate={() => detailsDialogRef.current?.close()} />
       </div>}
     </dialog>
-    <RotationCalendarEditor open={calendarEditorOpen} crops={catalog} value={cropCalendar} onClose={() => setCalendarEditorOpen(false)} onSave={(value: CropCalendar) => { writeCropCalendar(location, value); setCalendarState({ pointKey, value }); setCalendarEditorOpen(false) }} />
+    <RotationCalendarEditor open={calendarEditorOpen} crops={catalog} value={cropCalendar} workWindows={farmWorkWindows} onClose={() => setCalendarEditorOpen(false)} onSave={(value: CropCalendar, windows: FarmWorkWindows) => { writeCropCalendar(location, value); writeFarmWorkWindows(location, windows); setCalendarState({ pointKey, value }); setWorkWindowsState({ pointKey, value: windows }); setCalendarEditorOpen(false) }} />
   </section>
 }
 
