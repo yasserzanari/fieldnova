@@ -105,6 +105,7 @@
 .assistant-layer-choices { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:3px; margin-top:8px; padding-top:7px; border-top:1px solid #ece9e1; }
 .assistant-layer-choices button { display:flex; min-width:0; align-items:center; justify-content:center; gap:3px; padding:5px 3px; border:1px solid transparent; border-radius:6px; background:#f4f3ed; color:#686656; font-size:7px; cursor:pointer; }
 .assistant-layer-choices button.is-active { border-color:#d8e4cc; background:#eaf1e2; color:#385d35; font-weight:700; }
+.assistant-soilgrids-legend { display:grid; gap:3px; margin-top:6px; padding:6px 5px 2px; border-top:1px solid #ece9e1; }.assistant-soilgrids-legend small { color:#6f6b5b; font-size:7px; }.assistant-soilgrids-legend img { display:block; width:100%; max-height:33px; object-fit:contain; object-position:left center; }
 .assistant-map-layer-card > p { display:flex; align-items:center; gap:4px; margin:7px 0 0; color:#898576; font-size:7px; }
 .assistant-base-toggle { margin-top:7px; padding:0; border:0; background:transparent; color:#507149; font-size:8px; font-weight:650; cursor:pointer; }
 .assistant-map-legend { position:absolute; z-index:4; left:13px; bottom:13px; display:grid; gap:5px; padding:8px 10px; border:1px solid rgb(255 255 255 / 78%); border-radius:9px; background:rgb(255 254 249 / 94%); box-shadow:0 3px 10px rgb(14 28 14 / 14%); }

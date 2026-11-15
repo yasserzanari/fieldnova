@@ -1,13 +1,13 @@
 # Assistant FieldNova
 
-The Assistant route pairs a French chat with the shared interactive map. Clicking the map updates the selected coordinate across the application. The map can switch between OpenStreetMap, NASA MODIS true color and NDVI, and NASA SMAP surface and root-zone soil moisture. On narrow screens, an accessible Chat/Carte switcher gives the active panel the available viewport; Chat opens first so the composer is immediately reachable.
+The Assistant route pairs a French chat with the shared interactive map. Clicking the map updates the selected coordinate across the application. The map can switch between OpenStreetMap, NASA MODIS true color and NDVI, NASA SMAP surface and root-zone soil moisture, and the ISRIC SoilGrids predicted mean clay layer for 0–5 cm. The chat can activate each map layer; SoilGrids requests use its WMS map and published legend without extracting a point value. On narrow screens, an accessible Chat/Carte switcher gives the active panel the available viewport; Chat opens first so the composer is immediately reachable.
 
 Each user request and its reply retain the selected coordinate used for that tool call. Later map changes update the active context for new questions without relabeling earlier answers.
 
 ## Live data and limits
 
 - Climate questions read the selected point's NASA POWER monthly temperature, corrected precipitation, and modeled soil-wetness series. A request for several variables summarizes every requested value in one grounded answer and calls out missing variables; the displayed month and grid coordinate travel with the response.
-- Composite questions that combine supported local topics (soil, rotation, crop calendar, or farm constraints) read each requested context; when NASA climate is also requested, its series is read as well. NASA layer requests update the map and add a GIBS trace. Every tool and source appears in the response trace. Combining contexts does not add a compatibility check or agronomic score.
+- Composite questions that combine supported local topics (soil, rotation, crop calendar, or farm constraints) read each requested context; when NASA climate is also requested, its series is read as well. NASA layer requests update the map and add a GIBS trace; SoilGrids map requests add an ISRIC WMS trace and say that the 250 m pixel is predicted, not a local measurement. Every tool and source appears in the response trace. Combining contexts does not add a compatibility check or agronomic score.
 - Rotation questions include per-plan family, legume and documented-root counts, raw differences from the current reference, and any user-declared crop exclusions. These counts are descriptive; they do not predict yield or soil improvement.
 - Crop-calendar questions read the local crop sowing/harvest windows and the farm's declared work windows for the selected point, including optional user-entered crop-calendar source links. The Assistant reports only whether the declared month ranges overlap; missing ranges remain unknown, and no dates are converted into recommendations or feasibility checks.
 - Rotation and farm-profile answers read the per-point custom crop catalog. Locally declared family and crop traits are included as such and are not presented as independently validated evidence.
@@ -27,5 +27,6 @@ Each user request and its reply retain the selected coordinate used for that too
 
 - [NASA POWER monthly API](https://power.larc.nasa.gov/docs/services/api/temporal/monthly/)
 - [NASA GIBS access documentation](https://nasa-gibs.github.io/gibs-api-docs/access-basics/)
+- [ISRIC SoilGrids WMS](https://maps.isric.org/mapserv/clay?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetCapabilities) — clay layer and legend rendered on the map; no numeric value extracted at the selected point. SoilGrids data attribution is provided under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 `src/components/ai-chat/` contains the FrontUI components used to present tool activity, source links, message actions, and the multimodal prompt.
