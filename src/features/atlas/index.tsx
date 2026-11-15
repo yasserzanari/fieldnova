@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { PowerCoverageSummary } from './PowerCoverageSummary'
+import { ClimateYearComparison } from './ClimateYearComparison'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { formatGibsDate, listGibsDates, resolveGibsDate, sampleGibsDates, useGibsAvailability } from '../../lib/nasa/gibs-availability'
@@ -42,6 +43,7 @@ export function AtlasPage() {
   const [coordinateError, setCoordinateError] = useState('')
   const [range, setRange] = useState(12)
   const [showTimeline, setShowTimeline] = useState(false)
+  const [showPeriodComparison, setShowPeriodComparison] = useState(false)
   const [mobileView, setMobileView] = useState<'map' | 'layers' | 'point' | 'timeline'>('map')
   const [locating, setLocating] = useState(false)
   const [playingNdvi, setPlayingNdvi] = useState(false)
@@ -213,10 +215,10 @@ export function AtlasPage() {
         <Link to="/app/data-trust" className="atlas-provenance-link">Sources et limites des données <span>›</span></Link></div>
       </aside>
 
-      {showTimeline && <section id="atlas-climate-history" className="atlas-data-timeline" aria-label="Graphiques climatiques NASA POWER">
+      {showTimeline && <section id="atlas-climate-history" className={`atlas-data-timeline ${showPeriodComparison ? 'is-period-comparison-open' : ''}`} aria-label="Graphiques climatiques NASA POWER">
       <div className="atlas-timeline-controls"><div><span className="timeline-icon"><Activity size={16} /></span><span><strong>Série climatique NASA POWER</strong><small>{rangeLabel} demandés · {visiblePeriod} · point suivi</small></span></div><div className="atlas-timeline-actions"><div className="timeline-ranges" role="group" aria-label="Période du graphique">{climateRanges.map(({ months, label, control }) => <button key={months} type="button" aria-pressed={range === months} className={range === months ? 'is-active' : ''} aria-label={`Afficher les ${label} précédents`} title={`Afficher les ${label} précédents`} onClick={() => setRange(months)}>{control}</button>)}</div><button className="atlas-export-button" type="button" aria-label="Télécharger les séries mensuelles NASA POWER en CSV, avec coordonnées arrondies à 0,001 degré" title="CSV · coordonnées arrondies à 0,001° · valeurs absentes conservées vides" disabled={!series} onClick={() => series && downloadPowerMonthlyCsv(series)}><Download size={14} /><span>CSV</span></button></div></div>
       <button type="button" className="atlas-history-close" aria-label="Fermer l’historique climatique" onClick={() => { setShowTimeline(false); setMobileView('map') }}><X size={15} /></button>
-      <PowerClimateChart records={series?.records ?? []} requestedMonths={series?.requestedMonths} source={series?.source.join(' + ') ?? 'en attente'} months={range} title="Précipitations et température · données mensuelles NASA" compact />
+      <div className="atlas-timeline-content"><PowerClimateChart records={series?.records ?? []} requestedMonths={series?.requestedMonths} source={series?.source.join(' + ') ?? 'en attente'} months={range} title="Précipitations et température · données mensuelles NASA" compact />{series && <ClimateYearComparison series={series} measurementSystem={measurementSystem} onExpanded={setShowPeriodComparison} />}</div>
       </section>}
     </div>
   </section>
