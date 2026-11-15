@@ -136,7 +136,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 61. **[LIVRÉ] Parcours de démo sans compte ni configuration** : le bouton de la landing démarre une ferme fictive préremplie; le profil, les rotations et les contraintes d’exemple sont séparés des réponses NASA consultées en direct.
 62. **[LIVRÉ] Indicateur « exemple » persistant** : le bandeau global reste visible dans toutes les vues et permet de quitter le cas fictif; le profil sauvegardé avant le lancement est restauré.
 63. **[P1] Mode mobile utilisable au champ** : boutons larges, panneaux courts et carte accessible sur petit écran.
-64. **[P1 · PARTIEL] Connexion lente tolérante** : les requêtes NASA POWER ont un délai maximal de 20 secondes, sont annulées si le point change et exposent un bouton de nouvel essai en cas d’échec; la conservation d’une dernière série périmée et le fonctionnement hors ligne restent à traiter.
+64. **[P1 · PARTIEL] Connexion lente tolérante** : les requêtes NASA POWER ont un délai maximal de 20 secondes, sont annulées si le point change et exposent un bouton de nouvel essai en cas d’échec. Une copie locale récente ou âgée de moins de six mois sert de repli hors ligne et son statut est visible; aucune série périmée n’est montrée sans ce libellé.
 65. **[P1] Unités préférées** : choisir unités métriques et formats locaux, tout en conservant l’unité d’origine en provenance.
 66. **[P1] Contraste de carte et daltonisme** : ne jamais faire dépendre une alerte d’une seule couleur.
 67. **[P1] Navigation au clavier** : parcourir panneaux, formulaire, graphique et contrôles de la carte sans souris.
@@ -178,7 +178,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 94. **[P0] Vidéo avec données lisibles** : montrer sources et limites à l’écran, pas seulement des animations de carte.
 95. **[P0 · LIVRÉ] Phrase de distinction** : FieldNova relie séries NASA mensuelles, contexte local et rotations de cinq ans pour comparer des critères descriptifs, sans prétendre prévoir un rendement ou diagnostiquer une parcelle.
 96. **[P1] Page technique publique** : architecture, données, licences, calculs, limites et instructions de lancement.
-97. **[P1] État de service visible** : distinguer données en direct, en cache, d’exemple ou indisponibles.
+97. **[P1 · PARTIEL] État de service visible** : la barre supérieure distingue la série reçue en ligne, le cache récent, la copie locale ancienne et l’indisponibilité; le bandeau démo distingue séparément les données fictives des séries NASA. Les dates de fraîcheur propres à chaque produit GIBS et les réponses servies en cache par d’autres intermédiaires ne sont pas connues.
 98. **[P1] Mode de secours hors réseau** : fournir une démo locale balisée si une API NASA est momentanément inaccessible.
 99. **[P1] Captures et script de présentation** : préparer un parcours de secours si la connexion ou la carte échoue.
 100. **[P1] Réponses aux questions des juges** : préparer preuves de validité, originalité, impact, sources et limites du prototype.

@@ -28,6 +28,7 @@ export type PowerMonthlySeries = {
   source: string[]
   timeStandard: string
   fetchedAt: string
+  deliveryMode: 'network' | 'fresh-cache' | 'stale-cache'
   parameters: Record<string, { units: string; longname: string }>
   records: PowerMonthlyRecord[]
 }
@@ -41,6 +42,8 @@ type PowerResponse = {
 }
 
 const CACHE_TTL = 15 * 60 * 1000
+const MAX_STALE_CACHE_AGE = 180 * 24 * 60 * 60 * 1000
+const STORAGE_PREFIX = 'fieldnova:nasa-power-monthly:v1:'
 const MERRA2_LATITUDE_STEP = 0.5
 const MERRA2_LONGITUDE_STEP = 0.625
 const cache = new Map<string, { expiresAt: number; data: PowerMonthlySeries }>()
@@ -83,7 +86,15 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5, signal?: Abo
   const endYear = new Date().getUTCFullYear()
   const key = `${lat},${lon}:${startYear}-${endYear}`
   const cached = cache.get(key)
-  if (cached && cached.expiresAt > Date.now()) return cached.data
+  const now = Date.now()
+  if (cached && cached.expiresAt > now) return { ...cached.data, deliveryMode: 'fresh-cache' }
+  const stored = readStoredCache(key)
+  const storedAge = stored ? now - stored.savedAt : Infinity
+  if (stored && storedAge <= CACHE_TTL) {
+    cache.set(key, { expiresAt: stored.savedAt + CACHE_TTL, data: stored.data })
+    return { ...stored.data, deliveryMode: 'fresh-cache' }
+  }
+  const stale = stored && storedAge <= MAX_STALE_CACHE_AGE ? stored.data : undefined
 
   const params = new URLSearchParams({
     parameters: 'PRECTOTCORR,T2M,T2M_MAX,T2M_MIN,GWETTOP,GWETROOT',
@@ -95,55 +106,86 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5, signal?: Abo
     format: 'JSON',
     'time-standard': 'UTC',
   })
-  const response = await fetch(`https://power.larc.nasa.gov/api/temporal/monthly/point?${params}`, { signal })
-  const body = await response.json() as PowerResponse
-  if (!response.ok) throw new Error(body.messages?.join(' ') || `NASA POWER a répondu ${response.status}.`)
+  try {
+    const response = await fetch(`https://power.larc.nasa.gov/api/temporal/monthly/point?${params}`, { signal })
+    const body = await response.json() as PowerResponse
+    if (!response.ok) throw new Error(body.messages?.join(' ') || `NASA POWER a répondu ${response.status}.`)
 
-  const values = body.properties?.parameter
-  if (!values) throw new Error('NASA POWER n’a renvoyé aucune série exploitable pour ce point.')
-  const now = new Date()
-  const currentMonth = now.toISOString().slice(0, 7).replace('-', '')
-  const currentMonthStart = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)
-  const requestedMonths: string[] = []
-  for (let time = Date.UTC(startYear, 0, 1); time < currentMonthStart;) {
-    const date = new Date(time)
-    requestedMonths.push(`${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`)
-    date.setUTCMonth(date.getUTCMonth() + 1)
-    time = date.getTime()
-  }
-  // The monthly endpoint may already return the in-progress month. Keep only closed
-  // calendar months so every consumer can call its latest record "complete" safely.
-  const keys = Object.keys(values.PRECTOTCORR ?? values.T2M ?? {}).filter(date => date < currentMonth).sort()
-  const fill = body.header?.fill_value ?? -999
-  const valueAt = (parameter: string, date: string) => {
-    const value = values[parameter]?.[date]
-    return value === undefined || value === fill || !Number.isFinite(value) ? undefined : value
-  }
-  const records = keys.map(date => ({
-    date: `${date.slice(0, 4)}-${date.slice(4, 6)}`,
-    precipitationMmPerDay: valueAt('PRECTOTCORR', date),
-    temperatureC: valueAt('T2M', date),
-    temperatureMaxC: valueAt('T2M_MAX', date),
-    temperatureMinC: valueAt('T2M_MIN', date),
-    surfaceSoilWetness: valueAt('GWETTOP', date),
-    rootZoneWetness: valueAt('GWETROOT', date),
-  })).filter(record => Object.values(record).some(value => typeof value === 'number'))
+    const values = body.properties?.parameter
+    if (!values) throw new Error('NASA POWER n’a renvoyé aucune série exploitable pour ce point.')
+    const requestDate = new Date()
+    const currentMonth = requestDate.toISOString().slice(0, 7).replace('-', '')
+    const currentMonthStart = Date.UTC(requestDate.getUTCFullYear(), requestDate.getUTCMonth(), 1)
+    const requestedMonths: string[] = []
+    for (let time = Date.UTC(startYear, 0, 1); time < currentMonthStart;) {
+      const date = new Date(time)
+      requestedMonths.push(`${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`)
+      date.setUTCMonth(date.getUTCMonth() + 1)
+      time = date.getTime()
+    }
+    // The monthly endpoint may already return the in-progress month. Keep only closed
+    // calendar months so every consumer can call its latest record "complete" safely.
+    const keys = Object.keys(values.PRECTOTCORR ?? values.T2M ?? {}).filter(date => date < currentMonth).sort()
+    const fill = body.header?.fill_value ?? -999
+    const valueAt = (parameter: string, date: string) => {
+      const value = values[parameter]?.[date]
+      return value === undefined || value === fill || !Number.isFinite(value) ? undefined : value
+    }
+    const records = keys.map(date => ({
+      date: `${date.slice(0, 4)}-${date.slice(4, 6)}`,
+      precipitationMmPerDay: valueAt('PRECTOTCORR', date),
+      temperatureC: valueAt('T2M', date),
+      temperatureMaxC: valueAt('T2M_MAX', date),
+      temperatureMinC: valueAt('T2M_MIN', date),
+      surfaceSoilWetness: valueAt('GWETTOP', date),
+      rootZoneWetness: valueAt('GWETROOT', date),
+    })).filter(record => Object.values(record).some(value => typeof value === 'number'))
 
-  if (!records.length) throw new Error('NASA POWER n’a pas encore de mois achevé exploitable pour ce point.')
-  const gridCell = merra2GridCellAt(point)
-  const series: PowerMonthlySeries = {
-    point,
-    gridPoint: gridCell.properties.center,
-    gridCell,
-    requestedMonths,
-    source: body.header?.sources ?? ['NASA POWER'],
-    timeStandard: body.header?.time_standard ?? 'UTC',
-    fetchedAt: new Date().toISOString(),
-    parameters: Object.fromEntries(Object.entries(body.parameters ?? {}).map(([name, value]) => [name, { units: value.units ?? '', longname: value.longname ?? name }])),
-    records,
+    if (!records.length) throw new Error('NASA POWER n’a pas encore de mois achevé exploitable pour ce point.')
+    const gridCell = merra2GridCellAt(point)
+    const series: PowerMonthlySeries = {
+      point,
+      gridPoint: gridCell.properties.center,
+      gridCell,
+      requestedMonths,
+      source: body.header?.sources ?? ['NASA POWER'],
+      timeStandard: body.header?.time_standard ?? 'UTC',
+      fetchedAt: new Date().toISOString(),
+      deliveryMode: 'network',
+      parameters: Object.fromEntries(Object.entries(body.parameters ?? {}).map(([name, value]) => [name, { units: value.units ?? '', longname: value.longname ?? name }])),
+      records,
+    }
+    cache.set(key, { expiresAt: Date.now() + CACHE_TTL, data: series })
+    try { localStorage.setItem(`${STORAGE_PREFIX}${key}`, JSON.stringify({ savedAt: Date.now(), data: series })) } catch { /* storage may be unavailable or full */ }
+    return series
+  } catch (error) {
+    if (stale) {
+      cache.set(key, { expiresAt: 0, data: stale })
+      return { ...stale, deliveryMode: 'stale-cache' }
+    }
+    throw error
   }
-  cache.set(key, { expiresAt: Date.now() + CACHE_TTL, data: series })
-  return series
+}
+
+function readStoredCache(key: string): { savedAt: number; data: PowerMonthlySeries } | undefined {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(`${STORAGE_PREFIX}${key}`) ?? 'null') as { savedAt?: unknown; data?: unknown } | null
+    if (!parsed || typeof parsed.savedAt !== 'number' || !isPowerMonthlySeries(parsed.data)) return undefined
+    return { savedAt: parsed.savedAt, data: parsed.data }
+  } catch {
+    return undefined
+  }
+}
+
+function isPowerMonthlySeries(value: unknown): value is PowerMonthlySeries {
+  if (!value || typeof value !== 'object') return false
+  const series = value as Partial<PowerMonthlySeries>
+  return typeof series.fetchedAt === 'string'
+    && Array.isArray(series.records)
+    && Array.isArray(series.source)
+    && typeof series.gridPoint?.latitude === 'number'
+    && typeof series.gridPoint?.longitude === 'number'
+    && Boolean(series.gridCell?.geometry)
 }
 
 export function latestCompleteRecord(records: PowerMonthlyRecord[]) {
