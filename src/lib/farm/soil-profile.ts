@@ -60,6 +60,17 @@ export function readSoilProfile(point: GeoPoint): FarmSoilProfile {
   }
 }
 
+export function resolveSoilHorizonProvenance(horizon: SoilHorizon, profile: Pick<FarmSoilProfile, 'sourceType' | 'sourceName' | 'sampleDate'>) {
+  const profileSourceType = profile.sourceType ?? 'farmer-reported'
+  const sourceType = horizon.sourceType ?? profileSourceType
+  const inheritsProfileMetadata = horizon.sourceType === undefined || horizon.sourceType === profileSourceType
+  return {
+    sourceType,
+    sourceName: horizon.sourceName ?? (inheritsProfileMetadata ? profile.sourceName : undefined),
+    sampleDate: horizon.sampleDate ?? (inheritsProfileMetadata ? profile.sampleDate : undefined),
+  }
+}
+
 export function writeSoilProfile(point: GeoPoint, profile: FarmSoilProfile) {
   const horizonError = validateSoilHorizons(profile.horizons ?? [])
   if (horizonError) throw new Error(horizonError)
