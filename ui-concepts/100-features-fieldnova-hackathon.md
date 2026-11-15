@@ -75,7 +75,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 15. **[P1 · PARTIELLEMENT LIVRÉ] Chronologie des observations** : l’Atlas permet de comparer 3, 6, 12, 36 ou 60 derniers mois de séries NASA POWER mensuelles, en gardant la période distincte de la date de récupération. La consultation d’une chronologie plus détaillée reste à développer.
 16. **[P1] Historique NDVI par point** : afficher un signal de végétation avec la date et la cadence réelle du produit GIBS sélectionné.
 17. **[P1] Humidité de surface et racinaire SMAP** : distinguer clairement le produit cartographique SMAP des variables NASA POWER.
-18. **[P1] Incertitude ou qualité de couverture** : signaler nuages, trous temporels, valeurs manquantes ou couverture insuffisante lorsqu’une métadonnée existe.
+18. **[P1 · PARTIELLEMENT LIVRÉ] Qualité de couverture POWER** : l’Atlas compte les mois avec valeur pour les six paramètres sur les douze mois demandés et nomme les mois absents. Cela ne mesure ni la couverture nuageuse, ni la qualité d’une estimation; aucune interpolation n’est appliquée.
 19. **[P2] Carte de comparaison de deux périodes** : afficher les différences saisonnières avec des plages temporelles comparables.
 20. **[P2 · LIVRÉ · EXPORT AU POINT] Télécharger les séries NASA POWER** : l’Atlas exporte la fenêtre mensuelle demandée avec les six paramètres, unités, mois absents conservés vides, source, date de récupération et mode réseau/cache. Le point est arrondi à 0,001° pour la confidentialité; ce CSV ne contient pas de statistiques zonales de parcelle.
 

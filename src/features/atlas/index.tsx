@@ -4,6 +4,7 @@ import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
+import { PowerCoverageSummary } from './PowerCoverageSummary'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { downloadPowerMonthlyCsv } from '../../lib/nasa/power-export'
@@ -151,6 +152,7 @@ export function AtlasPage() {
             <AtlasSummaryMetric label="Température moyenne" value={annualSummary.averageTemperatureC === undefined ? '—' : `${annualSummary.averageTemperatureC.toFixed(1).replace('.', ',')} °C`} detail={`${annualSummary.temperatureMonths}/12 mois disponibles`} />
             <AtlasSummaryMetric label="Plage annuelle min. – max." value={annualSummary.highestMaxC === undefined || annualSummary.lowestMinC === undefined ? '—' : `${annualSummary.lowestMinC.toFixed(1).replace('.', ',')}° → ${annualSummary.highestMaxC.toFixed(1).replace('.', ',')}°`} detail={`${annualSummary.extremeMonths}/12 mois · T2M_MIN à T2M_MAX`} />
           </div></section>
+          {series && <PowerCoverageSummary series={series} />}
         </>}
         <div className="atlas-panel-note"><ShieldCheck size={13} /><span>Valeurs mensuelles sur cellule de grille, pas des observations de la ferme.</span></div>
         <Link to="/app/data-trust" className="atlas-provenance-link">Sources et limites des données <span>›</span></Link></div>
