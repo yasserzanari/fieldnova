@@ -78,3 +78,33 @@
 .rotation-evidence-source-links { display:flex; flex-wrap:wrap; gap:8px 14px; }.rotation-evidence-source-links a { color:#477044; font-size:8px; text-decoration:underline; text-underline-offset:2px; }
 .rotation-evidence-context { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:11px; border:1px solid #e5e8dc; border-radius:10px; background:#f8f9f3; }.rotation-evidence-context > div { display:grid; align-content:start; gap:5px; }.rotation-evidence-context .rotation-evidence-limit { grid-column:1/-1; padding-top:8px; border-top:1px solid #e4e6da; color:#7a714e; font-weight:640; }.rotation-evidence-section ul { display:grid; gap:5px; margin:0; padding-left:17px; color:#716d5d; font-size:8px; line-height:1.45; }
 @media(max-width:600px) { .rotation-evidence-content { gap:11px; padding:12px; }.rotation-evidence-content > header h2 { font-size:14px; }.rotation-evidence-deltas { grid-template-columns:repeat(2,minmax(0,1fr)); }.rotation-evidence-context { grid-template-columns:1fr; }.rotation-evidence-context .rotation-evidence-limit { grid-column:auto; } }
+
+@media(max-width:560px) {
+  .rotation-context-panel { right:8px; bottom:8px; left:8px; width:auto; height:40%; padding:10px; }
+  .rotation-context-panel.is-mobile-hidden { display:none; }
+  .rotation-mobile-panel-switch { position:absolute; z-index:7; right:8px; bottom:calc(40% + 14px); left:8px; display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .rotation-mobile-panel-switch button { min-height:44px; padding:6px 9px; border:1px solid rgb(255 255 255 / 80%); border-radius:9px; background:rgb(255 254 249 / 96%); color:#53604a; font-size:10px; font-weight:680; box-shadow:0 3px 9px rgb(18 33 18 / 11%); }
+  .rotation-mobile-panel-switch button[aria-pressed="true"] { border-color:#91b77e; background:#eaf2df; color:#345d36; }
+  .rotation-panel-heading strong { font-size:10px; }
+  .rotation-panel-heading small { font-size:8px; }
+  .rotation-context-empty,.rotation-context-error { font-size:9px; }
+  .rotation-soil-list li { font-size:8px; }
+  .rotation-climate-metrics { gap:9px; }
+  .rotation-climate-metrics small { font-size:8px; }
+  .rotation-climate-metrics small.rotation-climate-reference { font-size:7px; }
+  .rotation-climate-metrics strong { font-size:10px; }
+  .rotation-climate-footnote,.rotation-context-source { font-size:7px; }
+  .rotation-priority-weights { gap:4px; }
+  .rotation-priority-weights legend,.rotation-method-details summary { font-size:9px; }
+  .rotation-priority-weights label { min-height:40px; grid-template-columns:16px minmax(0,1fr) 48px; gap:7px; font-size:9px; }
+  .rotation-priority-weights input { width:16px; height:16px; }
+  .rotation-priority-weights label > span { font-size:9px; }
+  .rotation-priority-weights select { width:48px; height:36px; font-size:10px; }
+  .rotation-method-details p,.rotation-rule-list,.rotation-exclusions p { font-size:8px; }
+  .rotation-exclusions > div label { min-height:36px; font-size:9px; }
+  .rotation-source-links a,.rotation-card-detail { font-size:9px; }
+  .rotation-catalog-note,.rotation-plans-footnote { font-size:8px; }
+  .rotation-season-selects select { min-height:40px; padding-inline:4px; font-size:9px; }
+  .rotation-card-metrics strong { font-size:9px; }
+  .rotation-card-metrics small { font-size:7px; }
+}
