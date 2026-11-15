@@ -130,8 +130,44 @@
 .terrain-soil-chart .power-climate-chart { min-height:72px; }
 .terrain-data-state,.terrain-data-error { display:grid; min-height:90px; flex:1; align-content:center; justify-items:center; gap:8px; color:#777465; font-size:8px; text-align:center; }
 .terrain-data-error { color:#8c5841; }.terrain-data-error button { padding:6px 8px; border:1px solid #e7dccb; border-radius:7px; background:#fbf5e9; color:#755c3b; font-size:8px; cursor:pointer; }
+.terrain-mobile-tabs { display:none; }
 @media(max-width:1120px) { .terrain-layers-panel { width:228px; }.terrain-soil-panel { width:270px; }.terrain-map-controls { left:244px; } }
 @media(max-width:820px) { .terrain-page { height:auto; min-height:calc(100dvh - 62px); grid-template-rows:auto minmax(650px,72dvh) 218px; overflow:visible; padding:14px; }.terrain-heading { align-items:flex-start; }.terrain-heading p { max-width:420px; }.terrain-map-stage { min-height:650px; }.terrain-panel { top:auto; bottom:10px; max-height:290px; overflow:auto; }.terrain-layers-panel { left:10px; width:calc(48% - 14px); }.terrain-soil-panel { right:10px; width:calc(52% - 14px); }.terrain-map-controls { top:89px; right:8px; left:auto; }.terrain-soil-chart { min-height:205px; } }
 @media(max-width:560px) { .terrain-page { grid-template-rows:auto minmax(850px,88dvh) 218px; padding:12px 10px; }.terrain-heading { flex-wrap:wrap; align-items:flex-start; }.terrain-heading > div:first-child,.terrain-source-statuses { flex:1 1 100%; min-width:0; }.terrain-heading h1 { font-size:19px; }.terrain-heading p { max-width:230px; font-size:9px; }.terrain-source-statuses { max-width:100%; justify-content:flex-start; }.terrain-source-status { max-width:100%; padding:5px 6px; font-size:7px; white-space:normal; }.terrain-map-stage { min-height:850px; }.terrain-map-topline { top:8px; right:8px; left:8px; flex-direction:column; align-items:flex-start; }.terrain-map-options { width:100%; justify-content:flex-start; }.terrain-map-controls { top:93px; right:8px; }.terrain-panel { right:8px; left:8px; width:auto; max-height:280px; }.terrain-layers-panel { bottom:295px; }.terrain-soil-panel { bottom:8px; }.terrain-map-click-hint { bottom:574px; }.terrain-soil-chart { min-height:210px; }.terrain-soil-chart .power-chart-heading { display:none; } }
 @media(max-width:560px) { .terrain-indicator-grid { grid-template-columns:1fr; } }
 @media(max-width:520px) { .terrain-soil-form { gap:11px; padding:16px; }.terrain-soil-fields { grid-template-columns:1fr; }.terrain-soil-field-wide { grid-column:auto; }.terrain-soil-form-heading h2 { font-size:16px; }.terrain-horizon-fields { grid-template-columns:repeat(2,minmax(0,1fr)); }.terrain-horizon-editor > header { align-items:flex-start; flex-direction:column; } }
+@media(max-width:820px) {
+  .terrain-page { height:100%; min-height:0; grid-template-rows:42px 44px minmax(0,1fr); gap:6px; overflow:hidden; padding:8px; }
+  .terrain-heading { min-height:0; align-items:center; }
+  .terrain-heading p { display:none; }
+  .terrain-mobile-tabs { display:flex; grid-row:2; min-width:0; gap:3px; padding:3px; border:1px solid #e7e5da; border-radius:9px; background:#f3f2eb; }
+  .terrain-mobile-tabs button { min-width:0; min-height:38px; flex:1; padding:0 5px; border:0; border-radius:6px; background:transparent; color:#676454; font-size:9px; font-weight:650; cursor:pointer; }
+  .terrain-mobile-tabs button.is-active { background:#e3efd7; color:#315d39; box-shadow:0 1px 3px #263c201a; }
+  .terrain-map-stage,.terrain-soil-chart { grid-row:3; min-height:0; }
+  .terrain-panel { top:auto; bottom:10px; max-height:290px; overflow:auto; }
+  .terrain-layers-panel { left:10px; width:calc(48% - 14px); }
+  .terrain-soil-panel { right:10px; width:calc(52% - 14px); }
+  .terrain-map-controls { top:89px; right:8px; left:auto; }
+  .terrain-soil-chart { min-height:0; }
+  .terrain-page.mobile-view-map .terrain-layers-panel,.terrain-page.mobile-view-map .terrain-soil-panel,.terrain-page.mobile-view-map .terrain-soil-chart { display:none; }
+  .terrain-page.mobile-view-layers .terrain-soil-chart,.terrain-page.mobile-view-soil .terrain-soil-chart { display:none; }
+  .terrain-page.mobile-view-layers .terrain-map-stage,.terrain-page.mobile-view-soil .terrain-map-stage { display:grid; grid-template:1fr / 1fr; border:0; background:transparent; box-shadow:none; }
+  .terrain-page.mobile-view-layers .terrain-map-stage > :not(.terrain-layers-panel),.terrain-page.mobile-view-soil .terrain-map-stage > :not(.terrain-soil-panel) { display:none; }
+  .terrain-page.mobile-view-layers .terrain-layers-panel,.terrain-page.mobile-view-soil .terrain-soil-panel { position:static; width:100%; height:100%; max-height:none; grid-area:1 / 1; padding:10px; border:1px solid #e6e3d9; border-radius:11px; background:#fffef9; box-shadow:none; }
+  .terrain-page.mobile-view-layers .terrain-soil-panel,.terrain-page.mobile-view-soil .terrain-layers-panel { display:none; }
+  .terrain-page.mobile-view-chart .terrain-map-stage { display:none; }
+  .terrain-page.mobile-view-chart .terrain-soil-chart { display:grid; }
+}
+@media(max-width:560px) {
+  .terrain-page { padding:7px 8px; }
+  .terrain-heading { display:grid; grid-template-columns:auto minmax(0,1fr); gap:5px; }
+  .terrain-heading h1 { font-size:18px; }
+  .terrain-heading > div:first-child,.terrain-source-statuses { min-width:0; }
+  .terrain-source-statuses { justify-content:flex-end; gap:3px; }
+  .terrain-source-status { max-width:none; min-height:22px; gap:3px; padding:3px 4px; font-size:6px; }
+  .terrain-map-topline { top:8px; right:8px; left:8px; flex-direction:column; align-items:flex-start; }
+  .terrain-map-options { width:100%; flex-wrap:wrap; justify-content:flex-start; }
+  .terrain-latest-chip { max-width:calc(100vw - 50px); white-space:normal; }
+  .terrain-map-controls { top:96px; right:8px; }
+  .terrain-map-click-hint { bottom:9px; }
+}

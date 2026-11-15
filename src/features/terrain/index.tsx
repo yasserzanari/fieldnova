@@ -34,6 +34,7 @@ export function TerrainPage() {
   const gibsDateLabel = (date: string | null) => date ? formatGibsDate(date) : gibsDateError ? 'date indisponible' : 'date en chargement'
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [locating, setLocating] = useState(false)
+  const [mobileView, setMobileView] = useState<'map' | 'layers' | 'soil' | 'chart'>('map')
   const { series, loading, error, retry } = usePowerMonthly(location)
 
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
@@ -56,8 +57,12 @@ export function TerrainPage() {
     }, () => setLocating(false), { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 })
   }
 
-  return <section className="terrain-page" aria-label="Sol et humidité au point sélectionné">
+  return <section className={`terrain-page mobile-view-${mobileView}`} aria-label="Sol et humidité au point sélectionné">
     <header className="terrain-heading"><div><h1>Mon terrain</h1><p>Humidité de surface, zone racinaire et données de sol pour le point choisi</p></div><div className="terrain-source-statuses" aria-label="État des sources NASA" aria-live="polite"><span className={`terrain-source-status ${powerStatusClass}`}><i />POWER · {powerStatus}</span><span className={`terrain-source-status ${gibsStatusClass}`}><i />Disponibilité GIBS · {gibsStatus}</span></div></header>
+
+    <nav className="terrain-mobile-tabs" role="group" aria-label="Panneau de la vue Mon terrain">
+      {([['map', 'Carte'], ['layers', 'SMAP'], ['soil', 'Sol & eau'], ['chart', 'Graphique']] as const).map(([view, label]) => <button key={view} type="button" aria-pressed={mobileView === view} className={mobileView === view ? 'is-active' : ''} onClick={() => setMobileView(view)}>{label}</button>)}
+    </nav>
 
     <div className="terrain-map-stage">
       <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={false} showSurfaceSoil={soilLayer === 'surface'} showRootSoil={soilLayer === 'root'} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive NASA GIBS avec humidité des sols SMAP" />
