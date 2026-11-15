@@ -20,6 +20,14 @@ function formatCoord(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(3).replace('.', ',')}° ${value < 0 ? negative : positive}`
 }
 
+const climateRanges = [
+  { months: 3, label: '3 mois', control: '3 m' },
+  { months: 6, label: '6 mois', control: '6 m' },
+  { months: 12, label: '12 mois', control: '1 an' },
+  { months: 36, label: '3 ans', control: '3 ans' },
+  { months: 60, label: '5 ans', control: '5 ans' },
+] as const
+
 export function AtlasPage() {
   const { location, selectLocation } = useSelectedLocation()
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
@@ -40,6 +48,11 @@ export function AtlasPage() {
 
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
   const latestDate = latest ? formatPowerMonth(latest.date) : 'aucune période valide'
+  const rangeLabel = climateRanges.find(item => item.months === range)?.label ?? '12 mois'
+  const visibleRecords = series?.records.slice(-range) ?? []
+  const visiblePeriod = visibleRecords.length
+    ? `${formatPowerMonth(visibleRecords[0].date)} – ${formatPowerMonth(visibleRecords[visibleRecords.length - 1].date)} · ${visibleRecords.length} mois disponibles`
+    : 'données en attente'
   const gridPoint = series?.gridPoint
   const annualSummary = useMemo(() => {
     const records = [...(series?.records ?? [])].sort((a, b) => a.date.localeCompare(b.date)).slice(-12)
@@ -144,7 +157,7 @@ export function AtlasPage() {
       </aside>
 
       {showTimeline && <section id="atlas-climate-history" className="atlas-data-timeline" aria-label="Graphiques climatiques NASA POWER">
-      <div className="atlas-timeline-controls"><div><span className="timeline-icon"><Activity size={16} /></span><span><strong>Série climatique NASA POWER</strong><small>{range} derniers mois · point suivi</small></span></div><div className="atlas-timeline-actions"><div className="timeline-ranges" role="group" aria-label="Période du graphique">{[[3, '3 mois'], [6, '6 mois'], [12, '1 an']].map(([months, label]) => <button key={months} type="button" className={range === months ? 'is-active' : ''} onClick={() => setRange(Number(months))}>{label}</button>)}</div><button className="atlas-export-button" type="button" aria-label="Télécharger les séries mensuelles NASA POWER en CSV, avec coordonnées arrondies à 0,001 degré" title="CSV · coordonnées arrondies à 0,001° · valeurs absentes conservées vides" disabled={!series} onClick={() => series && downloadPowerMonthlyCsv(series)}><Download size={14} /><span>CSV</span></button></div></div>
+      <div className="atlas-timeline-controls"><div><span className="timeline-icon"><Activity size={16} /></span><span><strong>Série climatique NASA POWER</strong><small>{rangeLabel} demandés · {visiblePeriod} · point suivi</small></span></div><div className="atlas-timeline-actions"><div className="timeline-ranges" role="group" aria-label="Période du graphique">{climateRanges.map(({ months, label, control }) => <button key={months} type="button" className={range === months ? 'is-active' : ''} aria-label={`Afficher les ${label} précédents`} title={`Afficher les ${label} précédents`} onClick={() => setRange(months)}>{control}</button>)}</div><button className="atlas-export-button" type="button" aria-label="Télécharger les séries mensuelles NASA POWER en CSV, avec coordonnées arrondies à 0,001 degré" title="CSV · coordonnées arrondies à 0,001° · valeurs absentes conservées vides" disabled={!series} onClick={() => series && downloadPowerMonthlyCsv(series)}><Download size={14} /><span>CSV</span></button></div></div>
       <button type="button" className="atlas-history-close" aria-label="Fermer l’historique climatique" onClick={() => setShowTimeline(false)}><X size={15} /></button>
       <PowerClimateChart records={series?.records ?? []} source={series?.source.join(' + ') ?? 'en attente'} months={range} title="Précipitations et température · données mensuelles NASA" compact />
       </section>}
