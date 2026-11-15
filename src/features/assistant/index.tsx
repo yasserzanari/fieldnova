@@ -24,8 +24,8 @@ import { AssistantSoilImportCard, type AssistantSoilImport } from './AssistantSo
 import { AssistantObservationCard, type AssistantObservationDraft } from './AssistantObservationCard'
 import './assistant.css'
 
-type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
-type Intent = 'soil' | 'calendar' | 'farm' | 'rotation' | 'climate' | 'observations' | 'unknown'
+type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root' | 'soilgrids-clay'
+type Intent = 'soil' | 'calendar' | 'farm' | 'rotation' | 'climate' | 'map' | 'observations' | 'unknown'
 type EvidenceTag = { label: string; kind: 'source' | 'calculation' | 'local' | 'limit' | 'missing' }
 type Message = { id: number; role: 'user' | 'assistant'; text: string; point?: GeoPoint; intent?: Intent; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[]; evidenceTags?: EvidenceTag[]; soilImport?: AssistantSoilImport; observationDraft?: AssistantObservationDraft }
 type CodexStatus = 'checking' | 'ready' | 'unavailable'
@@ -33,6 +33,7 @@ type CodexStatus = 'checking' | 'ready' | 'unavailable'
 const sources: AISource[] = [
   { id: 'power', title: 'NASA POWER · données mensuelles', url: 'https://power.larc.nasa.gov/docs/services/api/temporal/monthly/', snippet: 'Série au point de grille NASA POWER : température, précipitations et humidité du sol modélisée.' },
   { id: 'gibs', title: 'NASA GIBS · imagerie et humidité du sol', url: 'https://nasa-gibs.github.io/gibs-api-docs/access-basics/', snippet: 'Tuiles cartographiques MODIS et SMAP affichées à leur résolution native.' },
+  { id: 'soilgrids', title: 'ISRIC SoilGrids · argile cartographiée', url: 'https://maps.isric.org/mapserv/clay?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetCapabilities', snippet: 'Couche WMS SoilGrids 2.0 clay_0-5cm_mean, prédiction cartographique en fraction massique. Pixel nominal de 250 m; aucune valeur ponctuelle n’est extraite.' },
 ]
 const rotationReferences: AISource[] = [
   { id: 'fieldnova-rotations', title: 'FieldNova · scénarios enregistrés', url: '/app/scenarios', snippet: 'Séquences, priorité, métriques descriptives et contraintes consultées pour le point sélectionné.' },
@@ -100,11 +101,12 @@ function farmOperationsSource(point: GeoPoint): AISource {
   }
 }
 
-const layerOptions: Array<{ id: LayerId; label: string; short: string; icon: typeof Activity }> = [
-  { id: 'truecolor', label: 'Image MODIS', short: 'Satellite', icon: Layers3 },
-  { id: 'ndvi', label: 'NDVI · MODIS', short: 'NDVI', icon: Leaf },
-  { id: 'surface', label: 'Humidité de surface · SMAP', short: 'Surface', icon: Droplets },
-  { id: 'root', label: 'Humidité racinaire · SMAP', short: 'Racines', icon: Sprout },
+const layerOptions: Array<{ id: LayerId; label: string; short: string; source: 'NASA GIBS' | 'ISRIC SoilGrids'; icon: typeof Activity }> = [
+  { id: 'truecolor', label: 'Image MODIS', short: 'Satellite', source: 'NASA GIBS', icon: Layers3 },
+  { id: 'ndvi', label: 'NDVI · MODIS', short: 'NDVI', source: 'NASA GIBS', icon: Leaf },
+  { id: 'surface', label: 'Humidité de surface · SMAP', short: 'Surface', source: 'NASA GIBS', icon: Droplets },
+  { id: 'root', label: 'Humidité racinaire · SMAP', short: 'Racines', source: 'NASA GIBS', icon: Sprout },
+  { id: 'soilgrids-clay', label: 'Argile cartographiée · 0–5 cm', short: 'Argile', source: 'ISRIC SoilGrids', icon: Layers3 },
 ]
 
 function recentImageryDate(days = 11) {
@@ -202,15 +204,17 @@ function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, 
 function classifyQuestion(question: string, contextualIntent?: Intent) {
   const lower = question.toLocaleLowerCase('fr')
   const asksObservations = /journal|observations? de (?:terrain|champ)|notes? de (?:terrain|champ)|observations?.{0,24}(?:enregistr|saisi|noté)|(?:enregistr|saisi|noté).{0,24}observations?|historique.{0,24}(?:terrain|champ|irrigation|semis|récolte)|qu['’]ai-je (?:fait|noté|observé)|qu['’]est-ce que j['’]ai (?:fait|noté|observé)|(?:semis|semé|semer|récolte|récolté|irrigation|irrigué).{0,30}(?:noté|enregistr|fait|observ)|(?:noté|enregistr|fait|observ).{0,30}(?:semis|semé|récolte|irrigation|irrigué)|(?:semé|irrigué|récolté|noté|observé).{0,20}(?:quand|date|historique)|(?:ajoute|ajouter|consigne|consigner|enregistre|enregistrer).{0,45}(?:journal|observation|note de terrain|semis|récolte|irrigation)/.test(lower)
-  const asksSoilProfile = /profil de (?:mon |la )?sol|texture|\bph\b|matière organique|drainage|profondeur|horizon|couche|analyse de sol/.test(lower)
+  const asksLayer: LayerId | undefined = /ndvi|vigueur/.test(lower) ? 'ndvi' : /humidit[eé] de surface|smap surface/.test(lower) ? 'surface' : /humidit[eé] racinaire|humidit[eé] du sol|racine/.test(lower) ? 'root' : /soilgrids|argile/.test(lower) && /cartographi|surface|carte|couche|soilgrids|affiche|montre|visualise|active/.test(lower) ? 'soilgrids-clay' : undefined
+  const asksMapAction = Boolean(asksLayer && /affiche|montr|visualis|active/.test(lower)) || Boolean(asksLayer && /carte/.test(lower) && /sol|argile|ndvi|smap/.test(lower))
+  const asksSoilProfile = /profil de (?:mon |la )?sol|texture|\bph\b|matière organique|drainage|profondeur|horizon|couche|analyse de sol/.test(lower) && (!asksMapAction || /profil|analyse|\bph\b|matière organique|drainage|profondeur|horizon/.test(lower))
   const asksCalendar = /calendrier.{0,18}(?:cultural|culture|semis|récolte)|\bsemis\b|\bsemer\b|\brécolter\b|\bplanter\b|\b(?:date|période|fenêtre|quand).{0,20}récolte\b|\brécolte.{0,15}(?:date|période|fenêtre)\b|fenêtre.{0,15}travail|disponibilité.{0,20}(?:ferme|semis|récolte)|mois où.{0,20}(?:semer|récolter)/.test(lower)
   const asksEquipment = /matériel|équipement|tracteur|semoir|moissonneuse|prestataire|opérations? faisables/.test(lower)
   const asksRotation = /rotation|succession|famille botanique|légumineuse|alternance|cultures?|préférence|préférée?s?/.test(lower)
   const asksFarmProfile = /ma ferme|mon exploitation|accès.{0,3}eau|eau disponible|ressource en eau|approvisionnement en eau|restriction.{0,12}eau|contrainte.{0,12}eau|profil (?:de (?:ma |la )?ferme|d'exploitation|agricole)/.test(lower) || asksEquipment
-  const asksClimateData = /pluie|précip|température|\bchaud\b|\bfroid\b|humidité|climat|météo|irrig/.test(lower)
+  const asksClimateData = /pluie|précip|température|\bchaud\b|\bfroid\b|climat|météo|irrig/.test(lower) || /humidité/.test(lower) && !asksLayer
   const asksClimate = asksClimateData || /nasa|ndvi|vigueur|satellite|imagerie/.test(lower)
-  const asksLayer: LayerId | undefined = /ndvi|vigueur/.test(lower) ? 'ndvi' : /humidité de surface|smap surface/.test(lower) ? 'surface' : /humidité racinaire|humidité du sol|racine/.test(lower) ? 'root' : undefined
-  const intent: Intent = asksObservations ? 'observations' : asksSoilProfile ? 'soil' : asksEquipment ? 'farm' : asksCalendar ? 'calendar' : asksRotation ? 'rotation' : asksFarmProfile ? 'farm' : asksClimate ? 'climate' : 'unknown'
+  const asksMapOnly = asksMapAction && !asksClimateData && !asksSoilProfile && !asksCalendar && !asksEquipment && !asksRotation && !asksFarmProfile && !asksObservations
+  const intent: Intent = asksMapOnly ? 'map' : asksObservations ? 'observations' : asksSoilProfile ? 'soil' : asksEquipment ? 'farm' : asksCalendar ? 'calendar' : asksRotation ? 'rotation' : asksFarmProfile ? 'farm' : asksClimate ? 'climate' : 'unknown'
   const contextual = intent === 'unknown' && contextualIntent !== undefined
   return { intent: contextual ? contextualIntent : intent, asksObservations, asksSoilProfile, asksCalendar, asksEquipment, asksFarmProfile, asksRotation, asksClimate, asksClimateData, asksLayer, contextual }
 }
@@ -400,7 +404,7 @@ export function AssistantPage() {
   const { availability: gibsAvailability, error: gibsDateError } = useGibsAvailability()
   const [codexStatus, setCodexStatus] = useState<CodexStatus>('checking')
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, role: 'assistant', text: 'Bonjour. Je peux consulter les données climatiques mensuelles NASA POWER, afficher les couches MODIS ou SMAP, et retrouver vos observations du journal local. Cliquez sur la carte pour changer le point suivi, puis demandez-moi la pluie, la température, le NDVI, l’humidité du sol ou ce que vous avez noté au champ.' },
+    { id: 1, role: 'assistant', text: 'Bonjour. Je peux consulter les données climatiques mensuelles NASA POWER, afficher les couches MODIS, SMAP ou SoilGrids, et retrouver vos observations du journal local. Cliquez sur la carte pour changer le point suivi, puis demandez-moi la pluie, la température, le NDVI, l’argile cartographiée, l’humidité du sol ou ce que vous avez noté au champ.' },
   ])
   const [showDetails, setShowDetails] = useState(true)
   const [mobileView, setMobileView] = useState<'chat' | 'map'>('chat')
@@ -422,6 +426,23 @@ export function AssistantPage() {
     const thread = threadRef.current
     if (thread) thread.scrollTop = thread.scrollHeight
   }, [messages])
+
+  useEffect(() => {
+    if (mobileView !== 'map' || !map) return
+    let layerFrame = 0
+    const frame = window.requestAnimationFrame(() => {
+      map.resize()
+      if (map.isStyleLoaded() && map.getLayer('soilgrids-clay')) {
+        map.setLayoutProperty('soilgrids-clay', 'visibility', 'none')
+        layerFrame = window.requestAnimationFrame(() => {
+          if (!map.isStyleLoaded() || !map.getLayer('soilgrids-clay')) return
+          map.setLayoutProperty('soilgrids-clay', 'visibility', layer === 'soilgrids-clay' ? 'visible' : 'none')
+          map.triggerRepaint()
+        })
+      }
+    })
+    return () => { window.cancelAnimationFrame(frame); window.cancelAnimationFrame(layerFrame) }
+  }, [layer, map, mobileView])
 
   const handleSend = async (prompt: string, files: File[]) => {
     const question = prompt.trim() || (files.length ? `Analyse cette pièce jointe : ${files.map(file => file.name).join(', ')}` : '')
@@ -450,9 +471,10 @@ export function AssistantPage() {
     const canReadAdditionalContext = !files.length && !['observations', 'unknown'].includes(route.intent) && !unsupportedFarmDecision
     const addAdditionalContext = (context: { trace: TraceNode; answer: string; sources: AISource[]; tags: EvidenceTag[] }) => additionalContexts.push(context)
 
-    if (canReadAdditionalContext && route.asksLayer && route.intent !== 'climate') {
+    if (canReadAdditionalContext && route.asksLayer && route.intent !== 'climate' && route.intent !== 'map') {
       const label = layerOptions.find(item => item.id === route.asksLayer)?.label ?? 'Couche NASA'
-      addAdditionalContext({ trace: { id: `map-context-${id}`, type: 'step', primary: 'Couche affichée sur la carte', secondary: label, status: 'completed' }, answer: `La carte a été mise à jour avec ${label}.`, sources: [sources[1]], tags: [{ label: 'NASA GIBS · couche affichée', kind: 'source' }] })
+      const source = route.asksLayer === 'soilgrids-clay' ? sources[2] : sources[1]
+      addAdditionalContext({ trace: { id: `map-context-${id}`, type: 'step', primary: 'Couche affichée sur la carte', secondary: label, status: 'completed' }, answer: `La carte a été mise à jour avec ${label}.`, sources: [source], tags: [{ label: `${layerOptions.find(item => item.id === route.asksLayer)?.source ?? 'NASA GIBS'} · couche affichée`, kind: 'source' }] })
     }
     if (canReadAdditionalContext && route.asksClimateData && route.intent !== 'climate') {
       let climateSeries = currentSeries
@@ -575,6 +597,18 @@ export function AssistantPage() {
           }
         }
       }
+    } else if (route.intent === 'map') {
+      const selectedLayer = layerOptions.find(item => item.id === (route.asksLayer ?? layer))!
+      trace.push({ id: `map-${id}`, type: 'step', primary: 'Couche cartographique affichée', secondary: `${selectedLayer.source} · ${selectedLayer.label}`, status: 'completed' })
+      traceHeading = `${selectedLayer.source} affiché sur la carte`
+      answer = selectedLayer.id === 'soilgrids-clay'
+        ? 'La carte affiche maintenant SoilGrids 2.0, couche moyenne d’argile de surface sur 0–5 cm. C’est une prédiction cartographique ISRIC à 250 m, pas une analyse du sol de votre parcelle; FieldNova n’extrait aucune valeur à la coordonnée sélectionnée et cette couche ne remplace pas le profil local.'
+        : `La carte affiche maintenant ${selectedLayer.label}. Le produit est visualisé à son échelle régionale et ne constitue pas une mesure de parcelle.`
+      evidence = answer
+      usedSources = [selectedLayer.id === 'soilgrids-clay' ? sources[2] : sources[1]]
+      evidenceTags = selectedLayer.id === 'soilgrids-clay'
+        ? [{ label: 'ISRIC SoilGrids · prédiction cartographique', kind: 'source' }, { label: '250 m · aucune valeur ponctuelle', kind: 'limit' }]
+        : [{ label: 'NASA GIBS · couche affichée', kind: 'source' }, { label: 'Pixel régional · pas un diagnostic parcellaire', kind: 'limit' }]
     } else if (route.intent === 'observations') {
       const observations = readFieldObservations(location)
       const category = /\bsemis?\b|\bsemé\b|\bsemer\b/.test(question.toLocaleLowerCase('fr')) ? 'semis' : /\brécoltes?\b|\brécolté\b|\brécolter\b/.test(question.toLocaleLowerCase('fr')) ? 'récolte' : /\birrigations?\b|\birrigué\b|\barrosage\b|\barrosé\b/.test(question.toLocaleLowerCase('fr')) ? 'irrigation' : undefined
@@ -675,16 +709,18 @@ export function AssistantPage() {
       const gridLabel = currentSeries ? `Centre maille MERRA-2 ${coordinate(currentSeries.gridPoint.latitude, 'N', 'S')} · ${coordinate(currentSeries.gridPoint.longitude, 'E', 'O')} · résolution 0,5° × 0,625°` : 'La requête n’a pas abouti'
       trace.push(traceNode(`power-${id}`, seriesAlreadyLoaded || isDemoSnapshot ? 'read' : 'fetch', isDemoSnapshot ? 'Extrait NASA POWER local · mode démonstration' : seriesAlreadyLoaded ? 'Série NASA POWER chargée · contexte du point' : 'NASA POWER · API mensuelle', failed ? 'NASA POWER indisponible' : isDemoSnapshot ? 'Extrait local consulté · aucune requête réseau' : seriesAlreadyLoaded ? 'Série chargée consultée' : 'Série récupérée', [record ? formatPowerMonth(record.date) : '', gridLabel, demoSnapshotNote].filter(Boolean).join(' · '), failed ? 'failed' : 'completed'))
       if (route.asksLayer) {
-        const label = layerOptions.find(item => item.id === route.asksLayer)?.label ?? 'Couche NASA'
+        const selectedLayer = layerOptions.find(item => item.id === route.asksLayer)
+        const label = selectedLayer?.label ?? 'Couche cartographique'
         trace.push({ id: `map-${id}`, type: 'step', primary: 'Couche affichée sur la carte', secondary: label, status: 'completed' })
       }
       traceHeading = isDemoSnapshot ? 'Extrait NASA POWER consulté · mode démo' : route.asksLayer ? 'NASA POWER consulté · carte mise à jour' : 'NASA POWER consulté'
       answer = makeClimateAnswer(question, currentSeries, requestedLayer, location, measurementSystem)
       if (demoSnapshotNote) answer = `${demoSnapshotNote}\n\n${answer}`
       evidence = [demoSnapshotNote, answer].filter(Boolean).join('\n\n')
-      usedSources = [{ ...sources[0], snippet: demoSnapshotNote || sources[0].snippet }, ...(route.asksLayer ? [sources[1]] : [])]
+      const layerSource = route.asksLayer === 'soilgrids-clay' ? sources[2] : sources[1]
+      usedSources = [{ ...sources[0], snippet: demoSnapshotNote || sources[0].snippet }, ...(route.asksLayer ? [layerSource] : [])]
       evidenceTags = currentSeries && latestCompleteRecord(currentSeries.records)
-        ? [{ label: isDemoSnapshot ? 'NASA POWER · extrait local daté' : 'NASA POWER · donnée mensuelle modélisée', kind: 'source' }, ...(route.asksLayer?.includes('ndvi') ? [{ label: 'Imagerie NASA GIBS', kind: 'source' } as EvidenceTag] : []), { label: 'Maille régionale · pas un diagnostic parcellaire', kind: 'limit' }]
+        ? [{ label: isDemoSnapshot ? 'NASA POWER · extrait local daté' : 'NASA POWER · donnée mensuelle modélisée', kind: 'source' }, ...(route.asksLayer ? [{ label: layerOptions.find(item => item.id === route.asksLayer)?.source ?? 'Couche cartographique', kind: 'source' } as EvidenceTag] : []), { label: route.asksLayer === 'soilgrids-clay' ? 'ISRIC 250 m · aucune valeur ponctuelle extraite' : 'Maille régionale · pas un diagnostic parcellaire', kind: 'limit' }]
         : [{ label: 'Donnée NASA indisponible', kind: 'missing' }, { label: 'Aucune valeur de remplacement', kind: 'limit' }]
     }
     if (additionalContexts.length && evidence) {
@@ -792,19 +828,22 @@ export function AssistantPage() {
   const imageryDate = recentImageryDate()
   const displayedGibsDate = layer === 'truecolor'
     ? resolveGibsDate(imageryDate, gibsAvailability?.trueColor)
+    : layer === 'soilgrids-clay'
+      ? null
     : layer === 'ndvi'
       ? resolveGibsDate(imageryDate, gibsAvailability?.ndvi)
       : layer === 'surface'
         ? gibsAvailability?.surfaceSoil.at(-1)?.end ?? null
         : gibsAvailability?.rootSoil.at(-1)?.end ?? null
-  const gibsDateLabel = displayedGibsDate ? formatGibsDate(displayedGibsDate) : gibsDateError ? 'date source indisponible' : 'date en chargement'
-  const displayedGibsProduct = layer === 'truecolor' || layer === 'ndvi' ? 'MODIS' : layer === 'surface' ? 'SMAP surface' : 'SMAP racines'
+  const gibsDateLabel = layer === 'soilgrids-clay' ? 'couche statique · sans série temporelle' : displayedGibsDate ? formatGibsDate(displayedGibsDate) : gibsDateError ? 'date source indisponible' : 'date en chargement'
+  const displayedGibsProduct = layer === 'soilgrids-clay' ? 'SoilGrids · argile' : layer === 'truecolor' || layer === 'ndvi' ? 'MODIS' : layer === 'surface' ? 'SMAP surface' : 'SMAP racines'
   const requestedDateNote = (layer === 'truecolor' || layer === 'ndvi') && displayedGibsDate && displayedGibsDate !== imageryDate ? ` · cible ${formatGibsDate(imageryDate)}` : ''
   const suggestedQuestions = [
     ...(latest?.precipitationMmPerDay !== undefined ? [{ label: 'Pluie du mois', question: 'Quelle est la pluie mensuelle NASA POWER ?' }] : []),
     ...(latest?.temperatureC !== undefined ? [{ label: 'Température', question: 'Que montrent les températures mensuelles NASA POWER ?' }] : []),
     ...(latest?.rootZoneWetness !== undefined || latest?.surfaceSoilWetness !== undefined ? [{ label: 'Humidité modélisée', question: 'Explique l’humidité du sol observée pour ce point.' }] : []),
     [{ label: layer === 'ndvi' ? 'Limites du NDVI' : 'Voir le NDVI', question: layer === 'ndvi' ? 'Explique les limites du NDVI affiché.' : 'Affiche le NDVI et explique ses limites.' }],
+    { label: 'Argile de surface', question: 'Affiche la couche SoilGrids d’argile cartographiée de 0 à 5 cm.' },
     { label: 'Profil de sol', question: 'Lis mon profil de sol pour ce point.' },
     { label: 'Profil de ferme', question: 'Résume mon profil de ferme et mes contraintes d’eau.' },
     { label: 'Calendrier cultural', question: 'Quelles fenêtres de semis et de récolte sont renseignées ?' },
@@ -853,13 +892,13 @@ export function AssistantPage() {
       </aside>
 
       <div className="assistant-map-area">
-        <header className="assistant-map-header"><div><span className="assistant-map-kicker"><Layers3 size={14} /> EXPLORATION NASA · GIBS</span><h2>Carte du point suivi <ChevronDown size={16} /></h2><p>Cliquez sur la carte pour déplacer le point partagé avec les autres vues.</p></div><div className="assistant-map-header-actions"><span className="assistant-demo-chip">{displayedGibsProduct} · {gibsDateLabel}{requestedDateNote}</span><button type="button" className="assistant-expand-map" aria-label="Recentrer la carte" onClick={() => map?.flyTo({ center: [location.longitude, location.latitude], zoom: 5 })}><Maximize2 size={15} /></button></div></header>
+        <header className="assistant-map-header"><div><h2>Carte du point suivi <ChevronDown size={16} /></h2><p>Cliquez sur la carte pour déplacer le point partagé avec les autres vues.</p></div><div className="assistant-map-header-actions"><span className="assistant-demo-chip">{displayedGibsProduct} · {gibsDateLabel}{requestedDateNote}</span><button type="button" className="assistant-expand-map" aria-label="Recentrer la carte" onClick={() => map?.flyTo({ center: [location.longitude, location.latitude], zoom: 5 })}><Maximize2 size={15} /></button></div></header>
         <div className="assistant-map-canvas">
-          <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={layer === 'ndvi'} showSurfaceSoil={layer === 'surface'} showRootSoil={layer === 'root'} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectLocation} onMapReady={setMap} ariaLabel="Carte interactive NASA GIBS et OpenStreetMap" />
+          <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={layer === 'ndvi'} showSurfaceSoil={layer === 'surface'} showRootSoil={layer === 'root'} showMappedClay={layer === 'soilgrids-clay'} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectLocation} onMapReady={setMap} ariaLabel="Carte interactive NASA GIBS, ISRIC SoilGrids et OpenStreetMap" />
           <div className="assistant-map-toolbar"><div className="assistant-zoom-stack"><button type="button" aria-label="Zoom avant" onClick={() => map?.zoomIn({ duration: 250 })}><Plus size={16} /></button><button type="button" aria-label="Zoom arrière" onClick={() => map?.zoomOut({ duration: 250 })}><Minus size={16} /></button></div><button type="button" aria-label="Utiliser ma position" onClick={() => navigator.geolocation?.getCurrentPosition(position => selectLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude }))}><LocateFixed size={16} /></button></div>
           <div className="assistant-map-top-overlay"><span><span className="assistant-live-indicator" />Point partagé</span><span>{coordinate(location.latitude, 'N', 'S')}</span><span>{coordinate(location.longitude, 'E', 'O')}</span></div>
-          <div className="assistant-map-layer-card"><div className="assistant-map-layer-title"><span><LayerIcon size={15} /></span><div><strong>{activeLayer.label}</strong><small>GIBS · {gibsDateLabel}{requestedDateNote}</small></div><button type="button" aria-label="Fond de carte" aria-pressed={baseLayer === 'nasa'} onClick={() => setBaseLayer(value => value === 'nasa' ? 'streets' : 'nasa')}><ChevronDown size={15} /></button></div><div className="assistant-layer-choices">{layerOptions.map(item => { const Icon = item.icon; return <button key={item.id} type="button" aria-pressed={layer === item.id} className={layer === item.id ? 'is-active' : ''} onClick={() => setLayer(item.id)}><Icon size={13} />{item.short}</button> })}</div><button type="button" aria-pressed={baseLayer === 'streets'} className="assistant-base-toggle" onClick={() => setBaseLayer(value => value === 'nasa' ? 'streets' : 'nasa')}>{baseLayer === 'nasa' ? 'Passer au plan de rues' : 'Passer au fond NASA'}</button><p><ShieldCheck size={12} /> Résolution satellite régionale · pas parcellaire</p></div>
-          <div className="assistant-map-legend"><span><i className={`legend-gradient legend-${layer}`} />Couche NASA active</span><small>Pixel satellite ≠ contour de parcelle</small></div>
+          <div className="assistant-map-layer-card"><div className="assistant-map-layer-title"><span><LayerIcon size={15} /></span><div><strong>{activeLayer.label}</strong><small>{activeLayer.source} · {gibsDateLabel}{requestedDateNote}</small></div><button type="button" aria-label="Fond de carte" aria-pressed={baseLayer === 'nasa'} onClick={() => setBaseLayer(value => value === 'nasa' ? 'streets' : 'nasa')}><ChevronDown size={15} /></button></div><div className="assistant-layer-choices">{layerOptions.map(item => { const Icon = item.icon; return <button key={item.id} type="button" aria-pressed={layer === item.id} className={layer === item.id ? 'is-active' : ''} onClick={() => setLayer(item.id)}><Icon size={13} />{item.short}</button> })}</div>{layer === 'soilgrids-clay' && <div className="assistant-soilgrids-legend"><small>Argile · fraction massique en ‰</small><img src="https://maps.isric.org/mapserv/clay?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetLegendGraphic&LAYER=clay_0-5cm_mean&FORMAT=image%2Fpng" alt="Légende SoilGrids de la fraction massique d’argile, de 0 à 799 pour mille." /></div>}<button type="button" aria-pressed={baseLayer === 'streets'} className="assistant-base-toggle" onClick={() => setBaseLayer(value => value === 'nasa' ? 'streets' : 'nasa')}>{baseLayer === 'nasa' ? 'Passer au plan de rues' : 'Passer au fond NASA'}</button><p><ShieldCheck size={12} /> {layer === 'soilgrids-clay' ? 'Prédiction cartographique · pas une analyse de parcelle' : 'Résolution satellite régionale · pas parcellaire'}</p></div>
+          <div className="assistant-map-legend"><span><i className={`legend-gradient legend-${layer}`} />Couche {activeLayer.source === 'ISRIC SoilGrids' ? 'SoilGrids' : 'NASA'} active</span><small>{layer === 'soilgrids-clay' ? 'Pixel prédit ≠ analyse de parcelle' : 'Pixel satellite ≠ contour de parcelle'}</small></div>
           <div className="assistant-scale"><span />Échelle indiquée sur la carte</div>
         </div>
         <footer className="assistant-map-footer"><div className="assistant-footer-title"><Sprout size={16} /><span><strong>Point NASA suivi</strong><small>{series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? `Centre maille POWER · ${coordinate(series.gridPoint.latitude, 'N', 'S')} · ${coordinate(series.gridPoint.longitude, 'E', 'O')} · 0,5° × 0,625°` : 'Coordonnée choisie sur la carte'}</small></span></div><div className="assistant-soil-stat"><span className="soil-stat-icon moisture"><Droplets size={14} /></span><span><small>Humidité racinaire · POWER</small><strong>{soilValue !== undefined ? `${Math.round(soilValue * 100)} %` : 'Non disponible'} <em>{latest ? formatPowerMonth(latest.date) : ''}</em></strong></span></div><div className="assistant-soil-stat"><span className="soil-stat-icon weather"><ThermometerSun size={14} /></span><span><small>Température · POWER</small><strong>{latest?.temperatureC !== undefined ? formatTemperature(latest.temperatureC, measurementSystem) : 'Non disponible'} <em>{latest ? formatPowerMonth(latest.date) : ''}</em></strong></span></div><div className="assistant-soil-stat"><span className="soil-stat-icon organic"><CloudRain size={14} /></span><span><small>Pluie moyenne · POWER</small><strong>{latest?.precipitationMmPerDay !== undefined ? formatPrecipitationRate(latest.precipitationMmPerDay, measurementSystem) : 'Non disponible'} <em>{latest ? formatPowerMonth(latest.date) : ''}</em></strong></span></div><button type="button" className="assistant-map-details" onClick={() => handleSend('Explique les données NASA POWER pour ce point.', [])}>Analyser les données <Send size={13} /></button></footer>
