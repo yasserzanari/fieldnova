@@ -124,7 +124,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 52. **[P0 · LIVRÉ] Réponse avec sources consultables** : chaque réponse fondée sur un outil affiche les sources associées à ses données — NASA POWER/GIBS, profil local FieldNova ou références agronomiques — avec distinction explicite entre déclaration locale et source externe.
 53. **[P0 · LIVRÉ] Trace d’outils réelle** : le chat affiche les lectures locales, requêtes NASA POWER, actions de couche et statuts réellement exécutés.
 54. **[P0 · LIVRÉ] Questions de suivi suggérées** : proposer pluie, température et humidité seulement lorsque la variable correspondante existe dans la dernière période NASA exploitable; adapter aussi la question NDVI à la couche affichée et conserver les actions vers les profils locaux et rotations.
-55. **[P1] Réponses séparant fait, calcul et hypothèse** : utiliser des étiquettes visuelles différentes.
+55. **[P1 · LIVRÉ] Réponses séparant source, calcul, déclaration et limite** : des badges distincts qualifient NASA POWER/GIBS, les calculs descriptifs FieldNova, les déclarations locales, les valeurs manquantes et les limites. Aucune hypothèse non calculée n’est présentée comme un fait.
 56. **[P1] Réponse courte pour le terrain** : produire une synthèse en langage simple, avec un lien vers les détails.
 57. **[P1] « Pourquoi ce scénario ? »** : expliquer chaque règle et permettre de la désactiver ou la modifier.
 58. **[P1] Questions auxquelles l’assistant refuse de répondre** : expliquer quand les données ne permettent pas une dose d’irrigation ou une prédiction de rendement.

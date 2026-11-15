@@ -16,7 +16,8 @@ import { cropCatalog, evaluateRotation, priorityLabels, readRotationWorkspace, r
 import './assistant.css'
 
 type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
-type Message = { id: number; role: 'user' | 'assistant'; text: string; point?: GeoPoint; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[] }
+type EvidenceTag = { label: string; kind: 'source' | 'calculation' | 'local' | 'limit' | 'missing' }
+type Message = { id: number; role: 'user' | 'assistant'; text: string; point?: GeoPoint; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[]; evidenceTags?: EvidenceTag[] }
 type CodexStatus = 'checking' | 'ready' | 'unavailable'
 
 const sources: AISource[] = [
@@ -243,8 +244,10 @@ export function AssistantPage() {
     let evidence = ''
     let traceHeading = 'Aucun outil exécuté'
     let usedSources: AISource[] = []
+    let evidenceTags: EvidenceTag[] = []
     if (files.length) {
       answer = 'La pièce jointe est reçue, mais son contenu n’est pas encore analysé. Je peux consulter le climat NASA POWER, le profil local du sol ou les rotations enregistrées pour le point suivi.'
+      evidenceTags = [{ label: 'Pièce jointe non analysée', kind: 'missing' }, { label: 'Aucune donnée consultée', kind: 'limit' }]
     } else if (route.intent === 'soil') {
       const profile = readSoilProfile(location)
       const knownFields = Object.values(profile).filter(value => value !== undefined).length
@@ -253,6 +256,7 @@ export function AssistantPage() {
       answer = formatSoilAnswer(location)
       evidence = answer
       usedSources = [soilProfileSource(location)]
+      evidenceTags = [{ label: 'Déclaration locale', kind: 'local' }, { label: 'Mesure non vérifiée', kind: 'limit' }]
     } else if (route.intent === 'rotation') {
       const workspace = readRotationWorkspace(location)
       const constraints = readRotationConstraints(location)
@@ -263,6 +267,7 @@ export function AssistantPage() {
       answer = formatRotationAnswer(location)
       evidence = answer
       usedSources = rotationReferences
+      evidenceTags = [{ label: 'Données locales', kind: 'local' }, { label: 'Calcul FieldNova', kind: 'calculation' }, { label: 'Indicateur descriptif', kind: 'limit' }]
     } else if (route.intent === 'farm') {
       const profile = readFarmProfile(location)
       const workspace = readRotationWorkspace(location)
@@ -273,9 +278,11 @@ export function AssistantPage() {
       answer = formatFarmProfileAnswer(location)
       evidence = answer
       usedSources = [farmProfileSource(location), soilProfileSource(location), rotationWorkspaceSource]
+      evidenceTags = [{ label: 'Déclarations locales', kind: 'local' }, { label: 'Calcul FieldNova', kind: 'calculation' }, { label: 'Non vérifié sur le terrain', kind: 'limit' }]
     } else if (route.intent === 'unknown') {
       answer = 'Je peux agir sur les données NASA POWER mensuelles, les couches NASA de la carte, le profil de sol saisi localement et les rotations enregistrées. Posez une question sur la pluie, la température, l’humidité, le NDVI, le sol ou une rotation; aucune donnée n’a été consultée pour cette question.'
       evidence = 'Capacités disponibles : NASA POWER mensuel, couches MODIS/SMAP de la carte, profil de sol local saisi par l’utilisateur, scénarios de rotation locaux. Aucun outil n’a été exécuté pour cette question.'
+      evidenceTags = [{ label: 'Aucun outil consulté', kind: 'missing' }]
     } else {
       let failed = false
       const seriesAlreadyLoaded = Boolean(currentSeries && currentSeries.point.latitude === location.latitude && currentSeries.point.longitude === location.longitude)
@@ -298,6 +305,9 @@ export function AssistantPage() {
       answer = makeClimateAnswer(question, currentSeries, requestedLayer, location)
       evidence = answer
       usedSources = [sources[0], ...(route.asksLayer ? [sources[1]] : [])]
+      evidenceTags = currentSeries && latestCompleteRecord(currentSeries.records)
+        ? [{ label: 'NASA POWER · donnée mensuelle modélisée', kind: 'source' }, ...(route.asksLayer?.includes('ndvi') ? [{ label: 'Imagerie NASA GIBS', kind: 'source' } as EvidenceTag] : []), { label: 'Maille régionale · pas un diagnostic parcellaire', kind: 'limit' }]
+        : [{ label: 'Donnée NASA indisponible', kind: 'missing' }, { label: 'Aucune valeur de remplacement', kind: 'limit' }]
     }
     if (!files.length && codexStatus === 'ready') {
       try {
@@ -323,7 +333,7 @@ export function AssistantPage() {
       trace.push({ id: `codex-${id}`, type: 'step', primary: 'Codex CLI non connecté · réponse locale utilisée', secondary: 'Connectez Codex CLI sur le serveur de démonstration', status: 'failed' })
       traceHeading = 'Réponse locale FieldNova'
     }
-    setMessages(current => current.map(message => message.id === id ? { ...message, text: answer, trace, traceHeading, running: false, sources: usedSources.length ? usedSources : undefined } : message))
+    setMessages(current => current.map(message => message.id === id ? { ...message, text: answer, trace, traceHeading, running: false, sources: usedSources.length ? usedSources : undefined, evidenceTags } : message))
   }
 
   const activeLayer = layerOptions.find(item => item.id === layer)!
@@ -360,6 +370,7 @@ export function AssistantPage() {
               {message.role === 'user' ? <div className="assistant-user-bubble">{message.text}</div> : <>
                 {message.point && <small className="assistant-answer-point">Point utilisé · {message.point.latitude.toFixed(5).replace('.', ',')}° · {message.point.longitude.toFixed(5).replace('.', ',')}°</small>}
                 {Boolean(message.trace?.length) && <ThinkingState nodes={message.trace!} autoPlay={Boolean(message.running)} defaultExpanded={Boolean(message.running)} workingLabel={message.running ? 'Exécution des outils FieldNova' : message.traceHeading ?? 'Activité de l’assistant'} onSettled={() => setMessages(current => current.map(item => item.id === message.id ? { ...item, running: false } : item))} className="assistant-trace" />}
+                {Boolean(message.evidenceTags?.length) && <div className="assistant-evidence-tags" aria-label="Nature et limites des éléments utilisés">{message.evidenceTags!.map((tag, index) => <span key={`${message.id}-${index}`} className={`is-${tag.kind}`}>{tag.label}</span>)}</div>}
                 {message.text ? <p className="assistant-answer-text">{message.text}</p> : message.running ? <p className="assistant-pending">Consultation des données sélectionnées…</p> : null}
                 {message.sources && <AISources className="assistant-sources" label="Sources utilisées" sources={message.sources} />}
                 {message.text && <MessageActions text={message.text} actions={['copy', 'feedback']} quiet={false} className="assistant-actions" />}
