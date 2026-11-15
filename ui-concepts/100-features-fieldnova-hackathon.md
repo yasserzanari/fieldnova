@@ -102,7 +102,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 35. **[P1 · PARTIEL] Familles botaniques** : les cartes affichent désormais les familles année par année; le détail ouvre TAXREF/INPN, et les cartes comptent aussi les familles distinctes et répétitions consécutives. Aucune répétition n’est bloquée sans règle et validation locales.
 36. **[P1] Cultures de couverture** : ajouter une option dédiée, avec ses coûts opérationnels et ses limites locales.
 37. **[P1] Intercultures et mélanges** : représenter deux cultures simultanées et éviter de les traiter comme une rotation simple.
-38. **[P1] Calendrier cultural local** : semis, croissance et récolte selon région, variété et saison, avec source et plage de dates.
+38. **[P1 · PARTIEL] Calendrier cultural local** : fenêtres de semis et de récolte saisies par l’utilisateur et liées au point suivi, avec source/variété facultative. Aucune date n’est préremplie; les fenêtres sont visibles dans la justification de la rotation sans modifier le classement. Les durées de croissance, références régionales et validations agronomiques restent à intégrer.
 39. **[P2] Variétés et durées de cycle** : différencier les caractéristiques variétales des valeurs génériques de l’espèce.
 40. **[P2] Rotation éditable manuellement** : laisser l’agriculteur imposer une culture ou un ordre, puis recalculer les contraintes.
 
