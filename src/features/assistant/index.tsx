@@ -142,6 +142,35 @@ function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, 
   const point = `${coordinate(series.point.latitude, 'N', 'S')} · ${coordinate(series.point.longitude, 'E', 'O')}`
   const prefix = `Pour le point ${point}, la dernière période mensuelle exploitable est ${formatPowerMonth(record.date)}.`
   const requestedLayer = layerOptions.find(item => item.id === layer)?.label
+  const asksPrecipitation = /pluie|précip/.test(lower)
+  const asksTemperature = /temp|chaud|froid/.test(lower)
+  const asksSoilMoisture = /irrig|eau|humid|\bsol\b/.test(lower)
+  const asksVegetation = /ndvi|vigueur/.test(lower)
+  const requestedMetrics = [asksPrecipitation, asksTemperature, asksSoilMoisture, asksVegetation].filter(Boolean).length
+  if (requestedMetrics > 1) {
+    const metrics = [
+      asksPrecipitation
+        ? record.precipitationMmPerDay !== undefined
+          ? `Pluie : ${formatPrecipitationRate(record.precipitationMmPerDay, measurementSystem)} en moyenne journalière sur le mois (PRECTOTCORR).`
+          : 'Pluie : aucune valeur exploitable pour cette période.'
+        : '',
+      asksTemperature
+        ? record.temperatureC !== undefined
+          ? `Température moyenne : ${formatTemperature(record.temperatureC, measurementSystem)}${record.temperatureMinC !== undefined && record.temperatureMaxC !== undefined ? ` (min. ${formatTemperature(record.temperatureMinC, measurementSystem)} ; max. ${formatTemperature(record.temperatureMaxC, measurementSystem)})` : ''}.`
+          : 'Température moyenne : aucune valeur exploitable pour cette période.'
+        : '',
+      asksSoilMoisture
+        ? [
+            record.rootZoneWetness !== undefined ? `humidité racinaire modélisée ${Math.round(record.rootZoneWetness * 100)} %` : '',
+            record.surfaceSoilWetness !== undefined ? `humidité de surface modélisée ${Math.round(record.surfaceSoilWetness * 100)} %` : '',
+          ].filter(Boolean).join(' ; ') || 'Aucune humidité de sol exploitable pour cette période.'
+        : '',
+      asksVegetation
+        ? `NDVI : la carte affiche ${requestedLayer ?? 'le produit MODIS de NASA GIBS'} à l’échelle du pixel satellite; NASA POWER ne fournit pas de valeur NDVI numérique.`
+        : '',
+    ].filter(Boolean)
+    return `${prefix} ${metrics.join(' ')} Ces observations sont mensuelles ou régionales selon le produit; elles ne constituent ni une prévision ni un diagnostic de parcelle.`
+  }
   if (lower.includes('ndvi') || lower.includes('vigueur')) {
     return `${prefix} La carte affiche le NDVI MODIS de NASA GIBS à l’échelle du pixel satellite. Cette image peut être nuageuse ou décalée dans le temps et ne permet pas de comparer une sous-zone de parcelle ici. NASA POWER ne fournit pas le NDVI ; je n’en déduis donc pas un état de culture à partir des données météo.`
   }

@@ -6,7 +6,7 @@ Each user request and its reply retain the selected coordinate used for that too
 
 ## Live data and limits
 
-- Climate questions read the selected point's NASA POWER monthly temperature, corrected precipitation, and modeled soil-wetness series. The displayed month and grid coordinate travel with the response.
+- Climate questions read the selected point's NASA POWER monthly temperature, corrected precipitation, and modeled soil-wetness series. A request for several variables summarizes every requested value in one grounded answer and calls out missing variables; the displayed month and grid coordinate travel with the response.
 - Rotation questions include per-plan family, legume and documented-root counts, raw differences from the current reference, and any user-declared crop exclusions. These counts are descriptive; they do not predict yield or soil improvement.
 - Crop-calendar questions read the local crop sowing/harvest windows and the farm's declared work windows for the selected point, including optional user-entered crop-calendar source links. The Assistant reports only whether the declared month ranges overlap; missing ranges remain unknown, and no dates are converted into recommendations or feasibility checks.
 - Rotation and farm-profile answers read the per-point custom crop catalog. Locally declared family and crop traits are included as such and are not presented as independently validated evidence.
