@@ -12,6 +12,7 @@ export type SoilHorizon = {
   sourceType?: SoilSourceType
   sourceName?: string
   sampleDate?: string
+  samplingMethod?: string
 }
 export const soilSourceLabels: Record<SoilSourceType, string> = {
   'farmer-reported': 'déclaration de l’exploitation',
@@ -29,6 +30,7 @@ export type FarmSoilProfile = {
   sourceType?: SoilSourceType
   sourceName?: string
   sampleDate?: string
+  samplingMethod?: string
   updatedAt?: string
 }
 
@@ -53,6 +55,7 @@ export function readSoilProfile(point: GeoPoint): FarmSoilProfile {
       sourceType: isOneOf(parsed.sourceType, ['farmer-reported', 'lab-analysis', 'other-source']) ? parsed.sourceType : undefined,
       sourceName: typeof parsed.sourceName === 'string' ? parsed.sourceName.slice(0, 120) : undefined,
       sampleDate: isIsoDate(parsed.sampleDate) ? parsed.sampleDate : undefined,
+      samplingMethod: typeof parsed.samplingMethod === 'string' ? parsed.samplingMethod.slice(0, 120) : undefined,
       updatedAt: typeof parsed.updatedAt === 'string' && Number.isFinite(Date.parse(parsed.updatedAt)) ? parsed.updatedAt : undefined,
     }
   } catch {
@@ -60,7 +63,7 @@ export function readSoilProfile(point: GeoPoint): FarmSoilProfile {
   }
 }
 
-export function resolveSoilHorizonProvenance(horizon: SoilHorizon, profile: Pick<FarmSoilProfile, 'sourceType' | 'sourceName' | 'sampleDate'>) {
+export function resolveSoilHorizonProvenance(horizon: SoilHorizon, profile: Pick<FarmSoilProfile, 'sourceType' | 'sourceName' | 'sampleDate' | 'samplingMethod'>) {
   const profileSourceType = profile.sourceType ?? 'farmer-reported'
   const sourceType = horizon.sourceType ?? profileSourceType
   const inheritsProfileMetadata = horizon.sourceType === undefined || horizon.sourceType === profileSourceType
@@ -68,6 +71,7 @@ export function resolveSoilHorizonProvenance(horizon: SoilHorizon, profile: Pick
     sourceType,
     sourceName: horizon.sourceName ?? (inheritsProfileMetadata ? profile.sourceName : undefined),
     sampleDate: horizon.sampleDate ?? (inheritsProfileMetadata ? profile.sampleDate : undefined),
+    samplingMethod: horizon.samplingMethod ?? (inheritsProfileMetadata ? profile.samplingMethod : undefined),
   }
 }
 
@@ -84,6 +88,7 @@ export function writeSoilProfile(point: GeoPoint, profile: FarmSoilProfile) {
     sourceType: profile.sourceType ?? 'farmer-reported',
     sourceName: typeof profile.sourceName === 'string' ? profile.sourceName.trim().slice(0, 120) || undefined : undefined,
     sampleDate: isIsoDate(profile.sampleDate) ? profile.sampleDate : undefined,
+    samplingMethod: typeof profile.samplingMethod === 'string' ? profile.samplingMethod.trim().slice(0, 120) || undefined : undefined,
     updatedAt: new Date().toISOString(),
   }
   localStorage.setItem(soilProfileStorageKey(point), JSON.stringify(clean))
@@ -110,6 +115,7 @@ export function validateSoilHorizons(horizons: SoilHorizon[]) {
     if (horizon.sourceType !== undefined && !isOneOf(horizon.sourceType, ['farmer-reported', 'lab-analysis', 'other-source'])) return `Horizon ${index + 1} : origine invalide.`
     if (horizon.sourceName !== undefined && (typeof horizon.sourceName !== 'string' || horizon.sourceName.length > 120)) return `Horizon ${index + 1} : la référence de source ne peut pas dépasser 120 caractères.`
     if (horizon.sampleDate !== undefined && !isIsoDate(horizon.sampleDate)) return `Horizon ${index + 1} : date d’échantillon invalide.`
+    if (horizon.samplingMethod !== undefined && (typeof horizon.samplingMethod !== 'string' || horizon.samplingMethod.length > 120)) return `Horizon ${index + 1} : la méthode ne peut pas dépasser 120 caractères.`
   }
   return ''
 }
