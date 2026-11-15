@@ -9,6 +9,7 @@ export type FieldObservation = {
   crop: string
   note: string
   author: string
+  photoId?: string
 }
 
 const STORAGE_PREFIX = 'fieldnova:observations:v1:'
@@ -25,6 +26,7 @@ function isFieldObservation(entry: unknown): entry is FieldObservation {
     && /^\d{4}-\d{2}-\d{2}$/.test(value.date) && !Number.isNaN(Date.parse(`${value.date}T12:00:00`))
     && ['semis', 'recolte', 'irrigation', 'note'].includes(value.kind ?? '')
     && typeof value.crop === 'string' && typeof value.note === 'string' && typeof value.author === 'string'
+    && (value.photoId === undefined || typeof value.photoId === 'string')
 }
 
 export function readFieldObservations(point: GeoPoint): FieldObservation[] {
