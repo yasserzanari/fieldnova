@@ -2,7 +2,7 @@
 
 This route describes the actual integrations used by FieldNova and the data that is still missing. NASA POWER monthly climate and soil-wetness estimates are fetched for the shared selected coordinate; NASA GIBS MODIS and SMAP products are available on the shared interactive map. The POWER detail includes a live chart, grid point, latest usable month, variables, and limitations.
 
-Sentinel-2 and SoilGrids remain catalog references; local station records and farm parcel data require configuration or import. Those sources do not appear as connected or feed displayed metrics. The map has no farm boundary until a parcel geometry is provided.
+Sentinel-2 and SoilGrids remain catalog references; local station records and farm parcel data require configuration or import. Those sources do not appear as connected or feed displayed metrics. SoilGrids' REST API is currently paused by ISRIC; WMS/WCS endpoints are linked as alternatives, but FieldNova has not queried them. SoilGrids is a modeled 250 m product with standard depth intervals and prediction uncertainty, not a local soil analysis. Its product is published under CC BY 4.0 with ISRIC attribution. The map has no farm boundary until a parcel geometry is provided.
 
 ## Références et méthode
 
