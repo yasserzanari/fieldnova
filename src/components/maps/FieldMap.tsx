@@ -21,6 +21,7 @@ type Props = {
   showNdvi: boolean
   showSurfaceSoil?: boolean
   showRootSoil?: boolean
+  showMappedClay?: boolean
   powerGridCell?: PowerGridCell | null
   draftParcelPoints?: GeoPoint[]
   drawingParcel?: boolean
@@ -38,7 +39,7 @@ function gibsTileUrl(layer: string, date: string, format: 'jpg' | 'png', matrixS
   return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/${matrixSet}/{z}/{y}/{x}.${format}`
 }
 
-export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, powerGridCell, draftParcelPoints = [], drawingParcel = false, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
+export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, showMappedClay = false, powerGridCell, draftParcelPoints = [], drawingParcel = false, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
   const measurementSystem = useMeasurementSystem()
   const { availability, error: availabilityError } = useGibsAvailability()
   const trueColorDate = resolveGibsDate(imageryDate, availability?.trueColor)
@@ -58,11 +59,13 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
     ...(showNdvi ? [{ id: 'ndvi', label: `NDVI MODIS Terra · composite 8 jours · ${ndviDate ? formatGibsDate(ndviDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'}`, detail: `${ndviDate && ndviDate !== imageryDate ? `Date demandée : ${imageryDate}; date NASA la plus proche utilisée. ` : ''}${dateStatus} Résolution nominale du produit : 250 m au nadir; composite glissant de 8 jours, pas une mesure parcellaire.`, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/MODIS_NDVI_H.svg' }] : []),
     ...(showSurfaceSoil ? [{ id: 'surface', label: `SMAP L4 · humidité de surface · ${surfaceSoilDate ? formatGibsDate(surfaceSoilDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'} · ~${formatDistance(9, measurementSystem)} `, detail: dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
     ...(showRootSoil ? [{ id: 'root', label: `SMAP L4 · humidité zone racinaire · ${rootSoilDate ? formatGibsDate(rootSoilDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'} · ~${formatDistance(9, measurementSystem)}`, detail: dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
+    ...(showMappedClay ? [{ id: 'soilgrids-clay', label: 'SoilGrids · argile · 0–5 cm', detail: 'Prédiction cartographique ISRIC à 250 m · fraction massique en ‰ · ne représente pas une analyse de votre parcelle.' }] : []),
     ...(powerGridCell ? [{ id: 'power', label: 'Maille NASA POWER', detail: `≈ ${formatDistance(powerGridCell.properties.widthKm, measurementSystem)} × ${formatDistance(powerGridCell.properties.heightKm, measurementSystem)} · contour vert discontinu; pas une parcelle.` }] : []),
     ...(parcel ? [{ id: 'parcel', label: parcel.feature.properties?.name ?? 'Parcelle importée', detail: `Contour saisi/importé · ≈ ${formatArea(parcel.areaHectares, measurementSystem)}.` }] : []),
-    ...(baseLayer === 'streets' && !showNdvi && !showSurfaceSoil && !showRootSoil ? [{ id: 'osm', label: 'Fond de rues · OpenStreetMap', detail: '© OpenStreetMap contributors.' }] : []),
+    ...(baseLayer === 'streets' && !showNdvi && !showSurfaceSoil && !showRootSoil && !showMappedClay ? [{ id: 'osm', label: 'Fond de rues · OpenStreetMap', detail: '© OpenStreetMap contributors.' }] : []),
   ]
   const hasNasaLayers = legendItems.some(item => item.id === 'truecolor' || item.id === 'ndvi' || item.id === 'surface' || item.id === 'root')
+  const hasSoilGridsLayer = legendItems.some(item => item.id === 'soilgrids-clay')
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const scaleRef = useRef<ScaleControl | null>(null)
@@ -127,6 +130,14 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
             maxzoom: 6,
             attribution: NASA_ATTRIBUTION,
           },
+          soilGridsClay: {
+            type: 'raster',
+            tiles: ['https://maps.isric.org/mapserv/clay?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=clay_0-5cm_mean&STYLES=&SRS=EPSG%3A3857&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&FORMAT=image%2Fpng&TRANSPARENT=TRUE'],
+            tileSize: 256,
+            minzoom: 0,
+            maxzoom: 14,
+            attribution: 'ISRIC · SoilGrids 2.0 · CC BY 4.0',
+          },
           selectedPoint: {
             type: 'geojson',
             data: {
@@ -153,6 +164,7 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
           { id: 'nasa-ndvi', type: 'raster', source: 'nasaNdvi', layout: { visibility: showNdvi ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.82 } },
           { id: 'smap-surface-soil', type: 'raster', source: 'smapSurface', layout: { visibility: showSurfaceSoil ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.56 } },
           { id: 'smap-root-soil', type: 'raster', source: 'smapRoot', layout: { visibility: showRootSoil ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.56 } },
+          { id: 'soilgrids-clay', type: 'raster', source: 'soilGridsClay', layout: { visibility: showMappedClay ? 'visible' : 'none' }, paint: { 'raster-opacity': 0.66 } },
           { id: 'power-grid-cell-fill', type: 'fill', source: 'powerGridCell', paint: { 'fill-color': '#c8ec92', 'fill-opacity': 0.11 } },
           { id: 'power-grid-cell-line', type: 'line', source: 'powerGridCell', paint: { 'line-color': '#dff4ad', 'line-width': 2, 'line-opacity': 0.95, 'line-dasharray': [2, 2] } },
           { id: 'parcel-boundary-fill', type: 'fill', source: 'parcelBoundary', paint: { 'fill-color': '#b5df80', 'fill-opacity': 0.2 } },
@@ -198,6 +210,8 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
       map.setLayoutProperty('nasa-ndvi', 'visibility', showNdvi ? 'visible' : 'none')
       map.setLayoutProperty('smap-surface-soil', 'visibility', showSurfaceSoil ? 'visible' : 'none')
       map.setLayoutProperty('smap-root-soil', 'visibility', showRootSoil ? 'visible' : 'none')
+      map.setLayoutProperty('soilgrids-clay', 'visibility', showMappedClay ? 'visible' : 'none')
+      map.triggerRepaint()
     } else {
       map.once('load', () => {
         map.setLayoutProperty('osm-streets', 'visibility', 'visible')
@@ -205,9 +219,11 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
         map.setLayoutProperty('nasa-ndvi', 'visibility', showNdvi ? 'visible' : 'none')
         map.setLayoutProperty('smap-surface-soil', 'visibility', showSurfaceSoil ? 'visible' : 'none')
         map.setLayoutProperty('smap-root-soil', 'visibility', showRootSoil ? 'visible' : 'none')
+        map.setLayoutProperty('soilgrids-clay', 'visibility', showMappedClay ? 'visible' : 'none')
+        map.triggerRepaint()
       })
     }
-  }, [baseLayer, showNdvi, showSurfaceSoil, showRootSoil])
+  }, [baseLayer, showNdvi, showSurfaceSoil, showRootSoil, showMappedClay])
 
   useEffect(() => {
     const map = mapRef.current
@@ -309,7 +325,7 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
         <span className="field-map-legend-swatch" aria-hidden="true" />
         <span className="field-map-legend-copy"><strong>{item.label}</strong><small>{item.detail}</small>{'legendUrl' in item && <img src={item.legendUrl} alt={`Échelle de couleurs NASA GIBS · ${item.label}`} loading="lazy" />}</span>
       </div>)}
-      <small className="field-map-legend-attribution">{hasNasaLayers ? 'NASA EOSDIS GIBS · couches régionales, pas des mesures de parcelle.' : 'Fond OpenStreetMap · attribution affichée sur la carte.'}</small>
+      <small className="field-map-legend-attribution">{[hasNasaLayers ? 'NASA EOSDIS GIBS' : '', hasSoilGridsLayer ? 'ISRIC SoilGrids 2.0 · CC BY 4.0' : '', !hasNasaLayers && !hasSoilGridsLayer ? 'Fond OpenStreetMap · attribution affichée sur la carte.' : 'Pixel régional prédit, pas une mesure de parcelle.'].filter(Boolean).join(' · ')}</small>
     </aside>
   </div>
 }

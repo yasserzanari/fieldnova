@@ -30,6 +30,10 @@ Le [catalogue GIBS](https://nasa-gibs.github.io/gibs-api-docs/available-visualiz
 
 Pour la famille SMAP, voir le [catalogue NSIDC DAAC SPL4SMGP](https://nsidc.org/data/spl4smgp) et son guide de citation. Il décrit un produit L4 global de sol de surface et zone racinaire à 9 km et à pas de trois heures. La version du jeu archivé ne doit pas être attribuée automatiquement à la tuile GIBS `default`.
 
+### ISRIC SoilGrids — argile de surface
+
+FieldNova peut afficher le WMS ISRIC `clay_0-5cm_mean` (argile 0–2 µm, fraction massique en ‰) et la légende fournie par le service. SoilGrids 2.0 est un produit prédit à résolution nominale de 250 m; le pixel visible n’est pas une analyse ponctuelle ou une mesure de la parcelle et ne remplace pas le profil de sol saisi localement. Cette couche ne modifie pas les recommandations. L’attribution ISRIC et la licence [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) sont indiquées dans l’application. La carte utilise le service [WMS officiel](https://maps.isric.org/mapserv/clay?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetCapabilities); elle ne prétend pas interroger l’API REST ni lire une valeur à la coordonnée sélectionnée.
+
 ## Fonds de carte
 
 - Fond de rues : [© OpenStreetMap contributors](https://www.openstreetmap.org/copyright), attribution présente sur la carte.
@@ -39,10 +43,9 @@ Pour la famille SMAP, voir le [catalogue NSIDC DAAC SPL4SMGP](https://nsidc.org/
 ## Sources référencées, non intégrées
 
 - Sentinel-2 / Copernicus : aucun produit n’est demandé par l’application.
-- SoilGrids : aucune valeur de sol n’est demandée par l’application.
 - Station météo locale, analyses de sol, carnet et limites réelles de parcelle : aucune donnée n’est fournie dans le dépôt. Les profils du scénario démo sont des données de démonstration fictives.
 
-Ces sources ne doivent pas apparaître comme connectées, ne doivent alimenter aucun indicateur, et ne doivent pas être décrites comme vérifiées pour la ferme sélectionnée.
+Les sources réellement non intégrées ne doivent pas apparaître comme connectées, alimenter un indicateur ou être décrites comme vérifiées pour la ferme sélectionnée. SoilGrids est connecté uniquement comme couche WMS cartographique; aucune valeur ponctuelle n’est récupérée.
 
 ## Référence du défi
 
