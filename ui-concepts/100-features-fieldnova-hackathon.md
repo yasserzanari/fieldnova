@@ -87,7 +87,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 24. **[Livrée] Vue des horizons du sol** : saisir jusqu’à cinq couches de 0 à 400 cm, leurs textures/pH/matière organique connus, et distinguer les intervalles manquants ainsi que la profondeur sous la dernière couche comme non documentés. Provenance déclarée partagée avec le profil local.
 25. **[P1] Indicateurs de santé du sol définis** : expliquer chaque indicateur, sa méthode et les données requises avant de le calculer.
 26. **[P1] Historique des analyses** : comparer deux prélèvements comparables et avertir si les profondeurs ou méthodes diffèrent.
-27. **[P1] Fiche de prélèvement** : aider à noter lieu, profondeur, date et méthode pour de futures mesures de terrain.
+27. **[P1 · LIVRÉ · SAISIE LOCALE] Fiche de prélèvement** : Mon terrain associe une note de prélèvement au point suivi et enregistre la date, la méthode déclarée, le laboratoire/la référence et les profondeurs décrites; l’import CSV de laboratoire conserve aussi ces métadonnées par horizon. Elles peuvent être notées même si les propriétés mesurées restent inconnues. Rien n’est envoyé au serveur et FieldNova ne valide pas le protocole.
 28. **[P2] Photos de terrain annotées** : lier des observations visuelles à une parcelle sans les traiter comme une mesure scientifique.
 29. **[P2] Import d’une carte pédologique locale** : afficher l’organisme, l’échelle cartographique et la légende d’origine.
 30. **[P2] Plan d’acquisition de données manquantes** : indiquer quelles mesures de sol réduiraient le plus l’incertitude du scénario.

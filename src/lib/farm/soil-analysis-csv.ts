@@ -4,6 +4,7 @@ export type SoilAnalysisCsvImport = {
   horizons: SoilHorizon[]
   sampleDate?: string
   laboratory?: string
+  samplingMethod?: string
   rowCount: number
 }
 
@@ -19,6 +20,7 @@ const HEADER_ALIASES = {
   organicMatter: ['organic_matter_percent', 'organic_matter_pct', 'matiere_organique_percent', 'matiere_organique_pct', 'mo_percent'],
   sampleDate: ['sample_date', 'date_sample', 'date_echantillon'],
   laboratory: ['laboratory', 'lab', 'laboratoire', 'source_name'],
+  samplingMethod: ['sampling_method', 'sample_method', 'methode_prelevement', 'methode_echantillonnage', 'protocole_prelevement'],
 } as const
 
 export function parseSoilAnalysisCsv(text: string): SoilAnalysisCsvResult {
@@ -39,6 +41,7 @@ export function parseSoilAnalysisCsv(text: string): SoilAnalysisCsvResult {
   const organicMatterIndex = column('organicMatter')
   const dateIndex = column('sampleDate')
   const laboratoryIndex = column('laboratory')
+  const methodIndex = column('samplingMethod')
   const nonEmptyRows = dataRows.filter(row => row.some(value => value.trim() !== ''))
   if (!nonEmptyRows.length) return invalid('Ajoutez au moins une ligne de mesure sous les en-têtes.')
   if (nonEmptyRows.length > 5) return invalid('Un profil peut importer au maximum cinq intervalles de profondeur.')
@@ -46,6 +49,7 @@ export function parseSoilAnalysisCsv(text: string): SoilAnalysisCsvResult {
   const horizons: SoilHorizon[] = []
   const sampleDates = new Set<string>()
   const laboratories = new Set<string>()
+  const samplingMethods = new Set<string>()
   for (let index = 0; index < nonEmptyRows.length; index += 1) {
     const row = nonEmptyRows[index]
     const lineNumber = index + 2
@@ -70,13 +74,18 @@ export function parseSoilAnalysisCsv(text: string): SoilAnalysisCsvResult {
     const laboratory = row[laboratoryIndex]?.trim()
     if (laboratory && laboratory.length > 120) return invalid(`Ligne ${lineNumber} : le nom du laboratoire ne peut pas dépasser 120 caractères.`)
     if (laboratory) laboratories.add(laboratory)
+    const samplingMethod = row[methodIndex]?.trim()
+    if (samplingMethod && samplingMethod.length > 120) return invalid(`Ligne ${lineNumber} : la méthode de prélèvement ne peut pas dépasser 120 caractères.`)
+    if (samplingMethod) samplingMethods.add(samplingMethod)
   }
 
   if (sampleDates.size > 1) return invalid('Une seule date d’échantillon peut être associée à ce fichier.')
   if (laboratories.size > 1) return invalid('Une seule origine de laboratoire peut être associée à ce fichier.')
+  if (samplingMethods.size > 1) return invalid('Une seule méthode de prélèvement peut être associée à ce fichier.')
   const sampleDate = sampleDates.values().next().value as string | undefined
   const laboratory = laboratories.values().next().value as string | undefined
-  const analysisHorizons = horizons.map(horizon => ({ ...horizon, sourceType: 'lab-analysis' as const, sourceName: laboratory, sampleDate }))
+  const samplingMethod = samplingMethods.values().next().value as string | undefined
+  const analysisHorizons = horizons.map(horizon => ({ ...horizon, sourceType: 'lab-analysis' as const, sourceName: laboratory, sampleDate, samplingMethod }))
   const horizonError = validateSoilHorizons(analysisHorizons)
   if (horizonError) return invalid(horizonError)
   return {
@@ -85,13 +94,14 @@ export function parseSoilAnalysisCsv(text: string): SoilAnalysisCsvResult {
       horizons: analysisHorizons,
       sampleDate,
       laboratory,
+      samplingMethod,
       rowCount: nonEmptyRows.length,
     },
   }
 }
 
 export function soilAnalysisCsvTemplate() {
-  return 'profondeur_debut_cm;profondeur_fin_cm;texture;ph;matiere_organique_percent;date_echantillon;laboratoire\n'
+  return 'profondeur_debut_cm;profondeur_fin_cm;texture;ph;matiere_organique_percent;date_echantillon;laboratoire;methode_prelevement\n'
 }
 
 function invalid(error: string): SoilAnalysisCsvResult {
