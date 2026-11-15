@@ -11,6 +11,7 @@ import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { formatGibsDate, resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { readDemoWorkspace } from '../../lib/demo/demo-workspace'
 import { farmWaterAccessLabels, farmWaterConstraintLabels, readFarmProfile } from '../../lib/farm/farm-profile'
+import { fieldObservationKindLabel, readFieldObservations, type ObservationKind } from '../../lib/farm/field-observations'
 import { archiveSoilAnalysis, readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, writeSoilProfile, type SoilFieldKey } from '../../lib/farm/soil-profile'
 import { parseSoilAnalysisCsv } from '../../lib/farm/soil-analysis-csv'
 import { readRotationConstraints } from '../scenarios/rotation-constraints'
@@ -23,7 +24,7 @@ import { AssistantSoilImportCard, type AssistantSoilImport } from './AssistantSo
 import './assistant.css'
 
 type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
-type Intent = 'soil' | 'calendar' | 'farm' | 'rotation' | 'climate' | 'unknown'
+type Intent = 'soil' | 'calendar' | 'farm' | 'rotation' | 'climate' | 'observations' | 'unknown'
 type EvidenceTag = { label: string; kind: 'source' | 'calculation' | 'local' | 'limit' | 'missing' }
 type Message = { id: number; role: 'user' | 'assistant'; text: string; point?: GeoPoint; intent?: Intent; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[]; evidenceTags?: EvidenceTag[]; soilImport?: AssistantSoilImport }
 type CodexStatus = 'checking' | 'ready' | 'unavailable'
@@ -39,6 +40,7 @@ const rotationReferences: AISource[] = [
   { id: 'inrae-rotation', title: rotationSources.legumes.label, url: rotationSources.legumes.url, snippet: 'INRAE explique la diversification végétale, les successions pluriannuelles et le rôle des légumineuses.' },
 ]
 const rotationWorkspaceSource: AISource = { id: 'fieldnova-rotations', title: 'FieldNova · scénarios enregistrés', url: '/app/scenarios', snippet: 'Cultures, critères et contraintes enregistrés localement pour le point sélectionné.' }
+const fieldJournalSource: AISource = { id: 'fieldnova-field-journal', title: 'FieldNova · journal de terrain local', url: '/app/terrain', snippet: 'Observations ajoutées par l’utilisateur pour le point suivi; déclarations locales non vérifiées, distinctes des données NASA.' }
 
 function cropCalendarSources(point: GeoPoint): AISource[] {
   const catalog = readCropCatalog(point)
@@ -169,6 +171,7 @@ function makeClimateAnswer(question: string, series: PowerMonthlySeries | null, 
 
 function classifyQuestion(question: string, contextualIntent?: Intent) {
   const lower = question.toLocaleLowerCase('fr')
+  const asksObservations = /journal|observations? de (?:terrain|champ)|notes? de (?:terrain|champ)|observations?.{0,24}(?:enregistr|saisi|noté)|(?:enregistr|saisi|noté).{0,24}observations?|historique.{0,24}(?:terrain|champ|irrigation|semis|récolte)|qu['’]ai-je (?:fait|noté|observé)|qu['’]est-ce que j['’]ai (?:fait|noté|observé)|(?:semis|semé|semer|récolte|récolté|irrigation|irrigué).{0,30}(?:noté|enregistr|fait|observ)|(?:noté|enregistr|fait|observ).{0,30}(?:semis|semé|récolte|irrigation|irrigué)|(?:semé|irrigué|récolté|noté|observé).{0,20}(?:quand|date|historique)/.test(lower)
   const asksSoilProfile = /profil de (?:mon |la )?sol|texture|\bph\b|matière organique|drainage|profondeur|horizon|couche|analyse de sol/.test(lower)
   const asksCalendar = /calendrier.{0,18}(?:cultural|culture|semis|récolte)|\bsemis\b|\bsemer\b|\brécolter\b|\bplanter\b|\b(?:date|période|fenêtre|quand).{0,20}récolte\b|\brécolte.{0,15}(?:date|période|fenêtre)\b|fenêtre.{0,15}travail|disponibilité.{0,20}(?:ferme|semis|récolte)|mois où.{0,20}(?:semer|récolter)/.test(lower)
   const asksEquipment = /matériel|équipement|tracteur|semoir|moissonneuse|prestataire|opérations? faisables/.test(lower)
@@ -176,7 +179,7 @@ function classifyQuestion(question: string, contextualIntent?: Intent) {
   const asksFarmProfile = /ma ferme|mon exploitation|accès.{0,3}eau|eau disponible|ressource en eau|approvisionnement en eau|restriction.{0,12}eau|contrainte.{0,12}eau|profil (?:de (?:ma |la )?ferme|d'exploitation|agricole)/.test(lower) || asksEquipment
   const asksClimate = /pluie|précip|température|\bchaud\b|\bfroid\b|humidité|climat|météo|nasa|ndvi|vigueur|satellite|imagerie|irrig/.test(lower)
   const asksLayer: LayerId | undefined = /ndvi|vigueur/.test(lower) ? 'ndvi' : /humidité de surface|smap surface/.test(lower) ? 'surface' : /humidité racinaire|humidité du sol|racine/.test(lower) ? 'root' : undefined
-  const intent: Intent = asksSoilProfile ? 'soil' : asksEquipment ? 'farm' : asksCalendar ? 'calendar' : asksRotation ? 'rotation' : asksFarmProfile ? 'farm' : asksClimate ? 'climate' : 'unknown'
+  const intent: Intent = asksObservations ? 'observations' : asksSoilProfile ? 'soil' : asksEquipment ? 'farm' : asksCalendar ? 'calendar' : asksRotation ? 'rotation' : asksFarmProfile ? 'farm' : asksClimate ? 'climate' : 'unknown'
   const contextual = intent === 'unknown' && contextualIntent !== undefined
   return { intent: contextual ? contextualIntent : intent, asksLayer, contextual }
 }
@@ -259,6 +262,20 @@ function formatSoilAnswer(point: GeoPoint, measurementSystem: ReturnType<typeof 
   return `Pour ce point, le profil local saisi dans FieldNova indique : ${entries.length ? `${entries.join(' · ')}. ` : ''}${horizons.length ? `${horizons.join(' ')} Les profondeurs non couvertes restent inconnues. ` : ''}${profileOrigin}Ces valeurs locales ne sont pas des mesures NASA.`
 }
 
+function formatFieldObservationsAnswer(point: GeoPoint, question: string) {
+  const lower = question.toLocaleLowerCase('fr')
+  const requestedKind: ObservationKind | undefined = /\bsemis?\b|\bsemé\b|\bsemer\b/.test(lower) ? 'semis'
+    : /\brécoltes?\b|\brécolté\b|\brécolter\b/.test(lower) ? 'recolte'
+      : /\birrigations?\b|\birrigué\b|\barrosage\b|\barrosé\b/.test(lower) ? 'irrigation' : undefined
+  const entries = readFieldObservations(point).filter(entry => !requestedKind || entry.kind === requestedKind)
+  if (!entries.length) return `Aucune observation${requestedKind ? ` de ${fieldObservationKindLabel(requestedKind).toLocaleLowerCase('fr')}` : ''} n’est enregistrée dans le journal local de ce point. Vous pouvez en ajouter dans Mon terrain > Journal. FieldNova ne déduit pas ces événements des données NASA.`
+  const visible = entries.slice(0, 12).map(entry => {
+    const date = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${entry.date}T12:00:00Z`))
+    return `${date} · ${fieldObservationKindLabel(entry.kind)}${entry.crop ? ` · ${entry.crop}` : ''}${entry.author ? ` · auteur déclaré : ${entry.author}` : ''} — « ${entry.note} »`
+  })
+  return `Journal local pour le point ${coordinate(point.latitude, 'N', 'S')} · ${coordinate(point.longitude, 'E', 'O')} : ${entries.length} observation(s)${requestedKind ? ` de ${fieldObservationKindLabel(requestedKind).toLocaleLowerCase('fr')}` : ''}. ${visible.join(' ')}${entries.length > visible.length ? ` ${entries.length - visible.length} autre(s) entrée(s) ne sont pas affichées ici.` : ''} Ces entrées sont des déclarations saisies par l’utilisateur sur cet appareil; elles ne sont ni vérifiées ni des mesures NASA.`
+}
+
 function formatRotationAnswer(point: GeoPoint) {
   const catalog = readCropCatalog(point)
   const workspace = readRotationWorkspace(point, catalog)
@@ -330,7 +347,7 @@ export function AssistantPage() {
   const { availability: gibsAvailability, error: gibsDateError } = useGibsAvailability()
   const [codexStatus, setCodexStatus] = useState<CodexStatus>('checking')
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, role: 'assistant', text: 'Bonjour. Je peux consulter les données climatiques mensuelles NASA POWER et afficher les couches MODIS ou SMAP sur la carte. Cliquez sur la carte pour changer le point suivi, puis demandez-moi la pluie, la température, le NDVI ou l’humidité du sol.' },
+    { id: 1, role: 'assistant', text: 'Bonjour. Je peux consulter les données climatiques mensuelles NASA POWER, afficher les couches MODIS ou SMAP, et retrouver vos observations du journal local. Cliquez sur la carte pour changer le point suivi, puis demandez-moi la pluie, la température, le NDVI, l’humidité du sol ou ce que vous avez noté au champ.' },
   ])
   const [showDetails, setShowDetails] = useState(true)
   const [mobileView, setMobileView] = useState<'chat' | 'map'>('chat')
@@ -365,7 +382,7 @@ export function AssistantPage() {
     const messagePoint = { latitude: location.latitude, longitude: location.longitude }
     const requestedLayer = route.asksLayer ?? layer
     if (route.asksLayer) setLayer(route.asksLayer)
-    setMessages(current => [...current, { id: userId, role: 'user', text: question, point: messagePoint, intent: unsupportedFarmDecision ? 'unknown' : route.intent }, { id, role: 'assistant', text: '', point: messagePoint, running: true }])
+    setMessages(current => [...current, { id: userId, role: 'user', text: question, point: messagePoint, intent: unsupportedFarmDecision ? 'unknown' : route.intent }, { id, role: 'assistant', text: '', point: messagePoint, intent: unsupportedFarmDecision ? 'unknown' : route.intent, running: true }])
     const trace: TraceNode[] = []
     if (route.contextual) trace.push({ id: `context-${id}`, type: 'step', primary: 'Relance rattachée au sujet précédent', secondary: 'Le dernier sujet FieldNova est vérifié avec le même outil et le point courant.', status: 'completed' })
     let currentSeries = series
@@ -413,6 +430,17 @@ export function AssistantPage() {
           }
         }
       }
+    } else if (route.intent === 'observations') {
+      const observations = readFieldObservations(location)
+      const category = /\bsemis?\b|\bsemé\b|\bsemer\b/.test(question.toLocaleLowerCase('fr')) ? 'semis' : /\brécoltes?\b|\brécolté\b|\brécolter\b/.test(question.toLocaleLowerCase('fr')) ? 'récolte' : /\birrigations?\b|\birrigué\b|\barrosage\b|\barrosé\b/.test(question.toLocaleLowerCase('fr')) ? 'irrigation' : undefined
+      trace.push(traceNode(`observations-${id}`, 'read', 'Journal de terrain local · navigateur', `${observations.length} observation(s) disponible(s)`, category ? `Filtre appliqué · ${category} · point suivi` : 'Entrées déclaratives du point suivi · stockage sur cet appareil'))
+      traceHeading = 'Journal local consulté'
+      answer = formatFieldObservationsAnswer(location, question)
+      evidence = answer
+      usedSources = [fieldJournalSource]
+      evidenceTags = observations.length
+        ? [{ label: 'Déclarations locales', kind: 'local' }, { label: 'Non vérifiées · non NASA', kind: 'limit' }]
+        : [{ label: 'Journal vide pour ce point', kind: 'missing' }, { label: 'Aucune donnée déduite', kind: 'limit' }]
     } else if (route.intent === 'soil') {
       const profile = readSoilProfile(location)
       const knownFields = Object.values(profile).filter(value => value !== undefined).length
@@ -505,14 +533,14 @@ export function AssistantPage() {
         ? [{ label: isDemoSnapshot ? 'NASA POWER · extrait local daté' : 'NASA POWER · donnée mensuelle modélisée', kind: 'source' }, ...(route.asksLayer?.includes('ndvi') ? [{ label: 'Imagerie NASA GIBS', kind: 'source' } as EvidenceTag] : []), { label: 'Maille régionale · pas un diagnostic parcellaire', kind: 'limit' }]
         : [{ label: 'Donnée NASA indisponible', kind: 'missing' }, { label: 'Aucune valeur de remplacement', kind: 'limit' }]
     }
-    if (!files.length && codexStatus === 'ready' && route.intent !== 'unknown' && !unsupportedFarmDecision) {
+    if (!files.length && codexStatus === 'ready' && route.intent !== 'unknown' && route.intent !== 'observations' && !unsupportedFarmDecision) {
       try {
         const response = await fetch('/api/codex/reply', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             question,
-            history: messages.filter(message => message.text).slice(-6).map(message => ({ role: message.role, text: message.text })),
+            history: messages.filter(message => message.text && message.intent !== 'observations').slice(-6).map(message => ({ role: message.role, text: message.text })),
             evidence,
           }),
         })
@@ -533,7 +561,7 @@ export function AssistantPage() {
         trace.push({ id: `codex-${id}`, type: 'step', primary: 'Codex CLI indisponible · réponse locale utilisée', secondary: 'Aucune donnée supplémentaire n’a été consultée', status: 'failed' })
         traceHeading = 'Réponse locale FieldNova'
       }
-    } else if (!files.length && codexStatus === 'unavailable' && route.intent !== 'unknown' && !unsupportedFarmDecision) {
+    } else if (!files.length && codexStatus === 'unavailable' && route.intent !== 'unknown' && route.intent !== 'observations' && !unsupportedFarmDecision) {
       trace.push({ id: `codex-${id}`, type: 'step', primary: 'Codex CLI non connecté · réponse locale utilisée', secondary: 'Connectez Codex CLI sur le serveur de démonstration', status: 'failed' })
       traceHeading = 'Réponse locale FieldNova'
     }
