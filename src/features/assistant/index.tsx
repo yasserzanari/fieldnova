@@ -15,6 +15,7 @@ import { archiveSoilAnalysis, readSoilProfile, resolveSoilFieldProvenance, resol
 import { parseSoilAnalysisCsv } from '../../lib/farm/soil-analysis-csv'
 import { readRotationConstraints } from '../scenarios/rotation-constraints'
 import { formatCropMonthWindow, monthWindowsOverlap, readCropCalendar, readFarmWorkWindows } from '../scenarios/crop-calendar'
+import { declaredFarmOperationCount, farmOperations, operationAvailabilityLabels, readFarmOperationProfile } from '../../lib/farm/operation-availability'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { evaluateRotation, priorityLabels, readCropCatalog, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightsFor, type CropDefinition, type CropId, type RotationPriority } from '../scenarios/rotation-model'
 import { AssistantSoilImportCard, type AssistantSoilImport } from './AssistantSoilImportCard'
@@ -81,6 +82,16 @@ function farmProfileSource(point: GeoPoint): AISource {
     snippet: profile
       ? `${profile.isExample ? 'Profil fictif de démonstration' : 'Profil déclaré localement'} · ${profile.name} · accès et restrictions d’eau déclarés${profile.updatedAt ? ` · mis à jour le ${new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(profile.updatedAt))}` : ''}.`
       : 'Aucun profil de ferme enregistré pour ce point.',
+  }
+}
+
+function farmOperationsSource(point: GeoPoint): AISource {
+  const profile = readFarmOperationProfile(point)
+  return {
+    id: 'fieldnova-farm-operations',
+    title: 'FieldNova · opérations et matériel déclarés',
+    url: '/app/scenarios',
+    snippet: `${declaredFarmOperationCount(profile)}/7 opérations ont un statut ou une précision saisie localement; données non vérifiées et sans comparaison aux besoins des cultures.`,
   }
 }
 
@@ -158,11 +169,12 @@ function classifyQuestion(question: string) {
   const lower = question.toLocaleLowerCase('fr')
   const asksSoilProfile = /profil de (?:mon |la )?sol|texture|\bph\b|matière organique|drainage|profondeur|horizon|couche|analyse de sol/.test(lower)
   const asksCalendar = /calendrier.{0,18}(?:cultural|culture|semis|récolte)|\bsemis\b|\bsemer\b|\brécolter\b|\bplanter\b|\b(?:date|période|fenêtre|quand).{0,20}récolte\b|\brécolte.{0,15}(?:date|période|fenêtre)\b|fenêtre.{0,15}travail|disponibilité.{0,20}(?:ferme|semis|récolte)|mois où.{0,20}(?:semer|récolter)/.test(lower)
+  const asksEquipment = /matériel|équipement|tracteur|semoir|moissonneuse|prestataire|opérations? faisables/.test(lower)
   const asksRotation = /rotation|succession|famille botanique|légumineuse|alternance|cultures?/.test(lower)
-  const asksFarmProfile = /ma ferme|mon exploitation|accès.{0,3}eau|eau disponible|ressource en eau|approvisionnement en eau|restriction.{0,12}eau|contrainte.{0,12}eau|profil (?:de (?:ma |la )?ferme|d'exploitation|agricole)/.test(lower)
+  const asksFarmProfile = /ma ferme|mon exploitation|accès.{0,3}eau|eau disponible|ressource en eau|approvisionnement en eau|restriction.{0,12}eau|contrainte.{0,12}eau|profil (?:de (?:ma |la )?ferme|d'exploitation|agricole)/.test(lower) || asksEquipment
   const asksClimate = /pluie|précip|température|\bchaud\b|\bfroid\b|humidité|climat|météo|nasa|ndvi|vigueur|satellite|imagerie|irrig/.test(lower)
   const asksLayer: LayerId | undefined = /ndvi|vigueur/.test(lower) ? 'ndvi' : /humidité de surface|smap surface/.test(lower) ? 'surface' : /humidité racinaire|humidité du sol|racine/.test(lower) ? 'root' : undefined
-  const intent = asksSoilProfile ? 'soil' : asksCalendar ? 'calendar' : asksRotation ? 'rotation' : asksFarmProfile ? 'farm' : asksClimate ? 'climate' : 'unknown'
+  const intent = asksSoilProfile ? 'soil' : asksEquipment ? 'farm' : asksCalendar ? 'calendar' : asksRotation ? 'rotation' : asksFarmProfile ? 'farm' : asksClimate ? 'climate' : 'unknown'
   return { intent, asksLayer }
 }
 
@@ -173,9 +185,18 @@ function asksForUnsupportedFarmDecision(question: string) {
   return asksIrrigationDose || asksYieldPrediction
 }
 
-function formatFarmProfileAnswer(point: GeoPoint) {
+function formatFarmProfileAnswer(point: GeoPoint, question: string) {
   const farm = readFarmProfile(point)
-  if (!farm) return 'Aucun profil d’exploitation n’est enregistré pour ce point. Vous pouvez le configurer depuis la Vue d’ensemble. FieldNova ne déduit pas l’accès à l’eau ni les priorités de la ferme à partir des données satellite.'
+  const operations = readFarmOperationProfile(point)
+  const operationCount = declaredFarmOperationCount(operations)
+  const lower = question.toLocaleLowerCase('fr')
+  const asksEquipment = /matériel|équipement|tracteur|semoir|moissonneuse|prestataire|opérations? faisables/.test(lower)
+  const operationSummary = farmOperations.map(operation => {
+    const entry = operations[operation.id]
+    return `${operation.label} : ${operationAvailabilityLabels[entry.availability]}${entry.equipment ? ` · ${entry.equipment}` : ''}${entry.note ? ` · ${entry.note}` : ''}`
+  }).join('. ')
+  if (asksEquipment) return `${operationCount ? `${operationCount}/7 opérations ont une déclaration. ` : 'Aucune opération n’est renseignée; leur disponibilité reste inconnue. '}${operationSummary}. Ces statuts et précisions sont des déclarations locales, non vérifiées. FieldNova ne compare pas ces déclarations à des besoins par culture et ne peut pas conclure qu’une rotation est faisable. Vous pouvez les modifier dans Scénarios > Matériel & opérations.`
+  if (!farm) return `Aucun profil d’exploitation n’est enregistré pour ce point. Vous pouvez le configurer depuis la Vue d’ensemble. FieldNova ne déduit pas l’accès à l’eau ni les priorités de la ferme à partir des données satellite.${operationCount ? ` ${operationCount}/7 opérations de matériel ont toutefois été déclarées dans Scénarios.` : ''}`
   const catalog = readCropCatalog(point)
   const workspace = readRotationWorkspace(point, catalog)
   const constraints = readRotationConstraints(point, catalog)
@@ -185,7 +206,7 @@ function formatFarmProfileAnswer(point: GeoPoint) {
   const knownSoil = Boolean(soil.texture && soil.texture !== 'unknown' || soil.ph !== undefined || soil.organicMatterPercent !== undefined || soil.effectiveDepthCm !== undefined || soil.drainage && soil.drainage !== 'unknown' || soil.horizons?.length)
   const waterNote = farm.waterNotes ? ` Précision déclarée : « ${farm.waterNotes} ».` : ''
   const prioritySummary = (Object.entries(rotationWeightsFor(workspace)) as Array<[RotationPriority, 1 | 2 | 3]>).map(([priority, weight]) => `${priorityLabels[priority]} ×${weight}`).join(' · ')
-  return `${farm.isExample ? 'Ce profil est un exemple fictif et ne décrit pas une exploitation réelle. ' : ''}Le profil local de ${farm.name} indique : ${farmWaterAccessLabels[farm.waterAccess].toLocaleLowerCase('fr')} et ${farmWaterConstraintLabels[farm.waterConstraint].toLocaleLowerCase('fr')}.${waterNote} ${crops.length ? `La rotation actuelle renseignée contient ${crops.join(' → ')}.` : 'Aucune culture n’est renseignée dans la rotation actuelle.'} Sol local : ${knownSoil ? 'des caractéristiques ont été saisies ou importées dans Mon terrain.' : 'aucune caractéristique renseignée; le sol reste inconnu.'} Critères et poids de rotation : ${prioritySummary}. ${constraints.unavailableCropIds.length ? `Cultures exclues des options : ${constraints.unavailableCropIds.map(id => catalog.find(crop => crop.id === id)?.shortLabel ?? id).join(', ')}.` : 'Aucune culture exclue des options.'} Ces éléments sont des déclarations locales; ils ne prouvent pas un volume d’eau disponible et ne constituent pas un conseil agronomique.`
+  return `${farm.isExample ? 'Ce profil est un exemple fictif et ne décrit pas une exploitation réelle. ' : ''}Le profil local de ${farm.name} indique : ${farmWaterAccessLabels[farm.waterAccess].toLocaleLowerCase('fr')} et ${farmWaterConstraintLabels[farm.waterConstraint].toLocaleLowerCase('fr')}.${waterNote} ${crops.length ? `La rotation actuelle renseignée contient ${crops.join(' → ')}.` : 'Aucune culture n’est renseignée dans la rotation actuelle.'} Sol local : ${knownSoil ? 'des caractéristiques ont été saisies ou importées dans Mon terrain.' : 'aucune caractéristique renseignée; le sol reste inconnu.'} Critères et poids de rotation : ${prioritySummary}. ${constraints.unavailableCropIds.length ? `Cultures exclues des options : ${constraints.unavailableCropIds.map(id => catalog.find(crop => crop.id === id)?.shortLabel ?? id).join(', ')}.` : 'Aucune culture exclue des options.'}${operationCount ? ` Opérations déclarées (${operationCount}/7) : ${operationSummary}.` : ' Aucune disponibilité de matériel ou d’opération n’est renseignée.'} Ces éléments sont des déclarations locales; ils ne prouvent pas un volume d’eau disponible et ne constituent pas un conseil agronomique.`
 }
 
 function localCropReferences(point: GeoPoint): AISource[] {
@@ -414,15 +435,17 @@ export function AssistantPage() {
       evidenceTags = [{ label: 'Données locales', kind: 'local' }, { label: 'Calcul FieldNova', kind: 'calculation' }, { label: 'Indicateur descriptif', kind: 'limit' }]
     } else if (route.intent === 'farm') {
       const profile = readFarmProfile(location)
+      const operationProfile = readFarmOperationProfile(location)
+      const operationCount = declaredFarmOperationCount(operationProfile)
       const catalog = readCropCatalog(location)
       const workspace = readRotationWorkspace(location, catalog)
       const constraints = readRotationConstraints(location, catalog)
       const weights = Object.entries(rotationWeightsFor(workspace)).map(([priority, weight]) => `${priorityLabels[priority as RotationPriority]} ×${weight}`).join(' · ')
-      trace.push(traceNode(`farm-${id}`, 'read', 'Profil de ferme et contraintes locales · navigateur', profile ? `Profil de ${profile.name} consulté` : 'Aucun profil de ferme renseigné', `${farmWaterAccessLabels[profile?.waterAccess ?? 'unknown']} · critères de rotation ${weights} · ${constraints.unavailableCropIds.length} culture(s) exclue(s)`, 'completed'))
+      trace.push(traceNode(`farm-${id}`, 'read', 'Profil de ferme et contraintes locales · navigateur', profile ? `Profil de ${profile.name} consulté` : 'Aucun profil de ferme renseigné', `${farmWaterAccessLabels[profile?.waterAccess ?? 'unknown']} · ${operationCount}/7 opérations déclarées · critères de rotation ${weights} · ${constraints.unavailableCropIds.length} culture(s) exclue(s)`, 'completed'))
       traceHeading = 'Profil et contraintes de ferme consultés'
-      answer = formatFarmProfileAnswer(location)
+      answer = formatFarmProfileAnswer(location, question)
       evidence = answer
-      usedSources = [farmProfileSource(location), soilProfileSource(location), rotationWorkspaceSource, ...localCropReferences(location)]
+      usedSources = [farmProfileSource(location), farmOperationsSource(location), soilProfileSource(location), rotationWorkspaceSource, ...localCropReferences(location)]
       evidenceTags = [{ label: 'Déclarations locales', kind: 'local' }, { label: 'Calcul FieldNova', kind: 'calculation' }, { label: 'Non vérifié sur le terrain', kind: 'limit' }]
     } else if (route.intent === 'unknown' || unsupportedFarmDecision) {
       answer = unsupportedFarmDecision
