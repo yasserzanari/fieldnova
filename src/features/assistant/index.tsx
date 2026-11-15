@@ -11,15 +11,17 @@ import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
 import { formatGibsDate, resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { readDemoWorkspace } from '../../lib/demo/demo-workspace'
 import { farmWaterAccessLabels, farmWaterConstraintLabels, readFarmProfile } from '../../lib/farm/farm-profile'
-import { readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, type SoilFieldKey } from '../../lib/farm/soil-profile'
+import { archiveSoilAnalysis, readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, writeSoilProfile, type SoilFieldKey } from '../../lib/farm/soil-profile'
+import { parseSoilAnalysisCsv } from '../../lib/farm/soil-analysis-csv'
 import { readRotationConstraints } from '../scenarios/rotation-constraints'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { evaluateRotation, priorityLabels, readCropCatalog, readRotationWorkspace, rotationCombinedScore, rotationSources, rotationWeightsFor, type CropDefinition, type CropId, type RotationPriority } from '../scenarios/rotation-model'
+import { AssistantSoilImportCard, type AssistantSoilImport } from './AssistantSoilImportCard'
 import './assistant.css'
 
 type LayerId = 'truecolor' | 'ndvi' | 'surface' | 'root'
 type EvidenceTag = { label: string; kind: 'source' | 'calculation' | 'local' | 'limit' | 'missing' }
-type Message = { id: number; role: 'user' | 'assistant'; text: string; point?: GeoPoint; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[]; evidenceTags?: EvidenceTag[] }
+type Message = { id: number; role: 'user' | 'assistant'; text: string; point?: GeoPoint; trace?: TraceNode[]; traceHeading?: string; running?: boolean; sources?: AISource[]; evidenceTags?: EvidenceTag[]; soilImport?: AssistantSoilImport }
 type CodexStatus = 'checking' | 'ready' | 'unavailable'
 
 const sources: AISource[] = [
@@ -298,9 +300,45 @@ export function AssistantPage() {
     let traceHeading = 'Aucun outil exécuté'
     let usedSources: AISource[] = []
     let evidenceTags: EvidenceTag[] = []
+    let soilImport: AssistantSoilImport | undefined
     if (files.length) {
-      answer = 'La pièce jointe est reçue, mais son contenu n’est pas encore analysé. Je peux consulter le climat NASA POWER, le profil local du sol ou les rotations enregistrées pour le point suivi.'
-      evidenceTags = [{ label: 'Pièce jointe non analysée', kind: 'missing' }, { label: 'Aucune donnée consultée', kind: 'limit' }]
+      if (files.length !== 1) {
+        answer = 'Joignez un seul fichier CSV d’analyse de sol à la fois. Aucune pièce jointe n’a été lue ni transmise.'
+        evidenceTags = [{ label: 'Un seul CSV accepté', kind: 'missing' }, { label: 'Aucun contenu transmis', kind: 'limit' }]
+      } else {
+        const file = files[0]
+        const isCsv = file.name.toLocaleLowerCase('fr').endsWith('.csv')
+        if (!isCsv) {
+          answer = 'Ce format n’est pas analysé dans l’assistant. Joignez un CSV d’analyse de sol (1 Mo maximum); les PDF et images ne sont pas lus ni transmis à Codex CLI.'
+          evidenceTags = [{ label: 'Format non pris en charge', kind: 'missing' }, { label: 'Fichier non transmis', kind: 'limit' }]
+        } else if (!file.size || file.size > 1_000_000) {
+          answer = 'Le CSV doit contenir des données et ne pas dépasser 1 Mo. Le fichier n’a pas été lu ni enregistré.'
+          evidenceTags = [{ label: 'Limite CSV · 1 Mo', kind: 'missing' }, { label: 'Aucune donnée enregistrée', kind: 'limit' }]
+        } else {
+          try {
+            const parsed = parseSoilAnalysisCsv(await file.text())
+            trace.push({ id: `soil-csv-read-${id}`, type: 'step', primary: 'CSV lu dans ce navigateur', secondary: `${file.name} · aucun envoi au serveur ou à Codex CLI`, status: 'completed' })
+            if (!parsed.valid) {
+              answer = `Le CSV n’a pas été importé : ${parsed.error}`
+              trace.push({ id: `soil-csv-invalid-${id}`, type: 'step', primary: 'Validation du CSV échouée', secondary: parsed.error, status: 'failed' })
+              traceHeading = 'CSV d’analyse du sol refusé'
+              evidenceTags = [{ label: 'Fichier local', kind: 'local' }, { label: 'Format invalide', kind: 'missing' }]
+            } else {
+              soilImport = { ...parsed.value, fileName: file.name, point: messagePoint, state: 'ready' }
+              const date = parsed.value.sampleDate ? new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${parsed.value.sampleDate}T12:00:00Z`)) : 'date non renseignée'
+              answer = `Aperçu validé : ${parsed.value.rowCount} horizon(s) · ${parsed.value.laboratory ?? 'laboratoire non indiqué'} · ${date}. Rien n’est enregistré avant votre confirmation.`
+              trace.push({ id: `soil-csv-valid-${id}`, type: 'step', primary: 'Horizon(s) et métadonnées validés', secondary: `${parsed.value.rowCount} ligne(s) · profil du sol au point ${coordinate(messagePoint.latitude, 'N', 'S')} · ${coordinate(messagePoint.longitude, 'E', 'O')}`, status: 'completed' })
+              traceHeading = 'Import local en attente de confirmation'
+              evidenceTags = [{ label: 'CSV lu localement', kind: 'local' }, { label: 'Aucune donnée enregistrée', kind: 'limit' }]
+            }
+          } catch {
+            answer = 'Le fichier CSV n’a pas pu être lu. Vérifiez qu’il s’agit d’un fichier texte de moins de 1 Mo, puis réessayez.'
+            trace.push({ id: `soil-csv-failed-${id}`, type: 'step', primary: 'Lecture du CSV impossible', secondary: 'Aucune donnée n’a été enregistrée.', status: 'failed' })
+            traceHeading = 'Lecture du fichier échouée'
+            evidenceTags = [{ label: 'Fichier local', kind: 'local' }, { label: 'Aucune donnée enregistrée', kind: 'limit' }]
+          }
+        }
+      }
     } else if (route.intent === 'soil') {
       const profile = readSoilProfile(location)
       const knownFields = Object.values(profile).filter(value => value !== undefined).length
@@ -401,10 +439,46 @@ export function AssistantPage() {
       trace.push({ id: `codex-${id}`, type: 'step', primary: 'Codex CLI non connecté · réponse locale utilisée', secondary: 'Connectez Codex CLI sur le serveur de démonstration', status: 'failed' })
       traceHeading = 'Réponse locale FieldNova'
     }
-    setMessages(current => current.map(message => message.id === id ? { ...message, text: answer, trace, traceHeading, running: false, sources: usedSources.length ? usedSources : undefined, evidenceTags } : message))
+    setMessages(current => current.map(message => message.id === id ? { ...message, text: answer, trace, traceHeading, running: false, sources: usedSources.length ? usedSources : undefined, evidenceTags, soilImport } : message))
+  }
+
+  const saveSoilImport = (messageId: number, imported: AssistantSoilImport) => {
+    try {
+      const existing = readSoilProfile(imported.point)
+      const preservedFieldProvenance = Object.fromEntries(
+        (Object.keys(soilFieldLabels) as SoilFieldKey[])
+          .filter(field => existing[field] !== undefined)
+          .map(field => [field, resolveSoilFieldProvenance(existing, field)]),
+      ) as typeof existing.fieldProvenance
+      const profile = {
+        ...existing,
+        horizons: imported.horizons.map(horizon => ({ ...horizon })),
+        sourceType: 'lab-analysis' as const,
+        sourceName: imported.laboratory,
+        sampleDate: imported.sampleDate,
+        samplingMethod: imported.samplingMethod,
+        fieldProvenance: { ...preservedFieldProvenance, ...existing.fieldProvenance },
+      }
+      const canArchive = Boolean(imported.sampleDate && imported.samplingMethod && imported.horizons.some(horizon => horizon.ph !== undefined || horizon.organicMatterPercent !== undefined || (horizon.texture && horizon.texture !== 'unknown')))
+      if (canArchive) archiveSoilAnalysis(imported.point, profile)
+      else writeSoilProfile(imported.point, profile)
+      window.dispatchEvent(new CustomEvent('fieldnova:soil-profile-change', { detail: { point: imported.point } }))
+      setMessages(current => current.map(message => message.id === messageId && message.soilImport ? {
+        ...message,
+        text: canArchive ? 'L’analyse et ses horizons ont été ajoutés au profil local et archivés. Les caractéristiques générales déjà saisies ont été conservées.' : 'Les horizons ont été ajoutés au profil local. Les caractéristiques générales déjà saisies ont été conservées; l’échantillon pourra être archivé quand sa date et sa méthode seront renseignées.',
+        soilImport: { ...message.soilImport, state: 'saved', archived: canArchive, error: undefined },
+        evidenceTags: [{ label: 'Profil local mis à jour', kind: 'local' }, { label: canArchive ? 'Échantillon archivé' : 'Archive à compléter', kind: canArchive ? 'calculation' : 'limit' }],
+      } : message))
+    } catch (error) {
+      const messageText = error instanceof Error ? error.message : 'L’enregistrement local a échoué.'
+      setMessages(current => current.map(message => message.id === messageId && message.soilImport ? { ...message, soilImport: { ...message.soilImport, error: messageText } } : message))
+    }
   }
 
   const activeLayer = layerOptions.find(item => item.id === layer)!
+  const dismissSoilImport = (messageId: number) => setMessages(current => current.map(message => message.id === messageId && message.soilImport
+    ? { ...message, text: 'Aperçu ignoré. Le profil de sol n’a pas été modifié.', soilImport: undefined, evidenceTags: [{ label: 'Aucune donnée enregistrée', kind: 'limit' }] }
+    : message))
   const LayerIcon = activeLayer.icon
   const latest = series ? latestCompleteRecord(series.records) : undefined
   const soilValue = latest?.rootZoneWetness
@@ -441,7 +515,7 @@ export function AssistantPage() {
           <div className="assistant-chat-heading"><h1>Assistant FieldNova</h1><p>Point actif · {coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</p></div>
           <button className="assistant-quiet-icon" type="button" title="Informations sur cet assistant" aria-label="À propos de cet assistant" onClick={() => setShowDetails(value => !value)}><CircleHelp size={17} /></button>
         </header>
-        <div className={`assistant-demo-notice ${codexStatus === 'unavailable' ? 'is-warning' : ''}`}><span><ShieldCheck size={14} /></span><p><strong>{codexStatus === 'checking' ? 'Connexion à Codex CLI…' : codexStatus === 'ready' ? 'Codex CLI connecté · outils FieldNova actifs' : 'Codex CLI indisponible · mode données locales'}</strong><small>{codexStatus === 'ready' ? 'Codex rédige les réponses à partir des résultats NASA et des données du terrain consultées par FieldNova. Les pièces jointes ne sont pas analysées.' : 'La carte et les outils de données restent disponibles; les réponses locales signalent leurs limites. Les pièces jointes ne sont pas analysées.'}</small></p></div>
+        <div className={`assistant-demo-notice ${codexStatus === 'unavailable' ? 'is-warning' : ''}`}><span><ShieldCheck size={14} /></span><p><strong>{codexStatus === 'checking' ? 'Connexion à Codex CLI…' : codexStatus === 'ready' ? 'Codex CLI connecté · outils FieldNova actifs' : 'Codex CLI indisponible · mode données locales'}</strong><small>{codexStatus === 'ready' ? 'Codex rédige les réponses à partir des résultats NASA et des données du terrain consultées par FieldNova. Les CSV de sol sont lus localement et soumis à confirmation; aucun fichier ne lui est transmis.' : 'Les outils NASA et locaux restent disponibles. Les CSV de sol sont lus dans le navigateur après sélection; aucun fichier n’est transmis.'}</small></p></div>
         <div className="assistant-chat-context"><span className="assistant-context-pill"><MapPin size={12} /> Coordonnée sélectionnée</span><span>{loadingData ? 'NASA POWER…' : dataError ? 'Données indisponibles' : latest ? `Données · ${formatPowerMonth(latest.date)}` : 'Aucune observation récente'}</span></div>
         <div className="assistant-thread" ref={threadRef} aria-live="polite">
           {showDetails && <div className="assistant-welcome"><span><Sparkles size={14} /></span><p>Posez une question : l’assistant interroge la série mensuelle NASA POWER et met à jour les couches réellement visibles sur la carte. Les données régionales ne remplacent pas des mesures de parcelle.</p><button type="button" aria-label="Masquer les informations" onClick={() => setShowDetails(false)}><X size={13} /></button></div>}
@@ -453,6 +527,7 @@ export function AssistantPage() {
                 {Boolean(message.trace?.length) && <ThinkingState nodes={message.trace!} autoPlay={Boolean(message.running)} defaultExpanded={Boolean(message.running)} workingLabel={message.running ? 'Exécution des outils FieldNova' : message.traceHeading ?? 'Activité de l’assistant'} onSettled={() => setMessages(current => current.map(item => item.id === message.id ? { ...item, running: false } : item))} className="assistant-trace" />}
                 {Boolean(message.evidenceTags?.length) && <div className="assistant-evidence-tags" aria-label="Nature et limites des éléments utilisés">{message.evidenceTags!.map((tag, index) => <span key={`${message.id}-${index}`} className={`is-${tag.kind}`}>{tag.label}</span>)}</div>}
                 {message.text && summarizeForField(message.text).length + 80 < message.text.trim().length ? <div className="assistant-field-answer"><div className="assistant-field-summary"><strong>En bref</strong><p>{summarizeForField(message.text)}</p></div><div className="assistant-answer-details"><button type="button" aria-expanded={Boolean(expandedAnswers[message.id])} onClick={() => setExpandedAnswers(current => ({ ...current, [message.id]: !current[message.id] }))}>{expandedAnswers[message.id] ? 'Masquer les détails' : 'Voir la réponse détaillée'}</button>{expandedAnswers[message.id] && <div className="assistant-answer-full"><p className="assistant-answer-text">{detailedFieldAnswer(message.text)}</p>{message.sources && <AISources className="assistant-sources" label="Sources utilisées" sources={message.sources} />}<MessageActions text={message.text} actions={['copy', 'feedback']} quiet={false} className="assistant-actions" /></div>}</div></div> : message.text ? <><p className="assistant-answer-text">{message.text}</p>{message.sources && <AISources className="assistant-sources" label="Sources utilisées" sources={message.sources} />}<MessageActions text={message.text} actions={['copy', 'feedback']} quiet={false} className="assistant-actions" /></> : message.running ? <p className="assistant-pending">Consultation des données sélectionnées…</p> : null}
+                {message.soilImport && <AssistantSoilImportCard value={message.soilImport} onApply={() => saveSoilImport(message.id, message.soilImport!)} onDismiss={() => dismissSoilImport(message.id)} />}
               </>}
             </div>
           </article>)}
@@ -463,7 +538,7 @@ export function AssistantPage() {
         </div>
         <div className="assistant-composer-wrap">
           <LiquidMultimodalInput className="assistant-composer" defaultModel="fast" placeholder="Demandez à propos des données NASA…" maxHeight={110} onSubmit={handleSend} />
-          <div className="assistant-composer-foot"><span><span className="assistant-online-dot" /> Codex CLI {codexStatus === 'checking' ? '· vérification' : codexStatus === 'ready' ? '· connecté' : '· local'} · NASA POWER {loadingData ? '· chargement' : dataError ? '· indisponible' : '· connecté'}</span><span>Entrée pour envoyer · Maj + Entrée pour une nouvelle ligne</span></div>
+          <div className="assistant-composer-foot"><span><span className="assistant-online-dot" /> Codex CLI {codexStatus === 'checking' ? '· vérification' : codexStatus === 'ready' ? '· connecté' : '· local'} · NASA POWER {loadingData ? '· chargement' : dataError ? '· indisponible' : '· connecté'}</span><span>CSV sol · 1 Mo max · local · Entrée pour envoyer</span></div>
         </div>
       </aside>
 

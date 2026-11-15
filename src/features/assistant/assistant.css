@@ -124,3 +124,25 @@
   .assistant-map-footer { overflow-x:auto; }
 }
 @media(max-width:560px) { .assistant-workspace { gap:8px; padding:8px; }.assistant-map-header p { max-width:240px; }.assistant-map-top-overlay { gap:5px; padding:6px 7px; font-size:7px; }.assistant-map-top-overlay > span + span { padding-left:5px; }.assistant-map-layer-card { top:57px; right:8px; width:158px; padding:7px; }.assistant-map-legend { left:8px; bottom:8px; }.assistant-scale { right:8px; bottom:8px; }.assistant-map-footer { min-height:68px; gap:9px; }.assistant-footer-title { min-width:100px; }.assistant-soil-stat { min-width:115px; }.assistant-map-details { min-width:max-content; } }
+.assistant-soil-import { margin:7px 0 3px; overflow:hidden; border:1px solid #dce5d2; border-radius:11px; background:#fffefa; box-shadow:0 3px 12px rgb(42 49 32 / 6%); }
+.assistant-soil-import-head { display:flex; align-items:center; gap:8px; padding:9px 10px 7px; }
+.assistant-soil-import-icon { display:grid; width:27px; height:27px; flex:none; place-items:center; border-radius:8px; background:#edf3e6; color:#527b43; }
+.assistant-soil-import-head > span:nth-child(2) { display:grid; min-width:0; gap:2px; }
+.assistant-soil-import-head strong { overflow:hidden; color:#3f4938; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+.assistant-soil-import-head small { color:#827f72; font-size:7px; }
+.assistant-soil-import-success { margin-left:auto; color:#4e8748; }
+.assistant-soil-import-meta { display:flex; flex-wrap:wrap; gap:4px; padding:0 10px 7px; }
+.assistant-soil-import-meta span { padding:3px 6px; border-radius:999px; background:#f3f2eb; color:#686657; font-size:7px; }
+.assistant-soil-import-table-wrap { overflow-x:auto; padding:0 8px; }
+.assistant-soil-import-table { width:100%; border-collapse:collapse; color:#555344; font-size:7px; text-align:left; }
+.assistant-soil-import-table th { padding:5px 3px; border-bottom:1px solid #e9e6dc; color:#898575; font-size:6.5px; font-weight:650; }
+.assistant-soil-import-table td { padding:6px 3px; border-bottom:1px solid #f0eee7; white-space:nowrap; }
+.assistant-soil-import-table tr:last-child td { border-bottom:0; }
+.assistant-soil-import-note { display:flex; align-items:flex-start; gap:5px; margin:6px 9px; color:#777565; font-size:7px; line-height:1.4; }
+.assistant-soil-import-note svg { flex:none; margin-top:1px; color:#62804e; }
+.assistant-soil-import-error { margin:6px 9px; color:#a74a3c; font-size:8px; }
+.assistant-soil-import-saved { margin:6px 9px 9px; color:#527b43; font-size:8px; }
+.assistant-soil-import-actions { display:flex; justify-content:flex-end; gap:6px; padding:7px 9px 9px; border-top:1px solid #efede6; }
+.assistant-soil-import-actions button { display:inline-flex; align-items:center; gap:4px; padding:6px 8px; border-radius:7px; font-size:7px; font-weight:650; cursor:pointer; }
+.assistant-soil-import-dismiss { border:1px solid #e8e5dc; background:#fffefa; color:#777565; }
+.assistant-soil-import-apply { border:1px solid #557e45; background:#557e45; color:#fff; }
