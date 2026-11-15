@@ -1,6 +1,6 @@
 import { Bell, ChevronDown, ChevronLeft, CircleHelp, CloudRain, FlaskConical, Leaf, MapPin, Menu, ThermometerSun, UserRound } from 'lucide-react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { featureRoutes } from '../navigation'
 import { useSelectedLocation } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
@@ -11,10 +11,30 @@ function coordinate(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(2).replace('.', ',')}° ${value < 0 ? negative : positive}`
 }
 
+const SIDEBAR_PREFERENCES_KEY = 'fieldnova:sidebar-preferences:v1'
+const SIDEBAR_MIN_WIDTH = 180
+const SIDEBAR_MAX_WIDTH = 360
+const SIDEBAR_COLLAPSE_THRESHOLD = 116
+
+function readSidebarPreferences() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SIDEBAR_PREFERENCES_KEY) ?? 'null') as { width?: unknown; collapsed?: unknown } | null
+    return {
+      width: typeof saved?.width === 'number' ? Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, saved.width)) : 244,
+      collapsed: saved?.collapsed === true,
+    }
+  } catch {
+    return { width: 244, collapsed: false }
+  }
+}
+
 export function AppShell() {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState(() => readSidebarPreferences().width)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readSidebarPreferences().collapsed)
+  const [sidebarResizing, setSidebarResizing] = useState(false)
+  const sidebarDrag = useRef<{ pointerId: number; startX: number; startWidth: number } | null>(null)
   const [demoWorkspace, setDemoWorkspace] = useState<DemoWorkspace | null>(() => readDemoWorkspace())
   const [demoError, setDemoError] = useState('')
   const [quitPromptOpen, setQuitPromptOpen] = useState(false)
@@ -25,6 +45,63 @@ export function AppShell() {
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
   const unavailable = Boolean(error)
   const usingDemoSnapshot = series?.deliveryMode === 'demo-fixture'
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      try { localStorage.setItem(SIDEBAR_PREFERENCES_KEY, JSON.stringify({ width: sidebarWidth, collapsed: sidebarCollapsed })) } catch { /* preferences may be unavailable */ }
+    }, 180)
+    return () => window.clearTimeout(timeout)
+  }, [sidebarCollapsed, sidebarWidth])
+
+  const beginSidebarResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0 || window.matchMedia('(max-width: 820px)').matches) return
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    sidebarDrag.current = { pointerId: event.pointerId, startX: event.clientX, startWidth: sidebarCollapsed ? 72 : sidebarWidth }
+    setSidebarResizing(true)
+  }
+
+  const moveSidebarResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = sidebarDrag.current
+    if (!drag || drag.pointerId !== event.pointerId) return
+    const requestedWidth = drag.startWidth + event.clientX - drag.startX
+    if (requestedWidth <= SIDEBAR_COLLAPSE_THRESHOLD) {
+      setSidebarCollapsed(true)
+      return
+    }
+    setSidebarCollapsed(false)
+    setSidebarWidth(Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, requestedWidth)))
+  }
+
+  const endSidebarResize = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!sidebarDrag.current || sidebarDrag.current.pointerId !== event.pointerId) return
+    sidebarDrag.current = null
+    setSidebarResizing(false)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+  }
+
+  const resizeSidebarByKeyboard = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+    event.preventDefault()
+    if (event.key === 'Home' || (event.key === 'ArrowLeft' && sidebarCollapsed)) {
+      setSidebarCollapsed(true)
+      return
+    }
+    if (event.key === 'End') {
+      setSidebarCollapsed(false)
+      setSidebarWidth(SIDEBAR_MAX_WIDTH)
+      return
+    }
+    if (event.key === 'ArrowLeft') {
+      if (sidebarWidth <= SIDEBAR_MIN_WIDTH) setSidebarCollapsed(true)
+      else setSidebarWidth(width => Math.max(SIDEBAR_MIN_WIDTH, width - 16))
+      return
+    }
+    if (sidebarCollapsed) {
+      setSidebarCollapsed(false)
+      setSidebarWidth(width => Math.max(244, width))
+    } else setSidebarWidth(width => Math.min(SIDEBAR_MAX_WIDTH, width + 16))
+  }
 
   useEffect(() => {
     const refreshDemo = () => setDemoWorkspace(readDemoWorkspace())
@@ -74,8 +151,8 @@ export function AppShell() {
   }
 
   return (
-    <div className="app-frame">
-      <aside className={`app-sidebar ${menuOpen ? 'is-open' : ''} ${sidebarCollapsed ? 'is-collapsed' : ''}`}>
+    <div className={`app-frame ${sidebarResizing ? 'is-resizing' : ''}`}>
+      <aside className={`app-sidebar ${menuOpen ? 'is-open' : ''} ${sidebarCollapsed ? 'is-collapsed' : ''} ${sidebarResizing ? 'is-resizing' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as CSSProperties}>
         <div className="sidebar-brand-row">
         <NavLink className="brand-lockup" to="/app/overview" aria-label="FieldNova, vue d’ensemble">
           <span className="brand-symbol"><Leaf size={21} strokeWidth={2.3} /></span>
@@ -101,6 +178,7 @@ export function AppShell() {
           <span className="sidebar-farm"><strong>Point suivi</strong><small>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</small></span>
           <ChevronDown size={16} aria-hidden="true" />
         </div>
+        <div className="sidebar-resizer" role="separator" aria-label="Redimensionner la barre latérale" aria-orientation="vertical" aria-valuemin={72} aria-valuemax={SIDEBAR_MAX_WIDTH} aria-valuenow={sidebarCollapsed ? 72 : sidebarWidth} aria-valuetext={sidebarCollapsed ? 'Navigation réduite à 72 pixels' : `Navigation large de ${sidebarWidth} pixels`} tabIndex={0} title="Glisser pour redimensionner · flèches gauche/droite au clavier" onPointerDown={beginSidebarResize} onPointerMove={moveSidebarResize} onPointerUp={endSidebarResize} onPointerCancel={endSidebarResize} onLostPointerCapture={() => { sidebarDrag.current = null; setSidebarResizing(false) }} onKeyDown={resizeSidebarByKeyboard} />
       </aside>
 
       <div className="app-column">
