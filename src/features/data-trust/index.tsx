@@ -9,7 +9,7 @@ import { useSelectedLocation } from '../../lib/geo/location'
 import './data-trust.css'
 
 type SourceKind = 'Climat' | 'Satellite' | 'Sol' | 'Terrain'
-type SourceStatus = 'Connecté' | 'Référence' | 'À configurer'
+type SourceStatus = 'Connecté' | 'Extrait hors ligne' | 'Indisponible' | 'Référence' | 'À configurer'
 type DataSource = { id: string; name: string; short: string; provider: string; kind: SourceKind; description: string; status: SourceStatus; icon: typeof CloudSun; color: string; url: string; variables: string; resolution: string; coverage: string; period: string; license: string }
 
 const sources: DataSource[] = [
@@ -22,14 +22,14 @@ const sources: DataSource[] = [
 ]
 
 const themes: Array<'Toutes' | SourceKind> = ['Toutes', 'Climat', 'Satellite', 'Sol', 'Terrain']
-const statusFilters: Array<'Tous les statuts' | SourceStatus> = ['Tous les statuts', 'Connecté', 'Référence', 'À configurer']
+const statusFilters: Array<'Tous les statuts' | SourceStatus> = ['Tous les statuts', 'Connecté', 'Extrait hors ligne', 'Indisponible', 'Référence', 'À configurer']
 
 function coordinate(value: number, positive: string, negative: string) {
   return `${Math.abs(value).toFixed(3).replace('.', ',')}° ${value < 0 ? negative : positive}`
 }
 
 function statusClass(status: SourceStatus) {
-  return status === 'Connecté' ? 'connect' : status === 'Référence' ? 'reference' : 'import'
+  return status === 'Connecté' ? 'connect' : status === 'Extrait hors ligne' ? 'snapshot' : status === 'Référence' ? 'reference' : 'import'
 }
 
 function formatFetchedAt(value: string) {
@@ -64,21 +64,24 @@ export function DataTrustPage() {
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const { series, loading, error } = usePowerMonthly(location)
   const selected = sources.find(source => source.id === selectedId) ?? sources[0]
+  const isDemoSnapshot = series?.deliveryMode === 'demo-fixture'
+  const selectedStatus: SourceStatus = selected.id === 'power' && isDemoSnapshot ? 'Extrait hors ligne' : selected.id === 'power' && error ? 'Indisponible' : selected.status
   const SourceIcon = selected.icon
   const latest = series ? latestCompleteRecord(series.records) : undefined
   const coverage = selected.id === 'power' && series ? powerCoverage(series) : []
   const qualityFlags = selected.id === 'power' && series ? powerQualityFlags(series.records) : []
-  const filteredSources = useMemo(() => sources.filter(source => (theme === 'Toutes' || source.kind === theme) && (statusFilter === 'Tous les statuts' || source.status === statusFilter) && `${source.name} ${source.provider} ${source.description}`.toLocaleLowerCase('fr').includes(query.toLocaleLowerCase('fr'))), [query, statusFilter, theme])
+  const sourceStatus = (source: DataSource): SourceStatus => source.id === 'power' && isDemoSnapshot ? 'Extrait hors ligne' : source.id === 'power' && error ? 'Indisponible' : source.status
+  const filteredSources = useMemo(() => sources.filter(source => (theme === 'Toutes' || source.kind === theme) && (statusFilter === 'Tous les statuts' || sourceStatus(source) === statusFilter) && `${source.name} ${source.provider} ${source.description}`.toLocaleLowerCase('fr').includes(query.toLocaleLowerCase('fr'))), [error, isDemoSnapshot, query, statusFilter, theme])
 
   const imageryDate = (() => {
     const date = new Date()
     date.setUTCDate(date.getUTCDate() - 11)
     return date.toISOString().slice(0, 10)
   })()
-  const connectedCount = error ? 1 : 2
+  const connectedCount = error || isDemoSnapshot ? 1 : 2
 
   return <section className="trust-page" aria-label="Sources de données et traçabilité">
-    <header className="trust-page-heading"><div><span className="trust-heading-icon"><ShieldCheck size={17} /></span><span><h1>Données & confiance</h1><p>Sources réellement raccordées, coordonnées utilisées et limites de chaque produit.</p></span></div><span className="trust-status-banner"><ShieldCheck size={14} /> {connectedCount} sources NASA raccordées · {loading ? 'POWER en chargement' : error ? 'POWER indisponible' : latest ? `POWER · ${formatPowerMonth(latest.date)}` : 'POWER · aucune valeur'}</span></header>
+    <header className="trust-page-heading"><div><span className="trust-heading-icon"><ShieldCheck size={17} /></span><span><h1>Données & confiance</h1><p>Sources réellement raccordées, coordonnées utilisées et limites de chaque produit.</p></span></div><span className="trust-status-banner"><ShieldCheck size={14} /> {connectedCount} source{connectedCount > 1 ? 's' : ''} NASA raccordée{connectedCount > 1 ? 's' : ''} · {loading ? 'POWER en chargement' : isDemoSnapshot ? `POWER · extrait hors ligne capturé le ${series?.fetchedAt.slice(0, 10)}` : error ? 'POWER indisponible' : latest ? `POWER · ${formatPowerMonth(latest.date)}` : 'POWER · aucune valeur'}</span></header>
 
     <div className="trust-workspace">
       <aside className="trust-catalog-panel">
@@ -86,7 +89,7 @@ export function DataTrustPage() {
         <label className="trust-search"><Search size={14} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Rechercher une source…" aria-label="Rechercher une source" />{query && <button type="button" onClick={() => setQuery('')} aria-label="Effacer la recherche"><X size={13} /></button>}</label>
         <div className="trust-filter-row"><label><span>Thématique</span><select value={theme} onChange={event => setTheme(event.target.value as typeof theme)} aria-label="Filtrer par thématique">{themes.map(item => <option key={item}>{item}</option>)}</select></label><label><span>Connexion</span><select value={statusFilter} onChange={event => setStatusFilter(event.target.value as typeof statusFilter)} aria-label="Filtrer par statut">{statusFilters.map(item => <option key={item}>{item}</option>)}</select></label></div>
         <div className="trust-catalog-list" aria-label="Sources disponibles">
-          {filteredSources.map(source => { const Icon = source.icon; const status = source.id === 'power' && error ? 'Indisponible' : source.status; const cls = status === 'Indisponible' ? 'import' : statusClass(source.status); return <button key={source.id} type="button" className={`trust-source-item ${selectedId === source.id ? 'is-selected' : ''}`} onClick={() => { setSelectedId(source.id); setPanel('overview'); if (source.id === 'gibs') { setBaseLayer('nasa'); setLayer('truecolor') } }} aria-pressed={selectedId === source.id}>
+          {filteredSources.map(source => { const Icon = source.icon; const status = sourceStatus(source); const cls = statusClass(status); return <button key={source.id} type="button" className={`trust-source-item ${selectedId === source.id ? 'is-selected' : ''}`} onClick={() => { setSelectedId(source.id); setPanel('overview'); if (source.id === 'gibs') { setBaseLayer('nasa'); setLayer('truecolor') } }} aria-pressed={selectedId === source.id}>
             <span className={`trust-source-mark ${source.color}`}><Icon size={17} /></span><span className="trust-source-copy"><span className="trust-source-name">{source.short}</span><small>{source.provider} · {source.kind}</small><span className="trust-source-desc">{source.description}</span></span><span className={`trust-status-pill status-${cls}`}>{status}</span><ChevronRight className="trust-source-chevron" size={14} />
           </button> })}
           {!filteredSources.length && <div className="trust-empty"><Filter size={18} /><strong>Aucune source ne correspond</strong><span>Essayez un autre filtre ou une recherche.</span><button type="button" onClick={() => { setQuery(''); setTheme('Toutes'); setStatusFilter('Tous les statuts') }}>Réinitialiser les filtres</button></div>}
@@ -96,7 +99,7 @@ export function DataTrustPage() {
 
       <div className="trust-map-stage" aria-label="Carte des sources au point sélectionné">
         <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={layer === 'ndvi'} showSurfaceSoil={layer === 'surface'} showRootSoil={layer === 'root'} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectLocation} onMapReady={setMap} ariaLabel="Carte interactive des sources NASA et OpenStreetMap" />
-        <div className="trust-map-context"><span className={`trust-source-mark small ${selected.color}`}><SourceIcon size={14} /></span><span><strong>{selected.name}</strong><small>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</small></span><span className={`trust-status-pill status-${statusClass(selected.status)}`}>{selected.status}</span></div>
+        <div className="trust-map-context"><span className={`trust-source-mark small ${selected.color}`}><SourceIcon size={14} /></span><span><strong>{selected.name}</strong><small>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</small></span><span className={`trust-status-pill status-${statusClass(selectedStatus)}`}>{selectedStatus}</span></div>
         <div className="trust-map-controls"><div><button type="button" aria-label="Zoom avant" onClick={() => map?.zoomIn({ duration: 250 })}><span>+</span></button><button type="button" aria-label="Zoom arrière" onClick={() => map?.zoomOut({ duration: 250 })}><span>−</span></button></div><button type="button" aria-label="Recentrer" onClick={() => map?.flyTo({ center: [location.longitude, location.latitude], zoom: 5 })}><MapPin size={15} /></button><button type="button" aria-label="Basculer entre carte NASA et plan" onClick={() => setBaseLayer(value => value === 'nasa' ? 'streets' : 'nasa')}><Layers3 size={15} /></button></div>
         <div className="trust-layer-menu"><strong>Couches NASA</strong><div className="trust-map-layer-choices">{[
           { id: 'truecolor', label: 'MODIS' }, { id: 'ndvi', label: 'NDVI' }, { id: 'surface', label: 'SMAP surface' }, { id: 'root', label: 'SMAP racines' },
@@ -105,8 +108,8 @@ export function DataTrustPage() {
       </div>
 
       <aside className="trust-details-panel">
-        <header className="trust-detail-header"><div><span className={`trust-section-icon detail-icon ${selected.color}`}><SourceIcon size={17} /></span><span><small>FICHE DE SOURCE</small><strong>{selected.name}</strong></span></div><span className={`trust-status-label status-${statusClass(selected.status)}`}>{selected.id === 'power' && error ? 'Indisponible' : selected.status}</span></header>
-        <div className="trust-provider-line"><span className={`trust-status-dot status-dot-${statusClass(selected.status)}`} /><span>{selected.provider}</span><span>{selected.id === 'power' ? 'point actif' : selected.id === 'gibs' ? 'couches carte' : 'non utilisé'}</span></div>
+        <header className="trust-detail-header"><div><span className={`trust-section-icon detail-icon ${selected.color}`}><SourceIcon size={17} /></span><span><small>FICHE DE SOURCE</small><strong>{selected.name}</strong></span></div><span className={`trust-status-label status-${statusClass(selectedStatus)}`}>{selectedStatus}</span></header>
+        <div className="trust-provider-line"><span className={`trust-status-dot status-dot-${statusClass(selectedStatus)}`} /><span>{selected.provider}</span><span>{selected.id === 'power' ? 'point actif' : selected.id === 'gibs' ? 'couches carte' : 'non utilisé'}</span></div>
         <p className="trust-source-description">{selected.description}</p>
         {selected.url && <a className="trust-source-link" href={selected.url} target="_blank" rel="noreferrer">Documentation officielle <ExternalLink size={12} /></a>}
         <div className="trust-detail-tabs" role="tablist" aria-label="Détails de la source"><button type="button" role="tab" aria-selected={panel === 'overview'} className={panel === 'overview' ? 'is-active' : ''} onClick={() => setPanel('overview')}>Métadonnées</button><button type="button" role="tab" aria-selected={panel === 'lineage'} className={panel === 'lineage' ? 'is-active' : ''} onClick={() => setPanel('lineage')}>Traçabilité</button></div>
@@ -116,8 +119,8 @@ export function DataTrustPage() {
           <div className="trust-meta-row"><span><MapPin size={13} /> Couverture</span><strong>{selected.id === 'power' ? 'Point actif; valeur interpolée/agrégée au point de grille POWER' : selected.coverage}</strong></div>
           <div className="trust-meta-row"><span><Waves size={13} /> Période</span><strong>{selected.id === 'power' ? latest ? `Mensuel · dernière période exploitable ${formatPowerMonth(latest.date)}` : loading ? 'Chargement de la série mensuelle…' : 'Aucune période exploitable' : selected.period}</strong></div>
           {selected.id === 'power' && <>
-            <div className="trust-meta-row"><span><Database size={13} /> Source API</span><strong>{series ? series.source.join(' · ') : loading ? 'En attente de la réponse NASA POWER' : 'Non disponible'}</strong></div>
-            <div className="trust-meta-row"><span><CloudSun size={13} /> Récupérée</span><strong>{series ? `${formatFetchedAt(series.fetchedAt)} · version non fournie par la réponse` : 'Aucune récupération réussie pour ce point'}</strong></div>
+            <div className="trust-meta-row"><span><Database size={13} /> {isDemoSnapshot ? 'Source archivée' : 'Source API'}</span><strong>{series ? series.source.join(' · ') : loading ? 'En attente de la réponse NASA POWER' : 'Non disponible'}</strong></div>
+            <div className="trust-meta-row"><span><CloudSun size={13} /> {isDemoSnapshot ? 'Capture datée' : 'Récupérée'}</span><strong>{series ? `${formatFetchedAt(series.fetchedAt)} · version non fournie par la réponse` : 'Aucune récupération réussie pour ce point'}</strong></div>
           </>}
           {selected.id === 'gibs' && <div className="trust-meta-row"><span><Layers3 size={13} /> Produit affiché</span><strong>{layer === 'truecolor' ? `MODIS Terra Corrected Reflectance True Color · ${imageryDate}` : layer === 'ndvi' ? `MODIS Terra NDVI 8-Day · ${imageryDate}` : layer === 'surface' ? 'SMAP L4 · humidité de surface · date produit non récupérée' : 'SMAP L4 · humidité racinaire · date produit non récupérée'}</strong></div>}
           <div className="trust-meta-row"><span><ShieldCheck size={13} /> Limite</span><strong>{selected.id === 'power' ? 'Climatologie mensuelle; pas de prévision ni de mesure parcellaire' : selected.license}</strong></div>
@@ -128,10 +131,10 @@ export function DataTrustPage() {
           {selected.id === 'gibs' && <div className="trust-quality-card"><span className="trust-quality-icon"><ShieldCheck size={17} /></span><span><small>Lecture de la couche</small><strong>Pixel satellite</strong></span><span className="trust-quality-breakdown"><b>MODIS <em>image datée</em></b><b>SMAP <em>~9 km</em></b><b>Parcelle <em>non fournie</em></b></span></div>}
           {selected.id !== 'power' && selected.id !== 'gibs' && <div className="trust-provenance-note"><ShieldAlert size={14} /><p>Cette source est une référence ou une intégration manquante. Aucune valeur de cette source n’alimente les cartes, graphiques ou réponses de FieldNova.</p></div>}
         </div> : <div className="trust-lineage">
-          <div className="trust-lineage-summary"><span><ShieldCheck size={16} /></span><div><strong>{selected.status === 'Connecté' ? 'Flux intégré dans l’interface' : 'Flux non exécuté'}</strong><small>{selected.status === 'Connecté' ? 'La fiche décrit les données utilisées dans les vues FieldNova.' : 'Référence conservée au catalogue; aucune donnée n’est collectée.'}</small></div></div>
+          <div className="trust-lineage-summary"><span><ShieldCheck size={16} /></span><div><strong>{isDemoSnapshot && selected.id === 'power' ? 'Extrait NASA local utilisé' : selectedStatus === 'Connecté' ? 'Flux intégré dans l’interface' : 'Flux non exécuté'}</strong><small>{isDemoSnapshot && selected.id === 'power' ? `Aucune requête réseau réussie pour ce chargement · copie capturée le ${series?.fetchedAt.slice(0, 10)}.` : selectedStatus === 'Connecté' ? 'La fiche décrit les données utilisées dans les vues FieldNova.' : 'Référence conservée au catalogue; aucune donnée n’est collectée.'}</small></div></div>
           <ol>{(selected.id === 'power' ? [
             { title: 'Coordonnée active', desc: `${coordinate(location.latitude, 'N', 'S')} · ${coordinate(location.longitude, 'E', 'O')}`, done: true },
-            { title: 'Requête NASA POWER', desc: latest ? `Série reçue · ${formatPowerMonth(latest.date)}` : loading ? 'Requête en cours' : 'Requête indisponible', done: Boolean(series) },
+            { title: isDemoSnapshot ? 'Extrait NASA POWER local' : 'Requête NASA POWER', desc: latest ? `${isDemoSnapshot ? 'Copie datée' : 'Série reçue'} · ${formatPowerMonth(latest.date)}` : loading ? 'Requête en cours' : 'Requête indisponible', done: Boolean(series) },
             { title: 'Filtrage des valeurs', desc: 'Mois en cours et valeurs de remplissage exclus; paramètres sans valeur restent inconnus.', done: Boolean(series) },
             { title: 'Utilisation dans FieldNova', desc: 'Graphiques, indicateurs, empreinte de maille sur la carte et réponses de l’assistant.', done: Boolean(series) },
           ] : selected.id === 'gibs' ? [
@@ -148,15 +151,15 @@ export function DataTrustPage() {
           {selected.id === 'power' && series && <section className="trust-coverage-audit" aria-label="Couverture des périodes mensuelles NASA POWER"><header><strong>Valeurs disponibles par mois</strong><small>Fenêtre demandée · {series.requestedMonths.length} mois clos</small></header><div>{coverage.map(item => <span key={item.field}><strong>{item.label}</strong><small>{item.available}/{series.requestedMonths.length} mois exploitables</small></span>)}</div><details><summary>Mois sans valeur exploitable</summary><ul>{coverage.map(item => <li key={item.field}><strong>{item.label}</strong><small>{item.missing.length ? item.missing.map(formatPowerMonth).join(' · ') : 'Aucun mois manquant'}</small></li>)}</ul></details></section>}
           {selected.id === 'power' && series && <section className={`trust-quality-audit ${qualityFlags.length ? 'has-flags' : ''}`} aria-label="Contrôle de cohérence des valeurs NASA POWER"><header><strong>{qualityFlags.length ? `${qualityFlags.length} alerte${qualityFlags.length > 1 ? 's' : ''} de cohérence` : 'Aucune contradiction physique détectée'}</strong><small>Valeurs brutes conservées · contrôle indicatif</small></header>{qualityFlags.length > 0 && <details><summary>Voir les valeurs signalées</summary><ul>{qualityFlags.map((flag, index) => <li key={`${flag.date}-${flag.parameter}-${index}`}><strong>{flag.parameter} · {formatPowerMonth(flag.date)}</strong><span>{flag.value} · {flag.rule}</span></li>)}</ul></details>}</section>}
           {selected.id === 'power' && series && <details className="trust-transformation-audit"><summary>Étapes de transformation de cette série</summary><ol>
-            <li><strong>Point transmis</strong><small>{series.point.latitude.toFixed(3)}, {series.point.longitude.toFixed(3)} · arrondi à 0,001° pour la requête NASA POWER.</small></li>
+            <li><strong>{isDemoSnapshot ? 'Point de l’extrait' : 'Point transmis'}</strong><small>{series.point.latitude.toFixed(3)}, {series.point.longitude.toFixed(3)} · {isDemoSnapshot ? 'coordonnée de l’extrait NASA enregistré; aucune requête réseau envoyée.' : 'arrondi à 0,001° pour la requête NASA POWER.'}</small></li>
             <li><strong>Paramètres et période</strong><small>PRECTOTCORR, T2M, T2M_MAX, T2M_MIN, GWETTOP, GWETROOT · UTC · {series.requestedMonths[0] ? formatPowerMonth(series.requestedMonths[0]) : 'aucun mois'} à {series.requestedMonths[series.requestedMonths.length - 1] ? formatPowerMonth(series.requestedMonths[series.requestedMonths.length - 1]) : 'aucun mois'}.</small></li>
-            <li><strong>Calendrier et valeurs</strong><small>Les clés YYYYMM deviennent YYYY-MM; le mois en cours, les valeurs de remplissage NASA et les champs absents ne sont pas convertis en zéro.</small></li>
+            <li><strong>Calendrier et valeurs</strong><small>Les clés mensuelles YYYYMM deviennent YYYY-MM; les agrégats annuels YYYY13, le mois en cours, les valeurs de remplissage NASA et les champs absents sont exclus ou laissés inconnus.</small></li>
             <li><strong>Repère spatial dérivé</strong><small>Le centre MERRA-2 de plus proche voisin et l’empreinte 0,5° × 0,625° sont calculés séparément à partir du point suivi; ils ne sont pas une limite de parcelle.</small></li>
             <li><strong>Affichages dérivés</strong><small>Les fractions GWETTOP/GWETROOT sont multipliées par 100 pour les indicateurs en pourcentage; les repères historiques comparent le même mois des années antérieures.</small></li>
           </ol></details>}
           <div className="trust-provenance-note"><ShieldCheck size={14} /><p>Les valeurs affichées gardent leur source, leur unité, leur date et leur couverture spatiale. Les données de grille ne décrivent pas une parcelle individuelle.</p></div>
         </div>}
-        <footer className="trust-detail-footer"><span><span className={`trust-empty-dot ${selected.status === 'Connecté' && !error ? 'is-connected' : ''}`} />{selected.id === 'power' && error ? 'Récupération en échec' : selected.status === 'Connecté' ? 'Source intégrée' : selected.status}</span><button type="button" onClick={() => setPanel('lineage')}>Voir la traçabilité <ArrowUpRight size={13} /></button></footer>
+        <footer className="trust-detail-footer"><span><span className={`trust-empty-dot ${selectedStatus === 'Connecté' ? 'is-connected' : ''}`} />{selectedStatus === 'Connecté' ? 'Source intégrée' : selectedStatus}</span><button type="button" onClick={() => setPanel('lineage')}>Voir la traçabilité <ArrowUpRight size={13} /></button></footer>
       </aside>
     </div>
   </section>

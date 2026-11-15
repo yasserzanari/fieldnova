@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { GeoPoint } from '../geo/location'
-import { fetchPowerMonthly, type PowerMonthlySeries } from './power'
+import { readDemoWorkspace } from '../demo/demo-workspace'
+import { fetchPowerMonthly, offlineDemoPowerSeries, type PowerMonthlySeries } from './power'
 
 const REQUEST_TIMEOUT_MS = 20_000
 
@@ -28,6 +29,15 @@ export function usePowerMonthly(point: GeoPoint, years = 5) {
       if (active) setState({ requestKey, series, loading: false, error: '' })
     }).catch(reason => {
       if (!active) return
+      const demoWorkspace = readDemoWorkspace()
+      const isDemoPoint = demoWorkspace
+        && point.latitude.toFixed(4) === demoWorkspace.point.latitude.toFixed(4)
+        && point.longitude.toFixed(4) === demoWorkspace.point.longitude.toFixed(4)
+      const demoSnapshot = isDemoPoint ? offlineDemoPowerSeries(point, years) : null
+      if (demoSnapshot) {
+        setState({ requestKey, series: demoSnapshot, loading: false, error: '' })
+        return
+      }
       setState({
         requestKey,
         series: null,

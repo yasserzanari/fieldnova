@@ -6,8 +6,9 @@ import AISources, { type AISource } from '../../components/ai-chat/ai-sources'
 import { MessageActions } from '../../components/ai-chat/message-actions'
 import { LiquidMultimodalInput } from '../../components/ai-chat/liquid-multimodal-input'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
-import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, type PowerMonthlySeries } from '../../lib/nasa/power'
+import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, offlineDemoPowerSeries, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
+import { readDemoWorkspace } from '../../lib/demo/demo-workspace'
 import { farmWaterAccessLabels, farmWaterConstraintLabels, readFarmProfile } from '../../lib/farm/farm-profile'
 import { readSoilProfile, resolveSoilHorizonProvenance, soilSourceLabels } from '../../lib/farm/soil-profile'
 import { readRotationConstraints } from '../scenarios/rotation-constraints'
@@ -321,22 +322,29 @@ export function AssistantPage() {
           currentSeries = await fetchPowerMonthly(location, 5)
         }
       } catch {
-        failed = true
-        currentSeries = null
+        const demo = readDemoWorkspace()
+        const isDemoPoint = demo
+          && location.latitude.toFixed(4) === demo.point.latitude.toFixed(4)
+          && location.longitude.toFixed(4) === demo.point.longitude.toFixed(4)
+        currentSeries = isDemoPoint ? offlineDemoPowerSeries(location, 5) : null
+        failed = !currentSeries
       }
       const record = currentSeries ? latestCompleteRecord(currentSeries.records) : undefined
+      const isDemoSnapshot = currentSeries?.deliveryMode === 'demo-fixture'
+      const demoSnapshotNote = isDemoSnapshot ? `Extrait NASA POWER hors ligne · capturé le ${currentSeries?.fetchedAt.slice(0, 10)} · dernière période exploitable ${record ? formatPowerMonth(record.date) : 'inconnue'} · aucune requête actuelle.` : ''
       const gridLabel = currentSeries ? `Centre maille MERRA-2 ${coordinate(currentSeries.gridPoint.latitude, 'N', 'S')} · ${coordinate(currentSeries.gridPoint.longitude, 'E', 'O')} · résolution 0,5° × 0,625°` : 'La requête n’a pas abouti'
-      trace.push(traceNode(`power-${id}`, seriesAlreadyLoaded ? 'read' : 'fetch', seriesAlreadyLoaded ? 'Série NASA POWER chargée · contexte du point' : 'NASA POWER · API mensuelle', failed ? 'NASA POWER indisponible' : seriesAlreadyLoaded ? 'Série chargée consultée' : 'Série récupérée', record ? `${formatPowerMonth(record.date)} · ${gridLabel}` : gridLabel, failed ? 'failed' : 'completed'))
+      trace.push(traceNode(`power-${id}`, seriesAlreadyLoaded || isDemoSnapshot ? 'read' : 'fetch', isDemoSnapshot ? 'Extrait NASA POWER local · mode démonstration' : seriesAlreadyLoaded ? 'Série NASA POWER chargée · contexte du point' : 'NASA POWER · API mensuelle', failed ? 'NASA POWER indisponible' : isDemoSnapshot ? 'Extrait local consulté · aucune requête réseau' : seriesAlreadyLoaded ? 'Série chargée consultée' : 'Série récupérée', [record ? formatPowerMonth(record.date) : '', gridLabel, demoSnapshotNote].filter(Boolean).join(' · '), failed ? 'failed' : 'completed'))
       if (route.asksLayer) {
         const label = layerOptions.find(item => item.id === route.asksLayer)?.label ?? 'Couche NASA'
         trace.push({ id: `map-${id}`, type: 'step', primary: 'Couche affichée sur la carte', secondary: label, status: 'completed' })
       }
-      traceHeading = route.asksLayer ? 'NASA POWER consulté · carte mise à jour' : 'NASA POWER consulté'
+      traceHeading = isDemoSnapshot ? 'Extrait NASA POWER consulté · mode démo' : route.asksLayer ? 'NASA POWER consulté · carte mise à jour' : 'NASA POWER consulté'
       answer = makeClimateAnswer(question, currentSeries, requestedLayer, location)
-      evidence = answer
-      usedSources = [sources[0], ...(route.asksLayer ? [sources[1]] : [])]
+      if (demoSnapshotNote) answer = `${demoSnapshotNote}\n\n${answer}`
+      evidence = [demoSnapshotNote, answer].filter(Boolean).join('\n\n')
+      usedSources = [{ ...sources[0], snippet: demoSnapshotNote || sources[0].snippet }, ...(route.asksLayer ? [sources[1]] : [])]
       evidenceTags = currentSeries && latestCompleteRecord(currentSeries.records)
-        ? [{ label: 'NASA POWER · donnée mensuelle modélisée', kind: 'source' }, ...(route.asksLayer?.includes('ndvi') ? [{ label: 'Imagerie NASA GIBS', kind: 'source' } as EvidenceTag] : []), { label: 'Maille régionale · pas un diagnostic parcellaire', kind: 'limit' }]
+        ? [{ label: isDemoSnapshot ? 'NASA POWER · extrait local daté' : 'NASA POWER · donnée mensuelle modélisée', kind: 'source' }, ...(route.asksLayer?.includes('ndvi') ? [{ label: 'Imagerie NASA GIBS', kind: 'source' } as EvidenceTag] : []), { label: 'Maille régionale · pas un diagnostic parcellaire', kind: 'limit' }]
         : [{ label: 'Donnée NASA indisponible', kind: 'missing' }, { label: 'Aucune valeur de remplacement', kind: 'limit' }]
     }
     if (!files.length && codexStatus === 'ready' && route.intent !== 'unknown' && !unsupportedFarmDecision) {

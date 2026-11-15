@@ -1,6 +1,6 @@
 # Sources, citations et limites de FieldNova
 
-Dernière vérification documentaire : 14 novembre 2026. Ce registre distingue les données effectivement demandées par l’application des sources seulement référencées. Les valeurs affichées pour la ferme fictive de démonstration restent explicitement fictives.
+Dernière vérification documentaire : 15 novembre 2026. Ce registre distingue les données effectivement demandées par l’application des sources seulement référencées. Les valeurs affichées pour la ferme fictive de démonstration restent explicitement fictives.
 
 ## Sources actives
 
@@ -11,6 +11,7 @@ Dernière vérification documentaire : 14 novembre 2026. Ce registre distingue l
 - Les mois calendaires incomplets et les valeurs de remplissage sont écartés. Le client conserve les unités et noms de paramètres renvoyés, la source indiquée dans l’en-tête, le point interrogé et l’heure de récupération.
 - Les paramètres météorologiques POWER sont dérivés de MERRA-2. Les valeurs mensuelles sont des agrégats de grille; elles ne sont ni une observation à la ferme, ni une mesure de parcelle, ni une prévision.
 - Une réponse obtenue est aussi enregistrée dans le stockage local du navigateur, indexée par point arrondi au millième de degré et période. Pendant 15 minutes, elle est indiquée comme cache récent; après une panne, elle peut rester visible jusqu’à 180 jours depuis sa collecte sous le libellé « copie locale ancienne ». L’horodatage NASA de la série et les mois de mesure sont conservés; ce repli ne transforme pas des données passées en données récentes.
+- Le mode démonstration inclut aussi un extrait statique issu de cette API pour le point fictif `46.228, 2.214`, capturé le 15 novembre 2026. Il couvre janvier 2022 à septembre 2026 pour les mois ayant au moins une valeur exploitable; le mois courant et les résumés annuels `YYYY13` ne sont pas des observations mensuelles et sont exclus. Cet extrait ne sert qu’au point de démonstration lorsque l’appel réseau échoue; il est daté et balisé « extrait démo hors ligne », n’est jamais enregistré comme cache vivant et ne s’applique pas aux autres points.
 - FieldNova dérive le centre et l’empreinte approximative de la cellule MERRA-2 native de plus proche voisin (0,5° latitude × 0,625° longitude). L’API appelée par l’application ne renvoie pas la version du service : le tableau de bord l’indique et ne fabrique pas une valeur de version.
 - Pour citer POWER dans une présentation : nommer NASA Langley Research Center et le projet POWER, l’API mensuelle, la date d’accès et la version si elle est fournie. Voir le [guide officiel de référence NASA POWER](https://power.larc.nasa.gov/docs/referencing/).
 
