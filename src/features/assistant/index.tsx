@@ -27,6 +27,7 @@ const sources: AISource[] = [
 ]
 const rotationReferences: AISource[] = [
   { id: 'fieldnova-rotations', title: 'FieldNova · scénarios enregistrés', url: '/app/scenarios', snippet: 'Séquences, priorité, métriques descriptives et contraintes consultées pour le point sélectionné.' },
+  { id: 'inpn-taxref', title: rotationSources.botanicalFamilies.label, url: rotationSources.botanicalFamilies.url, snippet: 'Le référentiel taxonomique TAXREF de l’INPN documente la classification des espèces, dont leur famille botanique.' },
   { id: 'draaf-rotation', title: rotationSources.rootArchitecture.label, url: rotationSources.rootArchitecture.url, snippet: 'La DRAAF décrit les rotations, l’alternance des familles et des architectures racinaires; référence régionale à confirmer pour la parcelle.' },
   { id: 'inrae-rotation', title: rotationSources.legumes.label, url: rotationSources.legumes.url, snippet: 'INRAE explique la diversification végétale, les successions pluriannuelles et le rôle des légumineuses.' },
 ]

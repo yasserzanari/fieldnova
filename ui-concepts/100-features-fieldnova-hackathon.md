@@ -98,7 +98,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 32. **[P0 · LIVRÉ] Carte d’une rotation sur plusieurs saisons** : trois séquences éditables montrent distinctement les cultures de chaque année.
 33. **[P0 · LIVRÉ] Rotation actuelle comme référence** : la séquence de référence est modifiable et sert de base aux écarts affichés.
 34. **[P0 · À VALIDER LOCALEMENT] Vérification des successions incompatibles** : aucune règle d’incompatibilité n’est appliquée sans source agronomique et validation adaptées à la région pilote.
-35. **[P1 · PARTIEL] Familles botaniques** : le détail de rotation affiche les familles sourcées et les cartes comptent les familles distinctes ainsi que les répétitions consécutives. Aucune répétition n’est bloquée sans règle et validation locales.
+35. **[P1 · PARTIEL] Familles botaniques** : les cartes affichent désormais les familles année par année; le détail ouvre TAXREF/INPN, et les cartes comptent aussi les familles distinctes et répétitions consécutives. Aucune répétition n’est bloquée sans règle et validation locales.
 36. **[P1] Cultures de couverture** : ajouter une option dédiée, avec ses coûts opérationnels et ses limites locales.
 37. **[P1] Intercultures et mélanges** : représenter deux cultures simultanées et éviter de les traiter comme une rotation simple.
 38. **[P1] Calendrier cultural local** : semis, croissance et récolte selon région, variété et saison, avec source et plage de dates.

@@ -29,6 +29,10 @@ export type RotationWorkspace = {
 }
 
 export const rotationSources = {
+  botanicalFamilies: {
+    label: 'INPN · référentiel TAXREF des familles',
+    url: 'https://inpn.mnhn.fr/telechargement/referentielEspece/referentielTaxo',
+  },
   rootArchitecture: {
     label: 'DRAAF Hauts-de-France · systèmes racinaires et successions',
     url: 'https://draaf.hauts-de-france.agriculture.gouv.fr/grandes-cultures-les-systemes-cerealiers-au-coeur-des-assolements-des-hauts-de-a4927.html',
