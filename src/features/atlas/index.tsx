@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Activity, CloudRain, Download, Droplets, Layers2, LocateFixed, MapPinned, Minus, Plus, Search, ShieldCheck, Satellite, Sun, ThermometerSun } from 'lucide-react'
+import { Activity, CloudRain, Download, Droplets, Layers2, LocateFixed, MapPinned, Minus, Plus, Search, ShieldCheck, Satellite, Sun, ThermometerSun, X } from 'lucide-react'
 import type { Map as MapLibreMap } from 'maplibre-gl'
 import { Link } from 'react-router-dom'
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
@@ -29,6 +29,7 @@ export function AtlasPage() {
   const [coordinateInput, setCoordinateInput] = useState(`${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`)
   const [coordinateError, setCoordinateError] = useState('')
   const [range, setRange] = useState(12)
+  const [showTimeline, setShowTimeline] = useState(false)
   const [locating, setLocating] = useState(false)
   const { series, loading, error, retry } = usePowerMonthly(location)
 
@@ -40,6 +41,24 @@ export function AtlasPage() {
   const latest = useMemo(() => series ? latestCompleteRecord(series.records) : undefined, [series])
   const latestDate = latest ? formatPowerMonth(latest.date) : 'aucune période valide'
   const gridPoint = series?.gridPoint
+  const annualSummary = useMemo(() => {
+    const records = [...(series?.records ?? [])].sort((a, b) => a.date.localeCompare(b.date)).slice(-12)
+    const precipitation = records.flatMap(record => record.precipitationMmPerDay === undefined ? [] : [{
+      value: record.precipitationMmPerDay * new Date(Date.UTC(Number(record.date.slice(0, 4)), Number(record.date.slice(4, 6)), 0)).getUTCDate(),
+    }])
+    const temperatures = records.flatMap(record => record.temperatureC === undefined ? [] : [record.temperatureC])
+    const maxima = records.flatMap(record => record.temperatureMaxC === undefined ? [] : [record.temperatureMaxC])
+    const minima = records.flatMap(record => record.temperatureMinC === undefined ? [] : [record.temperatureMinC])
+    return {
+      precipitationMm: precipitation.length === 12 ? precipitation.reduce((sum, row) => sum + row.value, 0) : undefined,
+      precipitationMonths: precipitation.length,
+      averageTemperatureC: temperatures.length ? temperatures.reduce((sum, value) => sum + value, 0) / temperatures.length : undefined,
+      temperatureMonths: temperatures.length,
+      highestMaxC: maxima.length ? Math.max(...maxima) : undefined,
+      lowestMinC: minima.length ? Math.min(...minima) : undefined,
+      extremeMonths: Math.min(maxima.length, minima.length),
+    }
+  }, [series])
 
   const moveToPoint = (point: GeoPoint) => {
     selectLocation(point)
@@ -78,7 +97,7 @@ export function AtlasPage() {
   return <section className="atlas-page" aria-label="Atlas interactif des couches NASA">
     <header className="atlas-heading">
       <div className="atlas-title"><h1>Atlas</h1><span className="atlas-title-divider" /><p>Explorez l’imagerie NASA et les séries climatiques au point choisi</p></div>
-      <form className="atlas-search" onSubmit={submitCoordinates} role="search"><Search size={16} aria-hidden="true" /><input aria-label="Coordonnées, latitude puis longitude" value={coordinateInput} onChange={event => setCoordinateInput(event.target.value)} placeholder="Latitude, longitude" /><button type="submit" aria-label="Aller aux coordonnées"><MapPinned size={15} /></button></form>
+      <div className="atlas-heading-actions"><button type="button" className={`atlas-history-toggle ${showTimeline ? 'is-active' : ''}`} aria-expanded={showTimeline} aria-controls="atlas-climate-history" onClick={() => setShowTimeline(value => !value)}><Activity size={14} /><span>Historique climatique</span></button><form className="atlas-search" onSubmit={submitCoordinates} role="search"><Search size={16} aria-hidden="true" /><input aria-label="Coordonnées, latitude puis longitude" value={coordinateInput} onChange={event => setCoordinateInput(event.target.value)} placeholder="Latitude, longitude" /><button type="submit" aria-label="Aller aux coordonnées"><MapPinned size={15} /></button></form></div>
     </header>
 
     <div className="atlas-map-stage">
@@ -103,7 +122,7 @@ export function AtlasPage() {
 
       <aside className="atlas-float-panel atlas-selection-panel" aria-label="Séries climatiques du point sélectionné">
         <header className="atlas-selection-heading"><div><span className="atlas-polygon-icon" /><div><h2>Point suivi</h2><p>{formatCoord(location.latitude, 'N', 'S')} · {formatCoord(location.longitude, 'E', 'O')}</p></div></div><button type="button" aria-label="Centrer sur ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></header>
-        <p className="atlas-grid-point">{gridPoint ? `Centre maille NASA POWER · ${gridPoint.latitude.toFixed(3)}, ${gridPoint.longitude.toFixed(3)} · 0,5° × 0,625°` : 'Cellule de grille NASA en attente'}</p>
+        <div className="atlas-selection-content"><p className="atlas-grid-point">{gridPoint ? `Centre maille NASA POWER · ${gridPoint.latitude.toFixed(3)}, ${gridPoint.longitude.toFixed(3)} · 0,5° × 0,625°` : 'Cellule de grille NASA en attente'}</p>
         {loading ? <div className="atlas-data-state" role="status">Chargement de NASA POWER…</div> : error ? <div className="atlas-data-error" role="alert"><span>{error}</span><button type="button" onClick={retry}>Réessayer</button></div> : <>
           <div className="atlas-live-metrics">
             <AtlasMetric icon={<CloudRain size={14} />} label="Pluie moyenne" value={latest?.precipitationMmPerDay === undefined ? '—' : `${latest.precipitationMmPerDay.toFixed(2).replace('.', ',')} mm/j`} source="PRECTOTCORR" />
@@ -114,19 +133,29 @@ export function AtlasPage() {
             <AtlasMetric icon={<Droplets size={14} />} label="Humidité racinaire modélisée" value={latest?.rootZoneWetness === undefined ? '—' : `${(latest.rootZoneWetness * 100).toFixed(0)} %`} source="GWETROOT" />
           </div>
           <p className="atlas-live-source">Dernière période exploitable · {latestDate} · NASA POWER · {series?.source.join(' + ')}</p>
+          <section className="atlas-annual-summary" aria-label="Résumé des douze derniers mois NASA POWER"><h3>Résumé · 12 derniers mois</h3><div className="atlas-summary-metrics">
+            <AtlasSummaryMetric label="Pluie estimée" value={annualSummary.precipitationMm === undefined ? '—' : `${Math.round(annualSummary.precipitationMm).toLocaleString('fr-FR')} mm`} detail={annualSummary.precipitationMm === undefined ? `${annualSummary.precipitationMonths}/12 mois · cumul incomplet` : '12 mois complets · estimé depuis mm/j'} />
+            <AtlasSummaryMetric label="Température moyenne" value={annualSummary.averageTemperatureC === undefined ? '—' : `${annualSummary.averageTemperatureC.toFixed(1).replace('.', ',')} °C`} detail={`${annualSummary.temperatureMonths}/12 mois disponibles`} />
+            <AtlasSummaryMetric label="Plage annuelle min. – max." value={annualSummary.highestMaxC === undefined || annualSummary.lowestMinC === undefined ? '—' : `${annualSummary.lowestMinC.toFixed(1).replace('.', ',')}° → ${annualSummary.highestMaxC.toFixed(1).replace('.', ',')}°`} detail={`${annualSummary.extremeMonths}/12 mois · T2M_MIN à T2M_MAX`} />
+          </div></section>
         </>}
         <div className="atlas-panel-note"><ShieldCheck size={13} /><span>Valeurs mensuelles sur cellule de grille, pas des observations de la ferme.</span></div>
-        <Link to="/app/data-trust" className="atlas-provenance-link">Sources et limites des données <span>›</span></Link>
+        <Link to="/app/data-trust" className="atlas-provenance-link">Sources et limites des données <span>›</span></Link></div>
       </aside>
-    </div>
 
-    <section className="atlas-data-timeline" aria-label="Graphiques climatiques NASA POWER">
+      {showTimeline && <section id="atlas-climate-history" className="atlas-data-timeline" aria-label="Graphiques climatiques NASA POWER">
       <div className="atlas-timeline-controls"><div><span className="timeline-icon"><Activity size={16} /></span><span><strong>Série climatique NASA POWER</strong><small>{range} derniers mois · point suivi</small></span></div><div className="atlas-timeline-actions"><div className="timeline-ranges" role="group" aria-label="Période du graphique">{[[3, '3 mois'], [6, '6 mois'], [12, '1 an']].map(([months, label]) => <button key={months} type="button" className={range === months ? 'is-active' : ''} onClick={() => setRange(Number(months))}>{label}</button>)}</div><button className="atlas-export-button" type="button" aria-label="Télécharger les séries mensuelles NASA POWER en CSV, avec coordonnées arrondies à 0,001 degré" title="CSV · coordonnées arrondies à 0,001° · valeurs absentes conservées vides" disabled={!series} onClick={() => series && downloadPowerMonthlyCsv(series)}><Download size={14} /><span>CSV</span></button></div></div>
+      <button type="button" className="atlas-history-close" aria-label="Fermer l’historique climatique" onClick={() => setShowTimeline(false)}><X size={15} /></button>
       <PowerClimateChart records={series?.records ?? []} source={series?.source.join(' + ') ?? 'en attente'} months={range} title="Précipitations et température · données mensuelles NASA" compact />
-    </section>
+      </section>}
+    </div>
   </section>
 }
 
 function AtlasMetric({ icon, label, value, source }: { icon: React.ReactNode; label: string; value: string; source: string }) {
   return <div className="atlas-live-metric"><span>{icon}</span><div><small>{label}</small><strong>{value}</strong><em>NASA POWER · {source}</em></div></div>
+}
+
+function AtlasSummaryMetric({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return <div className="atlas-summary-metric"><small>{label}</small><strong>{value}</strong><em>{detail}</em></div>
 }
