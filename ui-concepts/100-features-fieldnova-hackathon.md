@@ -136,7 +136,7 @@ Les priorités indiquent l’ordre d’exploration, pas un engagement de livrais
 61. **[LIVRÉ] Parcours de démo sans compte ni configuration** : le bouton de la landing démarre une ferme fictive préremplie; le profil, les rotations et les contraintes d’exemple sont séparés des réponses NASA consultées en direct.
 62. **[LIVRÉ] Indicateur « exemple » persistant** : le bandeau global reste visible dans toutes les vues et permet de quitter le cas fictif; le profil sauvegardé avant le lancement est restauré.
 63. **[P1] Mode mobile utilisable au champ** : boutons larges, panneaux courts et carte accessible sur petit écran.
-64. **[P1] Connexion lente tolérante** : garder les informations déjà récupérées et signaler clairement les données indisponibles.
+64. **[P1 · PARTIEL] Connexion lente tolérante** : les requêtes NASA POWER ont un délai maximal de 20 secondes, sont annulées si le point change et exposent un bouton de nouvel essai en cas d’échec; la conservation d’une dernière série périmée et le fonctionnement hors ligne restent à traiter.
 65. **[P1] Unités préférées** : choisir unités métriques et formats locaux, tout en conservant l’unité d’origine en provenance.
 66. **[P1] Contraste de carte et daltonisme** : ne jamais faire dépendre une alerte d’une seule couleur.
 67. **[P1] Navigation au clavier** : parcourir panneaux, formulaire, graphique et contrôles de la carte sans souris.

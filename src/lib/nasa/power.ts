@@ -76,7 +76,7 @@ export function merra2GridCellAt(point: GeoPoint): PowerGridCell {
   }
 }
 
-export async function fetchPowerMonthly(point: GeoPoint, years = 5): Promise<PowerMonthlySeries> {
+export async function fetchPowerMonthly(point: GeoPoint, years = 5, signal?: AbortSignal): Promise<PowerMonthlySeries> {
   const lat = Number(point.latitude.toFixed(3))
   const lon = Number(point.longitude.toFixed(3))
   const startYear = new Date().getUTCFullYear() - years + 1
@@ -95,7 +95,7 @@ export async function fetchPowerMonthly(point: GeoPoint, years = 5): Promise<Pow
     format: 'JSON',
     'time-standard': 'UTC',
   })
-  const response = await fetch(`https://power.larc.nasa.gov/api/temporal/monthly/point?${params}`)
+  const response = await fetch(`https://power.larc.nasa.gov/api/temporal/monthly/point?${params}`, { signal })
   const body = await response.json() as PowerResponse
   if (!response.ok) throw new Error(body.messages?.join(' ') || `NASA POWER a répondu ${response.status}.`)
 
