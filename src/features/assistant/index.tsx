@@ -8,6 +8,7 @@ import { LiquidMultimodalInput } from '../../components/ai-chat/liquid-multimoda
 import { FieldMap, type MapBaseLayer } from '../../components/maps/FieldMap'
 import { fetchPowerMonthly, formatPowerMonth, latestCompleteRecord, offlineDemoPowerSeries, type PowerMonthlySeries } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
+import { formatGibsDate, resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { readDemoWorkspace } from '../../lib/demo/demo-workspace'
 import { farmWaterAccessLabels, farmWaterConstraintLabels, readFarmProfile } from '../../lib/farm/farm-profile'
 import { readSoilProfile, resolveSoilFieldProvenance, resolveSoilHorizonProvenance, soilFieldLabels, soilSourceLabels, type SoilFieldKey } from '../../lib/farm/soil-profile'
@@ -237,6 +238,7 @@ export function AssistantPage() {
   const { location, selectLocation } = useSelectedLocation()
   const [layer, setLayer] = useState<LayerId>('truecolor')
   const { series, loading: loadingData, error: dataError } = usePowerMonthly(location)
+  const { availability: gibsAvailability, error: gibsDateError } = useGibsAvailability()
   const [codexStatus, setCodexStatus] = useState<CodexStatus>('checking')
   const [messages, setMessages] = useState<Message[]>([
     { id: 1, role: 'assistant', text: 'Bonjour. Je peux consulter les données climatiques mensuelles NASA POWER et afficher les couches MODIS ou SMAP sur la carte. Cliquez sur la carte pour changer le point suivi, puis demandez-moi la pluie, la température, le NDVI ou l’humidité du sol.' },
@@ -389,7 +391,16 @@ export function AssistantPage() {
   const latest = series ? latestCompleteRecord(series.records) : undefined
   const soilValue = latest?.rootZoneWetness
   const imageryDate = recentImageryDate()
-  const imageDateLabel = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${imageryDate}T12:00:00Z`))
+  const displayedGibsDate = layer === 'truecolor'
+    ? resolveGibsDate(imageryDate, gibsAvailability?.trueColor)
+    : layer === 'ndvi'
+      ? resolveGibsDate(imageryDate, gibsAvailability?.ndvi)
+      : layer === 'surface'
+        ? gibsAvailability?.surfaceSoil.at(-1)?.end ?? null
+        : gibsAvailability?.rootSoil.at(-1)?.end ?? null
+  const gibsDateLabel = displayedGibsDate ? formatGibsDate(displayedGibsDate) : gibsDateError ? 'date source indisponible' : 'date en chargement'
+  const displayedGibsProduct = layer === 'truecolor' || layer === 'ndvi' ? 'MODIS' : layer === 'surface' ? 'SMAP surface' : 'SMAP racines'
+  const requestedDateNote = (layer === 'truecolor' || layer === 'ndvi') && displayedGibsDate && displayedGibsDate !== imageryDate ? ` · cible ${formatGibsDate(imageryDate)}` : ''
   const suggestedQuestions = [
     ...(latest?.precipitationMmPerDay !== undefined ? [{ label: 'Pluie du mois', question: 'Quelle est la pluie mensuelle NASA POWER ?' }] : []),
     ...(latest?.temperatureC !== undefined ? [{ label: 'Température', question: 'Que montrent les températures mensuelles NASA POWER ?' }] : []),
@@ -439,12 +450,12 @@ export function AssistantPage() {
       </aside>
 
       <div className="assistant-map-area">
-        <header className="assistant-map-header"><div><span className="assistant-map-kicker"><Layers3 size={14} /> EXPLORATION NASA · GIBS</span><h2>Carte du point suivi <ChevronDown size={16} /></h2><p>Cliquez sur la carte pour déplacer le point partagé avec les autres vues.</p></div><div className="assistant-map-header-actions"><span className="assistant-demo-chip">MODIS · {imageDateLabel}</span><button type="button" className="assistant-expand-map" aria-label="Recentrer la carte" onClick={() => map?.flyTo({ center: [location.longitude, location.latitude], zoom: 5 })}><Maximize2 size={15} /></button></div></header>
+        <header className="assistant-map-header"><div><span className="assistant-map-kicker"><Layers3 size={14} /> EXPLORATION NASA · GIBS</span><h2>Carte du point suivi <ChevronDown size={16} /></h2><p>Cliquez sur la carte pour déplacer le point partagé avec les autres vues.</p></div><div className="assistant-map-header-actions"><span className="assistant-demo-chip">{displayedGibsProduct} · {gibsDateLabel}{requestedDateNote}</span><button type="button" className="assistant-expand-map" aria-label="Recentrer la carte" onClick={() => map?.flyTo({ center: [location.longitude, location.latitude], zoom: 5 })}><Maximize2 size={15} /></button></div></header>
         <div className="assistant-map-canvas">
           <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={layer === 'ndvi'} showSurfaceSoil={layer === 'surface'} showRootSoil={layer === 'root'} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectLocation} onMapReady={setMap} ariaLabel="Carte interactive NASA GIBS et OpenStreetMap" />
           <div className="assistant-map-toolbar"><div className="assistant-zoom-stack"><button type="button" aria-label="Zoom avant" onClick={() => map?.zoomIn({ duration: 250 })}><Plus size={16} /></button><button type="button" aria-label="Zoom arrière" onClick={() => map?.zoomOut({ duration: 250 })}><Minus size={16} /></button></div><button type="button" aria-label="Utiliser ma position" onClick={() => navigator.geolocation?.getCurrentPosition(position => selectLocation({ latitude: position.coords.latitude, longitude: position.coords.longitude }))}><LocateFixed size={16} /></button></div>
           <div className="assistant-map-top-overlay"><span><span className="assistant-live-indicator" />Point partagé</span><span>{coordinate(location.latitude, 'N', 'S')}</span><span>{coordinate(location.longitude, 'E', 'O')}</span></div>
-          <div className="assistant-map-layer-card"><div className="assistant-map-layer-title"><span><LayerIcon size={15} /></span><div><strong>{activeLayer.label}</strong><small>{layer === 'ndvi' || layer === 'truecolor' ? `GIBS · ${imageDateLabel}` : 'GIBS · SMAP récent'}</small></div><button type="button" aria-label="Fond de carte" onClick={() => setBaseLayer(value => value === 'nasa' ? 'streets' : 'nasa')}><ChevronDown size={15} /></button></div><div className="assistant-layer-choices">{layerOptions.map(item => { const Icon = item.icon; return <button key={item.id} type="button" className={layer === item.id ? 'is-active' : ''} onClick={() => setLayer(item.id)}><Icon size={13} />{item.short}</button> })}</div><button type="button" className="assistant-base-toggle" onClick={() => setBaseLayer(value => value === 'nasa' ? 'streets' : 'nasa')}>{baseLayer === 'nasa' ? 'Passer au plan de rues' : 'Passer au fond NASA'}</button><p><ShieldCheck size={12} /> Résolution satellite régionale · pas parcellaire</p></div>
+          <div className="assistant-map-layer-card"><div className="assistant-map-layer-title"><span><LayerIcon size={15} /></span><div><strong>{activeLayer.label}</strong><small>GIBS · {gibsDateLabel}{requestedDateNote}</small></div><button type="button" aria-label="Fond de carte" onClick={() => setBaseLayer(value => value === 'nasa' ? 'streets' : 'nasa')}><ChevronDown size={15} /></button></div><div className="assistant-layer-choices">{layerOptions.map(item => { const Icon = item.icon; return <button key={item.id} type="button" className={layer === item.id ? 'is-active' : ''} onClick={() => setLayer(item.id)}><Icon size={13} />{item.short}</button> })}</div><button type="button" className="assistant-base-toggle" onClick={() => setBaseLayer(value => value === 'nasa' ? 'streets' : 'nasa')}>{baseLayer === 'nasa' ? 'Passer au plan de rues' : 'Passer au fond NASA'}</button><p><ShieldCheck size={12} /> Résolution satellite régionale · pas parcellaire</p></div>
           <div className="assistant-map-legend"><span><i className={`legend-gradient legend-${layer}`} />Couche NASA active</span><small>Pixel satellite ≠ contour de parcelle</small></div>
           <div className="assistant-scale"><span />Échelle indiquée sur la carte</div>
         </div>

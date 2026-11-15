@@ -7,6 +7,7 @@ import { PowerClimateChart } from '../../components/charts/PowerClimateChart'
 import { useSelectedLocation, type GeoPoint } from '../../lib/geo/location'
 import { formatPowerMonth, latestCompleteRecord } from '../../lib/nasa/power'
 import { usePowerMonthly } from '../../lib/nasa/use-power-monthly'
+import { formatGibsDate, resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { SoilProfileEditor } from './SoilProfileEditor'
 import './terrain.css'
 
@@ -27,7 +28,10 @@ export function TerrainPage() {
   const [baseLayer, setBaseLayer] = useState<MapBaseLayer>('nasa')
   const [soilLayer, setSoilLayer] = useState<SoilLayer>('root')
   const imageryDate = daysAgo(11)
-  const imageDateLabel = new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${imageryDate}T12:00:00Z`))
+  const { availability: gibsAvailability, error: gibsDateError } = useGibsAvailability()
+  const modisDate = resolveGibsDate(imageryDate, gibsAvailability?.trueColor)
+  const soilProductDate = soilLayer === 'surface' ? gibsAvailability?.surfaceSoil.at(-1)?.end ?? null : gibsAvailability?.rootSoil.at(-1)?.end ?? null
+  const gibsDateLabel = (date: string | null) => date ? formatGibsDate(date) : gibsDateError ? 'date indisponible' : 'date en chargement'
   const [map, setMap] = useState<MapLibreMap | null>(null)
   const [locating, setLocating] = useState(false)
   const { series, loading, error, retry } = usePowerMonthly(location)
@@ -57,7 +61,7 @@ export function TerrainPage() {
         <div className="terrain-map-location"><MapPinned size={15} /><span>{coordinate(location.latitude, 'N', 'S')} · {coordinate(location.longitude, 'E', 'O')}</span><small>Point suivi</small></div>
         <div className="terrain-map-options">
           <div className="terrain-base-switch" role="group" aria-label="Fond de carte"><button type="button" className={baseLayer === 'streets' ? 'is-active' : ''} onClick={() => setBaseLayer('streets')}>Plan</button><button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}>Satellite</button></div>
-          <span className="terrain-latest-chip">MODIS · {imageDateLabel} · SMAP récent</span>
+          <span className="terrain-latest-chip">MODIS · {gibsDateLabel(modisDate)} · SMAP {soilLayer === 'surface' ? 'surface' : 'racines'} · {gibsDateLabel(soilProductDate)}</span>
         </div>
       </div>
       <div className="terrain-map-controls" role="group" aria-label="Contrôles de la carte"><button type="button" aria-label="Zoomer" onClick={() => map?.zoomIn({ duration: 250 })}><Plus size={16} /></button><button type="button" aria-label="Dézoomer" onClick={() => map?.zoomOut({ duration: 250 })}><Minus size={16} /></button><button type="button" aria-label="Utiliser ma position" onClick={locateMe} disabled={locating}><LocateFixed size={15} /></button></div>

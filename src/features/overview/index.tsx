@@ -131,7 +131,7 @@ export function OverviewPage() {
               <button type="button" className={baseLayer === 'nasa' ? 'is-active' : ''} onClick={() => setBaseLayer('nasa')}><Satellite size={13} />NASA</button>
               <button type="button" className={showNdvi ? 'is-active' : ''} onClick={() => setShowNdvi(value => !value)}><Activity size={13} />NDVI</button>
             </div>
-            <label className="overview-imagery-date">Date imagerie <input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label>
+            <label className="overview-imagery-date">Date souhaitée <input type="date" value={imageryDate} max={daysAgo(1)} onChange={event => setImageryDate(event.target.value)} /></label>
           </div>
         </div>
 

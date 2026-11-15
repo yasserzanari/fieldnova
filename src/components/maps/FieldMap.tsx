@@ -4,7 +4,7 @@ import type { FeatureCollection } from 'geojson'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoPoint } from '../../lib/geo/location'
 import type { PowerGridCell } from '../../lib/nasa/power'
-import { resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
+import { formatGibsDate, resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { useParcelBoundary } from '../../lib/geo/parcel-boundary'
 import './field-map.css'
 
@@ -34,11 +34,6 @@ function gibsTileUrl(layer: string, date: string, format: 'jpg' | 'png', matrixS
   return `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/${layer}/default/${date}/${matrixSet}/{z}/{y}/{x}.${format}`
 }
 
-function productDate(date: string | null, loading: boolean) {
-  if (!date) return loading ? 'récupération…' : 'date NASA indisponible'
-  return new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`))
-}
-
 export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfaceSoil = false, showRootSoil = false, powerGridCell, draftParcelPoints = [], drawingParcel = false, imageryDate, onPointSelect, onMapReady, className = '', ariaLabel = 'Carte interactive FieldNova' }: Props) {
   const { availability, error: availabilityError } = useGibsAvailability()
   const trueColorDate = resolveGibsDate(imageryDate, availability?.trueColor)
@@ -54,10 +49,10 @@ export function FieldMap({ center, selectedPoint, baseLayer, showNdvi, showSurfa
   const gridCellLabel = powerGridCell ? ` Maille météo NASA POWER indiquée par un contour vert discontinu, environ ${Math.round(powerGridCell.properties.widthKm)} par ${Math.round(powerGridCell.properties.heightKm)} km.` : ''
   const mapLabel = `${ariaLabel}.${parcelLabel}${draftParcelLabel}${gridCellLabel}`
   const legendItems = [
-    ...(baseLayer === 'nasa' ? [{ id: 'truecolor', label: `MODIS Terra · composition couleur · ${productDate(trueColorDate, dateLoading)}`, detail: trueColorDate && trueColorDate !== imageryDate ? `Date demandée : ${imageryDate}; date NASA la plus proche utilisée. ${dateStatus} Image composite, pas une mesure unique.` : dateStatus }] : []),
-    ...(showNdvi ? [{ id: 'ndvi', label: `NDVI MODIS Terra · composite 8 jours · ${productDate(ndviDate, dateLoading)}`, detail: ndviDate && ndviDate !== imageryDate ? `Date demandée : ${imageryDate}; date NASA la plus proche utilisée. ${dateStatus}` : dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/MODIS_NDVI_H.svg' }] : []),
-    ...(showSurfaceSoil ? [{ id: 'surface', label: `SMAP L4 · humidité de surface · ${productDate(surfaceSoilDate, dateLoading)} · ~9 km`, detail: dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
-    ...(showRootSoil ? [{ id: 'root', label: `SMAP L4 · humidité zone racinaire · ${productDate(rootSoilDate, dateLoading)} · ~9 km`, detail: dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
+    ...(baseLayer === 'nasa' ? [{ id: 'truecolor', label: `MODIS Terra · composition couleur · ${trueColorDate ? formatGibsDate(trueColorDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'}`, detail: trueColorDate && trueColorDate !== imageryDate ? `Date demandée : ${imageryDate}; date NASA la plus proche utilisée. ${dateStatus} Image composite, pas une mesure unique.` : dateStatus }] : []),
+    ...(showNdvi ? [{ id: 'ndvi', label: `NDVI MODIS Terra · composite 8 jours · ${ndviDate ? formatGibsDate(ndviDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'}`, detail: ndviDate && ndviDate !== imageryDate ? `Date demandée : ${imageryDate}; date NASA la plus proche utilisée. ${dateStatus}` : dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/MODIS_NDVI_H.svg' }] : []),
+    ...(showSurfaceSoil ? [{ id: 'surface', label: `SMAP L4 · humidité de surface · ${surfaceSoilDate ? formatGibsDate(surfaceSoilDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'} · ~9 km`, detail: dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
+    ...(showRootSoil ? [{ id: 'root', label: `SMAP L4 · humidité zone racinaire · ${rootSoilDate ? formatGibsDate(rootSoilDate) : dateLoading ? 'récupération…' : 'date NASA indisponible'} · ~9 km`, detail: dateStatus, legendUrl: 'https://gibs.earthdata.nasa.gov/legends/SMAP_Analyzed_Soil_Moisture_H.svg' }] : []),
     ...(powerGridCell ? [{ id: 'power', label: 'Maille NASA POWER', detail: `≈ ${Math.round(powerGridCell.properties.widthKm)} × ${Math.round(powerGridCell.properties.heightKm)} km · contour vert discontinu; pas une parcelle.` }] : []),
     ...(parcel ? [{ id: 'parcel', label: parcel.feature.properties?.name ?? 'Parcelle importée', detail: `Contour saisi/importé · ≈ ${parcel.areaHectares.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} ha.` }] : []),
     ...(baseLayer === 'streets' && !showNdvi && !showSurfaceSoil && !showRootSoil ? [{ id: 'osm', label: 'Fond de rues · OpenStreetMap', detail: '© OpenStreetMap contributors.' }] : []),
