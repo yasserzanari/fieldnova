@@ -148,14 +148,14 @@ export function ScenariosPage() {
     else next.set('view', nextMode)
     return next
   })
-  return <div className="scenario-hub">
+  return <div className={`scenario-hub ${mode === 'water' ? 'is-water-mode' : ''} ${mode === 'climate' ? 'is-climate-mode' : ''}`}>
     <div className="scenario-hub-toolbar" role="group" aria-label="Modes des scénarios">
       <span>Comparer</span>
       <button type="button" aria-pressed={mode === 'rotations'} className={mode === 'rotations' ? 'is-active' : ''} onClick={() => changeMode('rotations')}>Rotations culturales</button>
       <button type="button" aria-pressed={mode === 'climate'} className={mode === 'climate' ? 'is-active' : ''} onClick={() => changeMode('climate')}>Climat historique</button>
       <button type="button" aria-pressed={mode === 'water'} className={mode === 'water' ? 'is-active' : ''} onClick={() => changeMode('water')}>Hypothèses d’eau</button>
     </div>
-    <div className={`scenario-hub-content ${mode === 'water' ? 'is-water-mode' : ''}`}>{mode === 'rotations' ? <RotationExplorer /> : mode === 'climate' ? <ClimateScenariosPage /> : <WaterAvailabilityScenarios />}</div>
+    <div className={`scenario-hub-content ${mode === 'water' ? 'is-water-mode' : ''} ${mode === 'climate' ? 'is-climate-mode' : ''}`}>{mode === 'rotations' ? <RotationExplorer /> : mode === 'climate' ? <ClimateScenariosPage /> : <WaterAvailabilityScenarios />}</div>
   </div>
 }
 
@@ -172,6 +172,7 @@ function ClimateScenariosPage() {
   const [priority, setPriority] = useState<Priority>('water')
   const [range, setRange] = useState(12)
   const [locating, setLocating] = useState(false)
+  const [mobileView, setMobileView] = useState<'map' | 'periods' | 'measures' | 'chart'>('map')
 
   const observedYears = useMemo(() => completeObservedYears(series?.records ?? []), [series])
   const activeYear = observedYears.includes(selectedYear) ? selectedYear : observedYears[0] ?? ''
@@ -197,8 +198,12 @@ function ClimateScenariosPage() {
     }, () => setLocating(false), { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 })
   }
 
-  return <section className="scenarios-page" aria-label="Comparaison historique des conditions NASA">
+  return <section className={`scenarios-page mobile-view-${mobileView}`} aria-label="Comparaison historique des conditions NASA">
     <header className="scenarios-heading"><div><h1>Scénarios climatiques</h1><p>Comparez des périodes réellement observées par NASA POWER au point sélectionné.</p></div><span className="scenario-data-badge"><i />Historique NASA · sans prévision</span></header>
+
+    <nav className="scenario-mobile-tabs" role="group" aria-label="Panneau des scénarios climatiques">
+      {([['map', 'Carte'], ['periods', 'Périodes'], ['measures', 'Mesures'], ['chart', 'Graphique']] as const).map(([view, label]) => <button key={view} type="button" aria-pressed={mobileView === view} className={mobileView === view ? 'is-active' : ''} onClick={() => setMobileView(view)}>{label}</button>)}
+    </nav>
 
     <div className="scenario-map-stage">
       <FieldMap center={location} selectedPoint={location} baseLayer={baseLayer} showNdvi={showNdvi} powerGridCell={series?.point.latitude === location.latitude && series.point.longitude === location.longitude ? series.gridCell : null} imageryDate={imageryDate} onPointSelect={selectPoint} onMapReady={setMap} ariaLabel="Carte interactive satellite NASA et point de sélection des scénarios" />
