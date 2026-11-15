@@ -52,7 +52,7 @@ export function PublicLanding() {
         wordFoot="#315a3b"
         columns={[
           { title: 'Plateforme', links: [{ label: 'Fonctionnalités', href: '#fonctionnalites' }, { label: 'Modules', href: '#modules' }, { label: 'Notre approche', href: '#chiffres' }] },
-          { title: 'Accès', links: [{ label: 'Se connecter', href: '/login' }] },
+          { title: 'Accès', links: [{ label: 'Se connecter', href: '/login' }, { label: 'Méthode & données', href: '/methode' }, { label: 'Code source MIT', href: 'https://github.com/yasserzanari/fieldnova' }] },
         ]}
       />
     </main>
