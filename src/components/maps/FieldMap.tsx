@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { Map as MapLibreMap, RasterTileSource, ScaleControl, type GeoJSONSource, type MapMouseEvent } from 'maplibre-gl'
+import { Map as MapLibreMap, RasterTileSource, ScaleControl, setWorkerUrl, type GeoJSONSource, type MapMouseEvent } from 'maplibre-gl'
+import mapLibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url'
 import type { FeatureCollection } from 'geojson'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { GeoPoint } from '../../lib/geo/location'
@@ -7,6 +8,8 @@ import type { PowerGridCell } from '../../lib/nasa/power'
 import { formatGibsDate, resolveGibsDate, useGibsAvailability } from '../../lib/nasa/gibs-availability'
 import { useParcelBoundary } from '../../lib/geo/parcel-boundary'
 import './field-map.css'
+
+setWorkerUrl(mapLibreWorkerUrl)
 
 export type MapBaseLayer = 'streets' | 'nasa'
 
